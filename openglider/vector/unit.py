@@ -111,7 +111,7 @@ class Quantity(pydantic.BaseModel):
         return f"{value.__format__(spec)}{unit}"
     
     def __hash__(self) -> int:
-        return hash(self.value)
+        return hash((self.value, self.unit, self.__class__.__name__))
     
     def __apply_operator(self, other: Any, operator: Callable[[float, float], float]) -> Self:
         new_value: float | None = None
