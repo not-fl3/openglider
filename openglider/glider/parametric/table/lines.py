@@ -57,7 +57,10 @@ class LineSetTable(BaseModel):
                     if not isinstance(lower_node_name, str):
                         lower_node_name = str(int(lower_node_name))
 
-                    attachment_point = self.lower_attachment_points[lower_node_name]
+                    try:
+                        attachment_point = self.lower_attachment_points[lower_node_name]
+                    except KeyError:
+                        raise ValueError(f"Lower node {lower_node_name} not found in lower_attachment_points (available points: {list(self.lower_attachment_points.keys())})")
                     current_nodes = [attachment_point]
                     column += 1
 
