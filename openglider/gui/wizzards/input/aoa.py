@@ -125,9 +125,13 @@ class AOAInput(Canvas):
         controlpoints = euklid.vector.PolyLine2D([[p[0]*span, p[1] * math.pi / 180] for p in curve.controlpoints])
         self.project.glider.aoa.controlpoints = controlpoints
         #self.project.glider.rescale_curves()
+        self.redraw()
+
+    def redraw(self) -> None:
         self.project.glider.apply_aoa(self.project.get_glider_3d())
 
         self.update()
+
 
 
 class AOAWizard(GliderSelectionWizard):
