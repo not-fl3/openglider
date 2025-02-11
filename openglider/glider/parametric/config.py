@@ -1,5 +1,5 @@
 import re
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar, Self, Annotated
 
 from packaging.version import Version
 import euklid
@@ -100,6 +100,14 @@ class SewingAllowanceConfig(ConfigTable):
     entry: Length = Length("10mm")
     folded: Length = Length("10mm")
 
+def validate_version(version: Version | str) -> Version:
+    if isinstance(version, str):
+        return Version(version)
+
+    return version
+
+VersionType = Annotated[Version, pydantic.BeforeValidator(validate_version)]
+
 class ParametricGliderConfig(ConfigTable):
     table_name = "Data"
 
@@ -125,7 +133,7 @@ class ParametricGliderConfig(ConfigTable):
     use_sag: bool = True
     baseline_pct: Percentage = Percentage(0.)
 
-    version: Version = Version(__version__)
+    version: VersionType = Version(__version__)
 
     @classmethod
     def __from_json__(cls, **data: Any) -> Self:
@@ -133,6 +141,11 @@ class ParametricGliderConfig(ConfigTable):
             data[name] = euklid.vector.Vector3D(data[name])
         
         return cls(**data)
+    
+    def __json__(self) -> dict[str, Any]:
+        data = super().__json__()
+        data["version"] = str(self.version)
+        return data
 
     def get_lower_attachment_points(self) -> dict[str, Node]:
         points = {
