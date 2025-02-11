@@ -91,6 +91,9 @@ class KnotCorrections:
         )
     
     def get(self, lower_type: LineType, upper_type: LineType, upper_num: int) -> list[float]:
+        if lower_type.thickness == 0:
+            return [0] * upper_num
+
         key = self._knot_key(lower_type, upper_type, upper_num)
 
         if key not in self.knots_dict:
