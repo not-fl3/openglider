@@ -80,7 +80,7 @@ class SingleSkinRib(Rib):
 
     def __json__(self) -> dict[str, typing.Any]:
         json_dict = super().__json__()  # type: ignore
-        json_dict["single_skin_paarameters"] = self.single_skin_parameters
+        json_dict["single_skin_parameters"] = self.single_skin_parameters
         return json_dict
 
     @cached_function("self", exclude=["attachment_points"], generator=lambda rib: [p.rib_pos for p in rib.attachment_points])
