@@ -171,13 +171,13 @@ class ParametricShape:
             return base_shape
         
         baseline = base_shape.get_baseline(self.config.baseline_pct).nodes
-        front_new = []
-        back_new = []
+        front_new: list[euklid.vector.Vector2D] = []
+        back_new: list[euklid.vector.Vector2D] = []
 
         for rib_no, angle in enumerate(zrot):
             if angle is None:
-                front_new.append(front[rib_no])
-                back_new.append(back[rib_no])
+                front_new.append(euklid.vector.Vector2D(front[rib_no]))
+                back_new.append(euklid.vector.Vector2D(back[rib_no]))
             else:
                 rotation = euklid.vector.Rotation2D(angle.si)
                 front_new.append(

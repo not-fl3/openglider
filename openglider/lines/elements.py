@@ -71,7 +71,11 @@ class SagMatrix():
             line.length_projected ** 2 / line.force_projected / 2
 
     def solve_system(self) -> None:
-        self.solution = np.linalg.solve(self.matrix, self.rhs)
+        result: np.ndarray = np.linalg.solve(
+            self.matrix,
+            self.rhs
+            )
+        self.solution = result
 
     def get_sag_parameters(self, line: Line) -> tuple[float, float]:
         line_nr = self.line_index(line)

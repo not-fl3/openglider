@@ -1,4 +1,3 @@
-from typing import Any
 from openglider.glider.parametric.table.base.dto import DTO
 from openglider.glider.rib import MiniRib
 
@@ -9,7 +8,7 @@ class MiniRibDTO(DTO):
     y_value: Percentage
     front_cut: Percentage
     back_cut: Percentage
-    trailing_edge_cut: Length | Percentage
+    trailing_edge_cut: Length
     material_code: str
 
     def get_object(self) -> MiniRib:

@@ -9,6 +9,7 @@ from collections.abc import Callable
 import euklid
 from openglider.glider.parametric.config import ParametricGliderConfig, SewingAllowanceConfig
 from openglider.glider.parametric.table.base.parser import Parser
+from openglider.glider.parametric.table.cell.ballooning import BallooningData
 import openglider.materials
 import pyfoil
 from openglider.glider.ballooning.base import BallooningBase
@@ -101,7 +102,7 @@ class ParametricGlider:
         """
         return self.arc.get_rib_angles(self.shape.rib_x_values)
 
-    def merge_ballooning(self, factor: float, multiplier: float) -> BallooningBase:
+    def merge_ballooning(self, factor: float, multiplier: float | None) -> BallooningBase:
         factor = max(0, min(len(self.balloonings)-1, factor))
         k = factor % 1
         i = int(factor // 1)
@@ -112,7 +113,10 @@ class ParametricGlider:
         else:
             result = first
         
-        return result * multiplier
+        if multiplier is not None:
+            result *= multiplier
+
+        return result
 
     def get_merge_profile(self, factor: float) -> pyfoil.Airfoil:
         factor = max(0, min(len(self.profiles)-1, factor))
@@ -240,18 +244,19 @@ class ParametricGlider:
         profile_merge_curve = euklid.vector.Interpolation(self.profile_merge_curve.get_sequence(self.num_interpolate).nodes)
         return [profile_merge_curve.get_value(abs(x)) for x in self.shape.rib_x_values]
 
-    def get_ballooning_merge(self) -> list[tuple[float, float]]:
+    def get_ballooning_data(self) -> list[BallooningData]:
         ballooning_merge_curve = euklid.vector.Interpolation(self.ballooning_merge_curve.get_sequence(self.num_interpolate).nodes)
-        factors = [ballooning_merge_curve.get_value(abs(x)) for x in self.shape.cell_x_values]
+        merge_factors = [ballooning_merge_curve.get_value(abs(x)) for x in self.shape.cell_x_values]
 
-        table = self.tables.ballooning_modifiers
+        result = []
 
-        if table is not None:
-            all_factors = table.get_merge_factors(factors)
-        else:
-            all_factors = [(factor, 1) for factor in factors]
-
-        return [(max(0, x), y) for x,y in all_factors]
+        for rib_no, merge_factor in enumerate(merge_factors):
+            modifier = self.tables.ballooning_modifiers.get_ballooning_data(rib_no, self.resolvers)
+            if modifier.merge_factor is None:
+                modifier.merge_factor = merge_factor
+            result.append(modifier)
+        
+        return result
 
     def apply_shape_and_arc(self, glider: Glider) -> None:
         x_values = [abs(x) for x in self.shape.rib_x_values]
@@ -455,17 +460,19 @@ class ParametricGlider:
 
         logger.info("create cells")
 
-        ballooning_factors = self.get_ballooning_merge()
+        ballooning_data = self.get_ballooning_data()
         glider.cells = []
         for cell_no, (rib1, rib2) in enumerate(zip(ribs[:-1], ribs[1:])):
 
-            ballooning_factor = ballooning_factors[cell_no]
-            ballooning = self.merge_ballooning(*ballooning_factor)
+            ballooning_factor = ballooning_data[cell_no]
+            assert ballooning_factor.merge_factor is not None
+            ballooning = self.merge_ballooning(ballooning_factor.merge_factor, ballooning_factor.ballooning_factor)
             
             cell = Cell(
                 rib1=rib1,
                 rib2=rib2,
                 ballooning=ballooning,
+                ballooning_reference=ballooning_factor.ballooning_reference,
                 name=f"c{cell_no+1}",
                 attachment_points=[],
                 ballooning_modifiers=self.tables.ballooning_modifiers.get_modifiers(cell_no, resolvers=resolvers)
@@ -517,15 +524,16 @@ class ParametricGlider:
         for ballooning in self.balloonings:
             ballooning.apply_splines()
 
-        ballooning_factors = self.get_ballooning_merge()
+        ballooning_factors = self.get_ballooning_data()
         balloonings = []
 
-        for cell_no in range(len(ballooning_factors)):
-            ballooning_factor = ballooning_factors[cell_no]
-            ballooning = self.merge_ballooning(*ballooning_factor)
+        for cell_no, ballooning_factor in enumerate(ballooning_factors):
+            assert ballooning_factor.merge_factor is not None
+            ballooning = self.merge_ballooning(ballooning_factor.merge_factor, ballooning_factor.ballooning_factor)
             if glider3d is not None:
                 cell = glider3d.cells[cell_no]
                 cell.ballooning = ballooning
+                cell.ballooning_reference = ballooning_factor.ballooning_reference
             
             balloonings.append(ballooning)
 

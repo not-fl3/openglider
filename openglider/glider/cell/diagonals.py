@@ -168,8 +168,8 @@ class DiagonalRib(BaseModel):
                 p2_1 = left_2d.nodes[-1]
                 p2_2 = right_2d.get(ik2)
                 
-            cp1 = p1_1 + (p1_2-p1_1) * self.curve_factor
-            cp2 = p2_1 + (p2_2 - p2_1) * self.curve_factor
+            cp1 = p1_1 + (p1_2-p1_1) * self.curve_factor.si
+            cp2 = p2_1 + (p2_2 - p2_1) * self.curve_factor.si
 
             return cp1, cp2
         
@@ -370,8 +370,8 @@ class TensionStrap(DiagonalRib):
             normal_2 = rotation.apply(right_2-left_2).normalized() * normal_size
 
             return (
-                left_1 + (right_1 - left_1) * 0.5 + normal_1 * self.curve_factor,
-                left_2 + (right_2 - left_2) * 0.5 - normal_2 * self.curve_factor,
+                left_1 + (right_1 - left_1) * 0.5 + normal_1 * self.curve_factor.si,
+                left_2 + (right_2 - left_2) * 0.5 - normal_2 * self.curve_factor.si,
             )
         
         return None

@@ -1,5 +1,7 @@
 import logging
+from typing import Literal, Self
 
+from openglider.glider.cell.cell import Cell
 from openglider.glider.parametric.table.base import CellTable, Keyword
 from openglider.glider.parametric.table.base.dto import DTO
 from openglider.glider.parametric.table.base.parser import Parser
@@ -17,6 +19,14 @@ class BallooningRampDTO(DTO):
 
     def get_object(self) -> EntryRamp:
         return EntryRamp(ramp_distance=self.ramp_distance)
+    
+class BallooningData(DTO):
+    ballooning_reference: Literal["local", "cell"]
+    merge_factor: float | None
+    ballooning_factor: float | None
+
+    def get_object(self)-> Self:
+        return self
 
 
 class BallooningModifierTable(CellTable):
@@ -26,7 +36,25 @@ class BallooningModifierTable(CellTable):
     }
     dtos = {
         "BallooningRamp": BallooningRampDTO,
+        "BallooningModifier": BallooningData
     }
+
+    def get_ballooning_data(self, row: int, resolvers: list[Parser]) -> BallooningData:
+        value: BallooningData | None = self.get_one(row_no=row, keywords=["BallooningModifier"], resolvers=resolvers)
+        if value is None:
+            value = BallooningData(ballooning_reference="local", merge_factor=None, ballooning_factor=None)
+        
+        if value.merge_factor is None:
+            merge_factors = self.get(row_no=row, keywords=["BallooningMerge"], resolvers=resolvers)
+            if merge_factors:
+                value.merge_factor = merge_factors[-1]["merge_factor"]
+        
+        if value.ballooning_factor is None:
+            ballooning_factors = self.get(row_no=row, keywords=["BallooningFactor"], resolvers=resolvers)
+            if ballooning_factors:
+                value.ballooning_factor = ballooning_factors[-1]["amount_factor"]
+
+        return value
 
     def get_merge_factors(self, factor_list: list[float]) -> list[tuple[float, float]]:
 

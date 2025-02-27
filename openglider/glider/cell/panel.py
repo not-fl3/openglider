@@ -34,7 +34,7 @@ class PanelCut(BaseModel):
     x_right: Percentage
     cut_type: PANELCUT_TYPES
     seam_allowance: Length = Field(default_factory=lambda: Length(0))
-    cut_3d_amount: list[float] = Field(default_factory=lambda: [0, 0])
+    cut_3d_amount: list[float] = Field(default_factory=lambda: [0., 0.])
     cut_3d_sigma: float = 0.077
     x_center: Percentage | None = None
 

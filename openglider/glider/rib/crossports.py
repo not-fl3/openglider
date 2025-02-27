@@ -116,7 +116,7 @@ class RibHole(RibHoleBase):
         return [self._get_points(rib)[0]]
 
 
-def polygon(points: list[euklid.vector.Vector2D], corner_size: float, num_points) -> euklid.vector.PolyLine2D:
+def polygon(points: list[euklid.vector.Vector2D], corner_size: float, num_points: int) -> euklid.vector.PolyLine2D:
     segments = []
 
     def get_point(index: int) -> euklid.vector.Vector2D:

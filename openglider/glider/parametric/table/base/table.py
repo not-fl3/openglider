@@ -151,7 +151,7 @@ class ElementTable(Generic[ElementType]):
                 )
                 index = index + 1 + max(tuple_type.index_offset)
             else:
-                if field.annotation == str:
+                if field.annotation is str or typing.get_origin(field.annotation) == typing.Literal:
                     dct[field_name] = data[index]
                 else:
                     dct[field_name] = resolvers[row].parse(data[index])

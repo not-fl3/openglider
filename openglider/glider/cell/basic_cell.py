@@ -21,16 +21,16 @@ class BasicCell(BaseModel):
         return self.midrib(y).get(ik)
 
     def midrib(self, y_value: float, ballooning: bool=True, arc_argument: bool=True, close_trailing_edge: bool=False) -> Profile3D:
-        if y_value <= 0:              # left side
+        # return early for left and right side
+        if y_value <= 0:
             return self.prof1
-        elif y_value >= 1:            # right side
+        elif y_value >= 1:
             return self.prof2
-        else:                   # somewhere else
-
-            # Ballooning is considered to be arcs, following 2 (two!) simple rules:
-            # 1: x1 = x*d
-            # 2: x2 = R*normvekt*(cos(phi2)-cos(phi)
-            # 3: norm(d)/r*(1-x) = 2*sin(phi(2))
+        else:
+            # Ballooning is considered to be arcs, these simple rules:
+            # 1: x = y_value * diff_vector
+            # 2: y = ballooning_radius * normal * (cos(phi2)-cos(phi))
+            # 3: 2 * sin(phi2) * ballooning_radius = norm(diff_vector)
 
             x_values: list[float] = []
             distances = []
@@ -41,7 +41,6 @@ class BasicCell(BaseModel):
 
             if not ballooning:
                 midrib = self.prof1.curve.add(diff * y_value)
-            
             else:
                 for i in range(len(self.prof1.curve.nodes)):  # Arc -> phi(bal) -> r  # oder so...
                     x_left = self.prof1.x_values[i]
@@ -53,7 +52,7 @@ class BasicCell(BaseModel):
                         d = y_value
                         h = 0.
 
-                    elif ballooning_radius > 1e-10:
+                    elif ballooning_radius is not None:
                         phi = self.ballooning_phi[i]    # phi is half only the half
                         
                         if arc_argument:
@@ -92,15 +91,15 @@ class BasicCell(BaseModel):
         return euklid.vector.PolyLine3D(normals)
 
     @cached_property('ballooning_phi', 'prof1', 'prof2')
-    def ballooning_radius(self) -> list[float]:
+    def ballooning_radius(self) -> list[float | None]:
         prof1 = self.prof1.curve.nodes
         prof2 = self.prof2.curve.nodes
 
-        radius: list[float] = []
+        radius: list[float | None] = []
 
         for p1, p2, phi in zip(prof1, prof2, self.ballooning_phi):
             if phi < 1e-10:
-                radius.append(0.)
+                radius.append(None)
             else:
                 r = (p1-p2).length() / (2 * math.sin(phi) + (phi==0))
                 radius.append(r)

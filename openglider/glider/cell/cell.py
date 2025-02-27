@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Sequence
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 import euklid
 import openglider.utils
@@ -43,23 +43,19 @@ class FlattenedCell(BaseModel):
 class Cell(BaseModel):
     rib1: Rib
     rib2: Rib
+
     ballooning: BallooningBase
-    attachment_points: list[CellAttachmentPoint] = Field(default_factory=list)
-    miniribs: list[MiniRib] = Field(default_factory=list)
+    ballooning_modifiers: list[BallooningModifier] = Field(default_factory=list)
+    ballooning_reference: Literal["local", "cell"] = "local"
+
     panels: list[Panel] = Field(default_factory=list)
     diagonals: list[DiagonalRib] = Field(default_factory=list)
     straps: list[TensionStrap] = Field(default_factory=list)
     rigidfoils: list[PanelRigidFoil] = Field(default_factory=list)
+    attachment_points: list[CellAttachmentPoint] = Field(default_factory=list)
+    miniribs: list[MiniRib] = Field(default_factory=list)
+
     name: str = "unnamed"
-
-    ballooning_modifiers: list[BallooningModifier] = Field(default_factory=list)
-
-    diagonal_naming_scheme: ClassVar[str] = "{cell.name}d{diagonal_no}"
-    strap_naming_scheme: ClassVar[str] = "{cell.name}s{side}{diagonal_no}"
-    panel_naming_scheme: ClassVar[str] = "{cell.name}p{panel_no}"
-    panel_naming_scheme_upper: ClassVar[str] = "{cell.name}pu{panel_no}"
-    panel_naming_scheme_lower: ClassVar[str] = "{cell.name}pl{panel_no}"
-    minirib_naming_scheme: ClassVar[str] = "{cell.name}mr{minirib_no}"
     
     def __hash__(self) -> int:
         return hash_list(self.rib1, self.rib2, *self.miniribs, *self.diagonals)
@@ -74,18 +70,18 @@ class Cell(BaseModel):
             lower.sort(key=sort_func)
 
             for panel_no, panel in enumerate(upper):
-                panel.name = self.panel_naming_scheme_upper.format(cell=self, panel_no=panel_no+1)
+                panel.name = f"{cell_no}pu{panel_no+1}"
             for panel_no, panel in enumerate(lower):
-                panel.name = self.panel_naming_scheme_lower.format(cell=self, panel_no=panel_no+1)
+                panel.name = f"{cell_no}pl{panel_no+1}"
 
         else:
             self.panels.sort(key=lambda panel: panel.mean_x())
             for panel_no, panel in enumerate(self.panels):
-                panel.name = self.panel_naming_scheme.format(cell=self, panel=panel, panel_no=panel_no+1)
+                panel.name = f"{cell_no}p{panel_no+1}"
     
     def rename_diagonals(self, diagonals: Sequence[DiagonalRib | TensionStrap], cell_no: int, naming_scheme: str) -> None:
-        upper = []
-        lower = []
+        upper: list[DiagonalRib | TensionStrap] = []
+        lower: list[DiagonalRib | TensionStrap] = []
 
         for diagonal in diagonals:
             if diagonal.get_average_x() > 0:
@@ -105,13 +101,23 @@ class Cell(BaseModel):
 
 
     def rename_parts(self, cell_no: int, seperate_upper_lower: bool=False) -> None:
-        self.rename_diagonals(self.diagonals, cell_no, self.diagonal_naming_scheme)
-        self.rename_diagonals(self.straps, cell_no, self.strap_naming_scheme)
+        self.rename_diagonals(self.diagonals, cell_no, "{cell.name}d{diagonal_no}")
+        self.rename_diagonals(self.straps, cell_no, "{cell.name}s{side}{diagonal_no}")
 
         for minirib_no, minirib in enumerate(self.miniribs):
-            minirib.name = self.minirib_naming_scheme.format(cell=self, minirib=minirib, minirib_no=minirib_no+1)
+            minirib.name = f"{self.name}mr{minirib_no+1}"
 
         self.rename_panels(cell_no, seperate_upper_lower=seperate_upper_lower)
+
+    @cached_property('prof1', 'prof2')
+    def width(self) -> float:
+        # get the distance between the two profiles
+        # project the base point of prof2 on the line of prof1
+
+        diff = self.rib2.pos - self.rib1.pos
+        rib1_chord_line = self.rib1.rotation_matrix.apply(euklid.vector.Vector2D([1, 0]))
+
+        return diff.cross(rib1_chord_line).length()
 
     @cached_property('rib1', 'rib2', 'ballooning_phi')
     def basic_cell(self) -> BasicCell:
@@ -300,10 +306,19 @@ class Cell(BaseModel):
         return ballooning
 
     @cached_property('ballooning_modified')
-    def ballooning_phi(self) -> HashedList:
+    def ballooning_phi(self) -> HashedList[float]:
+        # get ballooning arc angles for each x value of the profiles
+
         x_values = [max(-1, min(1, x)) for x in self.rib1.profile_2d.x_values]
-        balloon = [self.ballooning_modified[i] for i in x_values]
-        return HashedList([BallooningBase.arcsinc(1. / (1+bal)) if bal > 0 else 0 for bal in balloon])
+        balloon = [max(0., self.ballooning_modified[i]) for i in x_values]
+
+        if self.ballooning_reference == "cell":
+            lengths = [(p1 - p2).length() for p1, p2 in zip(self.rib1.profile_3d.curve.nodes, self.rib2.profile_3d.curve.nodes)]
+            width = self.width
+            sinc = [length / (length + width * bal) for length, bal in zip(lengths, balloon)]
+        else:
+            sinc = [1. / (1+bal) for bal in balloon]
+        return HashedList([BallooningBase.arcsinc(x) if x < 1. else 0. for x in sinc])
     
     @cached_property('ballooning', '_child_cells')
     def ballooning_tension_factors(self) -> list[float]:
