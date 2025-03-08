@@ -93,7 +93,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         
 
-        self.menus = {}
+        self.menus: dict[str, QtWidgets.QMenu] = {}
         self.add_menu()
 
 
@@ -130,7 +130,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setAcceptDrops(True)
         self.current_glider_changed()
 
-    def add_menu(self):
+    def add_menu(self) -> None:
         menubar: QtWidgets.QMenuBar = self.menuBar()
         self.menus = {
             "file": menubar.addMenu("&File")
@@ -140,7 +140,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for menu_name in self.menu_actions:
             self.menus[menu_name] = menubar.addMenu(f"&{menu_name}")
 
-        self.menus["debug"] = menubar.addMenu(f"&Debug")
+        self.menus["debug"] = menubar.addMenu("&Debug")
         reload_action = QAction(qtawesome.icon("fa.minus"), "Reload", self)
         reload_action.triggered.connect(self.app.reload_code)
         self.menus["debug"].addAction(reload_action)
@@ -178,7 +178,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.menus["view"].addAction(diff_gliders)
 
-    def diff(self):
+    def diff(self) -> None:
         active_gliders = self.state.projects.get_active()
         if len(active_gliders) != 2:
             raise ValueError("Need ti have two gliders selected")

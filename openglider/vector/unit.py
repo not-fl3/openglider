@@ -73,7 +73,7 @@ class Quantity(pydantic.BaseModel):
         return dct
     
     @classmethod
-    def get_all_unit_variants(cls) -> tuple[str]:
+    def get_all_unit_variants(cls) -> tuple[str,...]:
         variants = tuple(cls.unit_variants.keys())
         if cls.unit:
             variants += (cls.unit, )
@@ -142,7 +142,7 @@ class Quantity(pydantic.BaseModel):
         elif isinstance(other, (float, int)):
             return operator(self.value, other)
         else:
-            raise ValueError(f"")
+            raise ValueError("")
         
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, self.__class__):

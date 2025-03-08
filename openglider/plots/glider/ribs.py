@@ -462,8 +462,8 @@ class RibPlot:
                     diff = p2 - p1
                     normal = euklid.vector.Vector2D([diff[1], -diff[0]]).normalized()
 
-                    outline_lst.append(p1 + normal * allowance_diff)
-                    outline_lst.append(p2 + normal * allowance_diff)
+                    outline_lst.append(p1 + normal * allowance_diff.si)
+                    outline_lst.append(p2 + normal * allowance_diff.si)
 
                 outline_lst += line2
                 outline_lst += trailing_edge

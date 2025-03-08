@@ -25,6 +25,9 @@ class StrapsTableCache(GliderCache[Table]):
         row = 1
         column = 0
 
+        if project is None:
+            raise ValueError()
+
         for cell in project.get_glider_3d().cells:
             for strap in sorted(cell.straps, key=lambda strap: abs(strap.get_average_x())):
                 table[row, column] = strap.name

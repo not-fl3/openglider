@@ -124,7 +124,7 @@ class CellView(vtkmodules.vtkRenderingCore.vtkActor):
             line = vtkmodules.vtkCommonDataModel.vtkPolyLine()
             line.GetPointIds().SetNumberOfIds(len(rib))
             for i, p in enumerate(rib.curve.nodes):
-                p_id = self.nodes.InsertNextPoint(p)
+                p_id = self.nodes.InsertNextPoint(*p)
                 line.GetPointIds().SetId(i, p_id)
                 ribs_ids_this.append(p_id)
 

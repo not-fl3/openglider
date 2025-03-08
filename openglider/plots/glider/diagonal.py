@@ -89,13 +89,13 @@ class DribPlot:
         if not outer:
             side_obj = self.drib.side1
             rib = self.cell.rib1
-            inner = self.inner_1
-            outer = self.outer_1
+            inner_line = self.inner_1
+            outer_line = self.outer_1
         else:
             side_obj = self.drib.side2
             rib = self.cell.rib2
-            inner = self.inner_2
-            outer = self.outer_2
+            inner_line = self.inner_2
+            outer_line = self.outer_2
 
         x_range = [
             side_obj.start_x(rib),
@@ -119,8 +119,8 @@ class DribPlot:
         ik_2 = foil(x2)
         length = foil.curve.get(ik_1, ik_2).get_length() * rib.chord
 
-        ik_new = inner.walk(0, length)
-        return inner.get(ik_new), outer.get(ik_new)
+        ik_new = inner_line.walk(0, length)
+        return inner_line.get(ik_new), outer_line.get(ik_new)
     
     def _insert_center_marks(self, plotpart: PlotPart) -> None:
         def insert_center_mark(inner: euklid.vector.PolyLine2D, outer: euklid.vector.PolyLine2D) -> None:
@@ -188,7 +188,7 @@ class DribPlot:
         font_size = Length("6mm")
         front_length = front.get_length()
 
-        def add_text(x: float, text: str):
+        def add_text(x: float, text: str) -> None:
             text_width = font_size.si * len(text)
             if not self.drib.is_lower:
                 x = 1.-x

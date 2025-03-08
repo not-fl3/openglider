@@ -831,6 +831,8 @@ class LineSet:
             table[i+2, 8] = round(line_length.manual_correction * 1000)
             table[i+2, 9] = round(line_length.get_cutting_length() * 1000)
             if line_load:
+                if line.force is None or line.line_type.min_break_load is None:
+                    raise ValueError()
                 table[i+2, 10] = round(line.force)
                 table[i+2, 11] = round(line.line_type.min_break_load)
                 table[i+2, 12] = f"{100*line.force/line.line_type.min_break_load:.1f}%"

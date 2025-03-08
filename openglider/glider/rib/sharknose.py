@@ -4,16 +4,14 @@ import typing
 import euklid
 
 import openglider.airfoil
-from openglider.utils.dataclass import dataclass
+from openglider.utils.dataclass import BaseModel
 from openglider.glider.rib.rigidfoils import RigidFoilBase, RigidFoilCurved
 from openglider.vector.unit import Length, Percentage
 
 if typing.TYPE_CHECKING:
     from openglider.glider.rib.rib import Rib
 
-
-@dataclass
-class Sharknose:
+class Sharknose(BaseModel):
     position: Percentage
     amount: Percentage
     
@@ -39,8 +37,10 @@ class Sharknose:
         point_position = rib.profile_2d.curve.get(ik_position)
         point_end = rib.profile_2d.curve.get(ik_end)
 
+        # calculate new position point
         point_position[1] = point_position[1] + (point_start[1]-point_position[1])*self.amount.si
 
+        # get tangents to create a tangential bspline on each side
         tangents = euklid.vector.PolyLine2D(rib.profile_2d.curve.get_tangents())
         def get_tangent(ik: float, from_point: euklid.vector.Vector2D, to_point: euklid.vector.Vector2D, amount: Percentage) -> euklid.vector.Vector2D:
             #ik -= 0.5
@@ -69,6 +69,7 @@ class Sharknose:
             point_end
         ]).get_sequence(50)
 
+        # evaluate at pre-defined x-values
         interpolation_1 = euklid.vector.Interpolation(curve_1.nodes)
         interpolation_2 = euklid.vector.Interpolation(curve_2.nodes)
         

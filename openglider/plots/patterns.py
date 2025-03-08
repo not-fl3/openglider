@@ -222,7 +222,7 @@ class Patterns(PatternsNew):
                     strap.name = f"{prefix}{cell_no+1}{get_name(strap_side, rib)}"
 
             rename_straps(filter(lambda strap: strap.is_lower, cell.straps), "B")
-            layers_between: dict[str, int] = {}
+            layers_between = {}
             rename_straps(filter(lambda strap: not strap.is_lower, cell.straps), "T")
-            layers_between: dict[str, int] = {}
+            layers_between = {}
             rename_straps(cell.diagonals[:], "D")

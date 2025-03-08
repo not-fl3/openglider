@@ -171,7 +171,7 @@ class PlotMaker:
 
         return self.dribs
 
-    def get_straps(self) -> collections.OrderedDict[tuple[list[PlotPart], list[PlotPart]]]:
+    def get_straps(self) -> collections.OrderedDict[Cell, tuple[list[PlotPart], list[PlotPart]]]:
         self.straps.clear()
         weight = MaterialUsage()
 
