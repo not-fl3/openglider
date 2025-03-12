@@ -88,51 +88,46 @@ class Sharknose(BaseModel):
         
         return openglider.airfoil.Profile2D(data)
 
-    def update_rigidfoils(self, rib: Rib) -> list[RigidFoilBase]:
-        result: list[RigidFoilBase] = []
+    def update_rigidfoil(self, rib: Rib, rigidfoil: RigidFoilBase) -> tuple[RigidFoilCurved, RigidFoilCurved] | None:
+        if rigidfoil.start < self.position and rigidfoil.end > self.position:
+            nearest_position = round(rib.profile_2d.get_ik(self.position))
+            position = Percentage(rib.profile_2d.curve.get(nearest_position)[0])
 
-        nearest_position = round(rib.profile_2d.get_ik(self.position))
-        position = Percentage(rib.profile_2d.curve.get(nearest_position)[0])
+            # split rigidfoil
+            rigid_1 = RigidFoilCurved(
+                start=rigidfoil.start,
+                end=position,
+                distance=rigidfoil.distance,
+                cap_length=rigidfoil.cap_length,
+                tension=rigidfoil.tension,
+                inner_allowance=rigidfoil.inner_allowance
+            )
+            if straight_part := getattr(rigidfoil, "straight_part", None):
+                rigid_1.straight_part = straight_part
+                
+            radius, amount =  rigidfoil.get_cap_radius(start=True)
+            rigid_1.circle_radius_start = radius
+            rigid_1.circle_amount_start = amount
+            rigid_1.circle_radius_end = self.rigidfoil_circle_radius
+            rigid_1.circle_amount_end = self.rigidfoil_circle_amount
 
-        for rigidfoil in rib.rigidfoils:
-            if rigidfoil.start < position and rigidfoil.end > position:
-                # split rigidfoil
-                rigid_1 = RigidFoilCurved(
-                    start=rigidfoil.start,
-                    end=position,
-                    distance=rigidfoil.distance,
-                    cap_length=rigidfoil.cap_length,
-                    tension=rigidfoil.tension,
-                    inner_allowance=rigidfoil.inner_allowance
-                )
-                if straight_part := getattr(rigidfoil, "straight_part"):
-                    rigid_1.straight_part = straight_part
-                    
-                radius, amount =  rigidfoil.get_cap_radius(start=True)
-                rigid_1.circle_radius_start = radius
-                rigid_1.circle_amount_start = amount
-                rigid_1.circle_radius_end = self.rigidfoil_circle_radius
-                rigid_1.circle_amount_end = self.rigidfoil_circle_amount
+            rigid_2 = RigidFoilCurved(
+                start=position,
+                end=rigidfoil.end,
+                distance=rigidfoil.distance,
+                cap_length=rigidfoil.cap_length,
+                tension=rigidfoil.tension,
+                inner_allowance=rigidfoil.inner_allowance
+            )
+            if straight_part:
+                rigid_2.straight_part = straight_part
 
-                rigid_2 = RigidFoilCurved(
-                    start=position,
-                    end=rigidfoil.end,
-                    distance=rigidfoil.distance,
-                    cap_length=rigidfoil.cap_length,
-                    tension=rigidfoil.tension,
-                    inner_allowance=rigidfoil.inner_allowance
-                )
-                if straight_part := getattr(rigidfoil, "straight_part"):
-                    rigid_2.straight_part = straight_part
+            radius, amount =  rigidfoil.get_cap_radius(start=False)
+            rigid_2.circle_radius_end = radius
+            rigid_2.circle_amount_end = amount
+            rigid_2.circle_radius_start = self.rigidfoil_circle_radius
+            rigid_2.circle_amount_start = self.rigidfoil_circle_amount
 
-                radius, amount =  rigidfoil.get_cap_radius(start=False)
-                rigid_2.circle_radius_end = radius
-                rigid_2.circle_amount_end = amount
-                rigid_2.circle_radius_start = self.rigidfoil_circle_radius
-                rigid_2.circle_amount_start = self.rigidfoil_circle_amount
+            return (rigid_1, rigid_2)
 
-                result += [rigid_1, rigid_2]
-            else:
-                result.append(rigidfoil)
-        
-        return result
+        return None

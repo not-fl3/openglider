@@ -262,11 +262,18 @@ class Rib(RibBase):
         
     def get_rigidfoils(self) -> list[RigidFoilBase]:
         if self.sharknose is not None:
-            rigidfoils = self.sharknose.update_rigidfoils(self)
-            for rigid_no, rigid in enumerate(rigidfoils):
+            result: list[RigidFoilBase] = []
+
+            for rigidfoil in self.rigidfoils:
+                rigidfoils_this = self.sharknose.update_rigidfoil(self, rigidfoil)
+                if rigidfoils_this is not None:
+                    result += rigidfoils_this
+                else:
+                    result.append(rigidfoil)
+            for rigid_no, rigid in enumerate(result):
                 rigid.name = self.rigid_naming_scheme.format(rigid_no, rib=self)
             
-            return rigidfoils
+            return result
 
         return self.rigidfoils
 

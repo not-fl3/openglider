@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 from collections.abc import Callable
 
 import euklid
@@ -33,80 +33,109 @@ class RigidFoilPlot:
     rigidfoil: RigidFoilBase
     ribplot: RibPlot
 
+    drawing: PlotPart
     inner_curve: euklid.vector.PolyLine2D | None = None
     outer_curve: euklid.vector.PolyLine2D | None = None
+    center_curve: euklid.vector.PolyLine2D | None = None
 
     def __init__(self, rigidfoil: RigidFoilBase, ribplot: RibPlot) -> None:
         self.rigidfoil = rigidfoil
         self.ribplot = ribplot
+        self.drawing = PlotPart()
 
-    def add_text(self, plotpart: PlotPart) -> None:
-        (_, p1), (_, p2) = self.get_cap(-1, True)
+    def add_text(self) -> None:
+        (_, p1), (_, p2) = self.get_cap("back")
 
-        plotpart.layers[self.ribplot.layer_name_text] += Text(
+        self.drawing.layers[self.ribplot.layer_name_text] += Text(
             self.rigidfoil.name, p1, p2, align="center", valign=0.6
         ).get_vectors()
 
-    def get_cap(self, position: int, rear: bool) -> tuple[tuple[Vector2D, Vector2D], tuple[Vector2D, Vector2D]]:
-        assert self.inner_curve is not None and self.outer_curve is not None
+    def get_cap(self, side: Literal["front", "back"], outer_distance: float | None = None) -> tuple[tuple[Vector2D, Vector2D], tuple[Vector2D, Vector2D]]:
+        if side == "front":
+            position = 0
+            angle = math.pi/2
+        elif side == "back":
+            position = -1
+            angle = -math.pi/2
+        else:
+            raise ValueError("side must be 'front' or 'back'")
+        
+        if self.center_curve is None:
+            raise ValueError("Setup not called")
 
+        if outer_distance is None:
+            outer_distance = self.get_outer_distance().si
+        inner_distance = self.get_inner_distance().si
+
+        center_point = self.center_curve.nodes[position]
+        normal = self.center_curve.normvectors().nodes[position]
+
+        outer_point = center_point + normal * outer_distance
+        inner_point = center_point - normal * inner_distance
         # back cap
-        p1 = self.inner_curve.nodes[position]
-        p2 = self.outer_curve.nodes[position]
-        angle = math.pi/2
-        if rear:
-            angle = -angle
-        diff = euklid.vector.Rotation2D(angle).apply(p1-p2).normalized() * self.rigidfoil.cap_length.si
+        diff = euklid.vector.Rotation2D(angle).apply(inner_point - outer_point).normalized() * self.rigidfoil.cap_length.si
 
         return (
-            (p1, p2),
-            (p1+diff, p2+diff)
+            (inner_point, outer_point),
+            (inner_point+diff, outer_point+diff)
         )
     
-    def _get_inner_outer(self, glider: Glider) -> tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]:
-        curve = self.rigidfoil.get_flattened(self.ribplot.rib, glider)
-
+    def get_outer_distance(self) -> Length:
         distance = self.ribplot.rib.convert_to_chordlength(self.rigidfoil.distance)
-        d_outer = self.ribplot.rib.seam_allowance.si + distance.si
-
+        return self.ribplot.rib.seam_allowance + distance + self.rigidfoil.diameter/2
+    
+    def get_inner_distance(self) -> Length:
         if self.rigidfoil.inner_allowance:
             allowance = self.rigidfoil.inner_allowance
         else:
             allowance = self.ribplot.rib.seam_allowance
         
-        inner_curve = curve.offset(-(distance+allowance).si).fix_errors()
-        outer_curve = curve.offset(d_outer).fix_errors()
+        return (self.rigidfoil.diameter/2+allowance)
+    
+    def setup(self, glider: Glider) -> tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]:
+        if any([x is None for x in [self.inner_curve, self.outer_curve, self.center_curve]]):
+            curve = self.rigidfoil.get_center_line(self.ribplot.rib, glider)
 
-        return inner_curve, outer_curve
+            d_outer = self.get_outer_distance()
+            d_inner = self.get_inner_distance()
+
+            
+            self.center_curve = curve
+            self.inner_curve = curve.offset(-d_inner.si)
+            self.outer_curve = curve.offset(d_outer.si)
+
+        return self.center_curve, self.inner_curve, self.outer_curve  # type: ignore
+    
+    def insert_mark(self) -> None:
+        assert self.center_curve is not None
+
+        rigidfoil_outline = self.rigidfoil.get_flattened(self.center_curve)
+
+        self.drawing.layers[self.ribplot.layer_name_marks].append(rigidfoil_outline)
+        self.ribplot.plotpart.layers[self.ribplot.layer_name_rigidfoils].append(rigidfoil_outline)
     
     def flatten(self, glider: Glider) -> PlotPart:
-        plotpart = PlotPart()
+        curve, inner_curve, outer_curve = self.setup(glider)
+        plotpart = self.drawing
 
         controlpoints: list[tuple[float, list[euklid.vector.PolyLine2D]]] = []
         for x in self.ribplot.config.get_controlpoints(self.ribplot.rib):
             for mark in self.ribplot.insert_mark(x, self.ribplot.config.marks_controlpoint, insert=False):
                 controlpoints.append((x, mark))
 
-        curve = self.rigidfoil.get_flattened(self.ribplot.rib, glider)
-
         # add marks into the profile
-        self.ribplot.plotpart.layers[self.ribplot.layer_name_rigidfoils].append(curve)
         self.ribplot.plotpart.layers[self.ribplot.layer_name_laser_dots].append(euklid.vector.PolyLine2D([curve.get(0)]))
         self.ribplot.plotpart.layers[self.ribplot.layer_name_laser_dots].append(euklid.vector.PolyLine2D([curve.get(len(curve)-1)]))
 
-        self.inner_curve, self.outer_curve = self._get_inner_outer(glider)
-
-        plotpart.layers[self.ribplot.layer_name_marks].append(curve)
-
-        back_cap = self.get_cap(-1, True)
+        back_cap = self.get_cap("back")
         plotpart.layers[self.ribplot.layer_name_marks].append(euklid.vector.PolyLine2D(list(back_cap[0])))
 
-        front_cap = self.get_cap(0, False)
+        front_cap = self.get_cap("front")
         plotpart.layers[self.ribplot.layer_name_marks].append(euklid.vector.PolyLine2D(list(front_cap[0])))
         
-        outline = self.inner_curve
+        outline = inner_curve
         outline += euklid.vector.PolyLine2D(list(back_cap[1]))
-        outline += self.outer_curve.reverse()
+        outline += outer_curve.reverse()
         outline += euklid.vector.PolyLine2D(list(front_cap[1])).reverse()
 
         for x, controlpoint in controlpoints:
@@ -117,7 +146,7 @@ class RigidFoilPlot:
                 
         plotpart.layers[self.ribplot.layer_name_outline].append(outline.fix_errors().close())
 
-        self.add_text(plotpart)
+        self.add_text()
 
         return plotpart
 

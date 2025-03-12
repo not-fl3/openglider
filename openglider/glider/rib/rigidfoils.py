@@ -26,17 +26,24 @@ class RigidFoilBase(ABC, BaseModel):
 
     cap_length: Length = Length("2cm")
     tension: Percentage = Percentage("98%")
+    material: str = "Plastic"
+    diameter: Length = Length("2mm")
 
     def get_3d(self, rib: Rib) -> euklid.vector.PolyLine3D:
-        return euklid.vector.PolyLine3D([rib.align(p, scale=False) for p in self.get_flattened(rib)])
+        return euklid.vector.PolyLine3D([rib.align(p, scale=False) for p in self.get_center_line(rib)])
 
     def get_length(self, rib: Rib) -> float:
-        return self.get_flattened(rib).get_length() * self.tension.si
+        return self.get_center_line(rib).get_length() * self.tension.si
 
-    def get_flattened(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
-        return self._get_flattened(rib, glider).fix_errors()
+    def get_flattened(self, center_line: euklid.vector.PolyLine2D) -> euklid.vector.PolyLine2D:
+        outer_line = center_line.offset(self.diameter.si/2).fix_errors()
+        inner_line = center_line.offset(-self.diameter.si/2).fix_errors()
+
+        outline = euklid.vector.PolyLine2D(outer_line.nodes + inner_line.nodes[::-1]).close()
+
+        return outline
     
-    def _get_flattened(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
+    def get_center_line(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
         raise NotImplementedError()
 
     def get_cap_radius(self, start: bool) -> tuple[Length, Percentage]:
@@ -62,7 +69,7 @@ class RigidFoil(RigidFoilBase):
     def get_cap_radius(self, start: bool) -> tuple[Length, Percentage]:
         return -self.circle_radius, Percentage(0.35)
 
-    def _get_flattened(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
+    def get_center_line(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
         max_segment = 0.005  # 5mm
         profile = rib.get_hull()
         profile_normvectors = profile.normvectors
@@ -90,7 +97,7 @@ class RigidFoil(RigidFoilBase):
         indices = [profile(x) for x in point_range]
 
         # convert to unitless percentage (everything is scaled later)
-        distance = rib.convert_to_percentage(self.distance)
+        distance = rib.convert_to_percentage(self.distance) + rib.convert_to_percentage(self.diameter/2)
         radius = rib.convert_to_percentage(self.circle_radius)
 
         nodes = [
@@ -105,13 +112,13 @@ class _RigidFoilCurved(RigidFoilBase):
     append_curve: bool = True
     straight_part: Length = Length(0)
 
-    def _get_flattened(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
+    def get_center_line(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
         profile = rib.get_hull()
 
         start = profile.get_ik(self.start.si)
         end = profile.get_ik(self.end.si)
 
-        distance = rib.convert_to_chordlength(self.distance)
+        distance = rib.convert_to_chordlength(self.distance) + self.diameter/2
 
         rigidfoil_curve = (profile.curve.get(start, end) * rib.chord).offset(-distance.si).fix_errors()
         inner_curve = rigidfoil_curve
