@@ -100,7 +100,7 @@ class RigidFoilPlot:
             d_inner = self.get_inner_distance()
 
             
-            self.center_curve = curve
+            self.center_curve = curve.fix_errors()
             self.inner_curve = curve.offset(-d_inner.si)
             self.outer_curve = curve.offset(d_outer.si)
 
@@ -146,6 +146,7 @@ class RigidFoilPlot:
                 
         plotpart.layers[self.ribplot.layer_name_outline].append(outline.fix_errors().close())
 
+        self.insert_mark()
         self.add_text()
 
         return plotpart

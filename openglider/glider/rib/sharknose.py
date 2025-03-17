@@ -98,6 +98,8 @@ class Sharknose(BaseModel):
                 start=rigidfoil.start,
                 end=position,
                 distance=rigidfoil.distance,
+                material=rigidfoil.material,
+                diameter=rigidfoil.diameter,
                 cap_length=rigidfoil.cap_length,
                 tension=rigidfoil.tension,
                 inner_allowance=rigidfoil.inner_allowance
@@ -115,6 +117,8 @@ class Sharknose(BaseModel):
                 start=position,
                 end=rigidfoil.end,
                 distance=rigidfoil.distance,
+                material=rigidfoil.material,
+                diameter=rigidfoil.diameter,
                 cap_length=rigidfoil.cap_length,
                 tension=rigidfoil.tension,
                 inner_allowance=rigidfoil.inner_allowance

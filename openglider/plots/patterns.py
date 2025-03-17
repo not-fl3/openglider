@@ -140,7 +140,7 @@ class PatternsNew:
         self.project.get_glider_3d().lineset.rename_lines()
         excel = get_glider_data(self.project, consumption=self.weight)
         excel_internal = get_glider_data_internal(self.project)
-        excel.saveas(outdir / f"{self.project.name}_production.ods")
+        excel.saveas(str(outdir / f"{self.project.name}_production.ods"))
         excel_internal.saveas(outdir / f"{self.project.name}_internal.ods")
 
 

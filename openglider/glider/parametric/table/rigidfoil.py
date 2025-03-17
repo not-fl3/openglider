@@ -31,14 +31,18 @@ class RigidFoil5(RigidFoil3):
 class RigidFoil6(RigidFoil5):
     inner_allowance: Length
 
+class RigidFoil8(RigidFoil6):
+    material: str
+    diameter: Length
+
 class RibRigidTable(RibTable):
     dtos = {
         "RIGIDFOIL": RigidFoilDTO,
         "RIGIDFOIL3": RigidFoil3,
         "RIGIDFOIL5": RigidFoil5,
-        "RIGIDFOIL6": RigidFoil6
+        "RIGIDFOIL6": RigidFoil6,
+        "RIGIDFOIL8": RigidFoil8
     }
-
 
 class CellRigidTable(CellTable):
     keywords = {
