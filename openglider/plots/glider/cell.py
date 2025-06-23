@@ -461,7 +461,6 @@ class PanelPlot:
             cut_front_result: CutResult,
             cut_back_result: CutResult
             ) -> euklid.vector.PolyLine2D | None:
-        logger.warning(f"straight line {y} {start} {end}")
         if start > max(self.panel.cut_back.x_left, self.panel.cut_back.x_right):
             return None
         if end < min(self.panel.cut_front.x_left, self.panel.cut_front.x_right):

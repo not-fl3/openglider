@@ -112,6 +112,8 @@ class ShapePlot:
     
     def redraw(self, config: ShapePlotConfig, force: bool=False) -> Layout:
         if config != self.config or force:
+            if force:
+                self._get_shapes(force=True)
             self.config = config
             self.drawing = Layout()
 
@@ -224,6 +226,40 @@ class ShapePlot:
 
         self.draw_cells(left=left)
         return self
+
+    def draw_en_marks(self):
+        part = PlotPart()
+        shapes = self._get_shapes()
+
+        front, back = shapes[1].ribs[0]
+        
+        dist = abs(front[1]-back[1])
+
+        def baseline(pct):
+            return euklid.vector.PolyLine2D(
+                [shapes[0].get_point(rib, pct) for rib in self._get_rib_range(True)][::-1] +
+                [shapes[1].get_point(rib, pct) for rib in self._get_rib_range(False)]
+            )
+
+        collapse_side_50 = euklid.vector.PolyLine2D([
+            euklid.vector.Vector2D((0, front[1])),
+            euklid.vector.Vector2D((-dist, back[1]))
+        ])
+        collapse_side_75 = euklid.vector.PolyLine2D([
+            euklid.vector.Vector2D((0, back[1])),
+            euklid.vector.Vector2D((dist, front[1]))
+        ])
+
+        part.layers["marks"] +=  [
+            collapse_side_50,
+            collapse_side_75,
+            baseline(0.25),
+            baseline(0.5)
+        ]
+
+        self.drawing.parts.append(part)
+
+
 
     def _get_attachment_point_positions(self, left: bool=False) -> dict[str, euklid.vector.Vector2D]:
 
