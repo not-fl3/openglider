@@ -88,6 +88,7 @@ def dfl(name: str, diameter: float, elongation: float, strength: float, weight: 
             "yellow": Color.parse_hex("FFDD00"),
             "orange": Color.parse_hex("EB6A27"),
             "red": Color.parse_hex("E2001A"),
+            "pink": Color.parse_hex("E30066")
         }
     )
 
@@ -99,20 +100,35 @@ dfl("p232", 1.9, 3.4, 2000, 2.58)
 
 dfl("350", 2.7, 3.5, 3500, 4.98)
 
+def dsl(name: str, diameter: float, elongation: list[list[float]], strength: float, weight: float) -> None:
+    LineType(
+        f"liros.dsl{name}",
+        diameter,
+        elongation,
+        strength,
+        weight,
+        sheated=True,
+        colors={
+            "yellow": Color.parse_hex("FFDD00"),
+            "orange": Color.parse_hex("EB6A27"),
+            "red": Color.parse_hex("E2001A"),
+            "pink": Color.parse_hex("E30066")
+        }
+    )
 
-LineType("liros.dsl25", 0.8, [[340, 3.7]], 250, 0.53, True)
+dsl("25", 0.8, [[340, 3.7]], 250, 0.53)
 
-LineType("liros.dsl35", 0.9, [[380, 3.6]], 350, 0.64, True)
+dsl("35", 0.9, [[380, 3.6]], 350, 0.64)
 
-LineType("liros.dsl70", 0.95, [[100, 0.19], [300, 0.41]], 700, 0.67, True)
+dsl("70", 0.95, [[100, 0.19], [300, 0.41]], 700, 0.67)
 
-LineType("liros.dsl110", 1.2, [[100, 0.23], [300, 0.73]], 1100, 1.02, True)
+dsl("110", 1.2, [[100, 0.23], [300, 0.73]], 1100, 1.02)
 
-LineType("liros.dsl140", 1.25, [[100, 0.54], [300, 0.42]], 1400, 1.14, True)
+dsl("140", 1.25, [[100, 0.54], [300, 0.42]], 1400, 1.14)
 
-LineType("liros.dsl350", 2., [[100, 0.15], [300, 0.33]], 3500, 3.25, True)
+dsl("350", 2., [[100, 0.15], [300, 0.33]], 3500, 3.25)
 
-LineType("liros.dsl600", 2.4, [[100, 0.08], [300, 0.24]], 6000, 4.3, True)
+dsl("600", 2.4, [[100, 0.08], [300, 0.24]], 6000, 4.3)
 
 def lirosdc(name: int, thickness: float, elongation: float, break_load: float, weight: float) -> None:
     LineType(

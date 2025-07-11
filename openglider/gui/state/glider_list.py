@@ -44,6 +44,7 @@ class GliderList(SelectionList[GliderProject, GliderListItem]):
 
                 if project.mtime is not None:
                     if mtime > project.mtime:
+                        logger.info(f"detected update: {project_name}")
                         try:
                             project.element = self.import_glider(project.element.filename)
                             project.failed = False

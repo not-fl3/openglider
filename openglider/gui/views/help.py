@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from openglider.gui.qt import QtWidgets, QClipboard, QtCore
+from openglider.gui.qt import QtWidgets, QtCore
 
 from openglider.gui.widgets.select import AutoComplete
 from openglider.glider.parametric.table import GliderTables
@@ -89,8 +89,7 @@ class DtoChooser(QtWidgets.QWidget):
         ]
         
         text += "\t".join(annotations)
-
-        clipboard = QClipboard()
+        clipboard = QtWidgets.QApplication.clipboard()
         clipboard.setText(text)
         logger.info(f"copied header for {dto_name}")
 

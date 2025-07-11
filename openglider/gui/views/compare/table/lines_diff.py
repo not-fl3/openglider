@@ -1,7 +1,6 @@
 import logging
 from openglider.glider.project import GliderProject
-from openglider.gui.qt import QtCore, QtWidgets
-from openglider.gui.qt import QClipboard
+from openglider.gui.qt import QtWidgets
 
 from openglider.gui.app.app import GliderApp
 from openglider.utils.table import Table
@@ -69,6 +68,7 @@ class GliderLineSetTable(QtWidgets.QWidget, CompareView):
 
         super().__init__(parent)
 
+        self.app = app
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         self.table_widget = QTable()
@@ -99,6 +99,6 @@ class GliderLineSetTable(QtWidgets.QWidget, CompareView):
             for col in range(0, self.table.num_columns):
                 copied += self.table_widget.item(row, col).text() + '\t'
             copied = copied[:-1] + '\n'
-
-        clipboard = QClipboard()
+        
+        clipboard = self.app.clipboard()
         clipboard.setText(copied)

@@ -478,7 +478,7 @@ class ParametricGlider:
                 ballooning_modifiers=self.tables.ballooning_modifiers.get_modifiers(cell_no, resolvers=resolvers)
                 )
 
-            attachment_points = self.tables.attachment_points_cell.get(cell_no, curves=curves, cell=cell)
+            attachment_points = self.tables.attachment_points_cell.get(cell_no, resolvers=resolvers, cell=cell)
             cell.attachment_points = attachment_points
 
             cell.rigidfoils = self.tables.rigidfoils_cell.get(cell_no)

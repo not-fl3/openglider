@@ -157,7 +157,7 @@ class CellAttachmentPointTable(CellTable):
         "ATPDIFF": Keyword([("name", str), ("cell_pos", float), ("rib_pos", float), ("force", Union[float, str]), ("offset", float)], target_cls=CellAttachmentPoint)
     }
 
-    def get_element(self, row: int, keyword: str, data: list[Any], curves: dict[str, GliderCurveType]={}, cell: Cell=None, **kwargs: Any) -> CellAttachmentPoint:
+    def get_element(self, row: int, keyword: str, data: list[Any], resolvers: list[Parser], cell: Cell=None, **kwargs: Any) -> CellAttachmentPoint:
         force = data[3]
 
         if isinstance(force, str):
@@ -169,9 +169,7 @@ class CellAttachmentPointTable(CellTable):
         node = CellAttachmentPoint(name=data[0], cell_pos=data[1], rib_pos=data[2], force=force)
 
         if len(data) > 4:
-            offset = data[4]
-            if isinstance(offset, str):
-                offset = curves[offset].get(row)
+            offset = resolvers[row].parse(data[4])
             
             node.offset = offset
 

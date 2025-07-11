@@ -227,7 +227,7 @@ class ShapePlot:
         self.draw_cells(left=left)
         return self
 
-    def draw_en_marks(self):
+    def draw_en_marks(self) -> None:
         part = PlotPart()
         shapes = self._get_shapes()
 
@@ -235,7 +235,7 @@ class ShapePlot:
         
         dist = abs(front[1]-back[1])
 
-        def baseline(pct):
+        def baseline(pct: float) -> euklid.vector.PolyLine2D:
             return euklid.vector.PolyLine2D(
                 [shapes[0].get_point(rib, pct) for rib in self._get_rib_range(True)][::-1] +
                 [shapes[1].get_point(rib, pct) for rib in self._get_rib_range(False)]
@@ -250,16 +250,17 @@ class ShapePlot:
             euklid.vector.Vector2D((dist, front[1]))
         ])
 
+        diff = euklid.vector.Vector2D([self.glider_2d.shape.span*0.025, 0])
+
         part.layers["marks"] +=  [
             collapse_side_50,
-            collapse_side_75,
+            collapse_side_75.move(diff*-1),
+            collapse_side_75.move(diff),
             baseline(0.25),
             baseline(0.5)
         ]
 
         self.drawing.parts.append(part)
-
-
 
     def _get_attachment_point_positions(self, left: bool=False) -> dict[str, euklid.vector.Vector2D]:
 
