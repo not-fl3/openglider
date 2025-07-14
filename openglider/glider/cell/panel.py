@@ -278,9 +278,7 @@ class Panel(BaseModel):
             return None
 
     def is_lower(self) -> bool:
-        if (self.cut_front.x_left + self.cut_back.x_left) >=  1e-3:
-            return True
-        if (self.cut_front.x_right + self.cut_back.x_right) >=  1e-3:
+        if (self.cut_front.x_left + self.cut_back.x_left + self.cut_front.x_right + self.cut_back.x_right) >=  1e-3:
             return True
         
         return False
