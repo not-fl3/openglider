@@ -32,7 +32,7 @@ def get_rib_length_table(glider: Glider) -> Table:
             table[current_row, 1] = rib_no
             table[current_row, 2] = rigidfoil.start
             table[current_row, 3] = rigidfoil.end
-            table[current_row, 4] = round(1000*rigidfoil.get_length(rib), 1)
+            table[current_row, 4] = round(1000*rigidfoil.get_length(rib))
             table[current_row, 5] = rigidfoil.material
             table[current_row, 6] = rigidfoil.diameter
             table[current_row, 7] = rigidfoil.distance

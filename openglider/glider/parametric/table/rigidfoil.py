@@ -29,11 +29,15 @@ class RigidFoil5(RigidFoil3):
     circle_amount: Percentage
 
 class RigidFoil6(RigidFoil5):
-    inner_allowance: Length
+    inner_allowance: Length | None
 
 class RigidFoil8(RigidFoil6):
     material: str
     diameter: Length
+
+
+class RigidFoil9(RigidFoil8):
+    tension: Percentage
 
 class RibRigidTable(RibTable):
     dtos = {
@@ -41,7 +45,8 @@ class RibRigidTable(RibTable):
         "RIGIDFOIL3": RigidFoil3,
         "RIGIDFOIL5": RigidFoil5,
         "RIGIDFOIL6": RigidFoil6,
-        "RIGIDFOIL8": RigidFoil8
+        "RIGIDFOIL8": RigidFoil8,
+        "RIGIDFOIL9": RigidFoil9
     }
 
 class CellRigidTable(CellTable):
