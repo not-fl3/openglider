@@ -209,8 +209,9 @@ class ShapeSettings:
     aspect_ratio: float
     sweep: float
     cell_count: int
-    scale: Literal["Area"] | Literal["Span"] | None
+    scale: Literal["Area"] | Literal["Span"] | None = None
     zrot: bool = False
+    scale_lines: bool = True
 
 class ShapeSettingsWidget(QtWidgets.QWidget):
     changed = QtCore.Signal()
@@ -222,9 +223,7 @@ class ShapeSettingsWidget(QtWidgets.QWidget):
             area=shape.area,
             aspect_ratio=shape.aspect_ratio,
             sweep=shape.get_sweep(),
-            cell_count=shape.cell_num,
-            scale=None,
-            zrot=False
+            cell_count=shape.cell_num
         )
 
         self.setLayout(layout)
@@ -246,11 +245,16 @@ class ShapeSettingsWidget(QtWidgets.QWidget):
         self.input_zrot.setText("Apply ZRot")
         self.input_zrot.setChecked(False)
 
-        self.input_zrot.clicked.connect(self._update)
-        self.input_area.on_changed.append(self._update)
-        self.input_aspect_ratio.on_changed.append(self._update)
-        self.input_sweep.on_changed.append(self._update)
-        self.input_cell_count.on_changed.append(self._update)
+        self.input_scale_lines = QtWidgets.QCheckBox()
+        self.input_scale_lines.setText("Scale Lines")
+        self.input_scale_lines.setChecked(self.settings.scale_lines)
+
+        self.input_scale_lines.clicked.connect(self._update_settings)
+        self.input_zrot.clicked.connect(self._update_settings)
+        self.input_area.on_changed.append(self._update_settings)
+        self.input_aspect_ratio.on_changed.append(self._update_settings)
+        self.input_sweep.on_changed.append(self._update_settings)
+        self.input_cell_count.on_changed.append(self._update_settings)
 
         layout.addWidget(self.input_area)
         layout.addWidget(self.input_aspect_ratio)
@@ -258,8 +262,9 @@ class ShapeSettingsWidget(QtWidgets.QWidget):
         layout.addWidget(self.input_cell_count)
         layout.addWidget(self.input_scale)
         layout.addWidget(self.input_zrot)
+        layout.addWidget(self.input_scale_lines)
 
-    def _update(self, value: Any=None) -> None:
+    def _update_settings(self, value: Any=None) -> None:
         self.settings.area = self.input_area.value
         self.settings.aspect_ratio = self.input_aspect_ratio.value
         self.settings.sweep = self.input_sweep.value
@@ -272,6 +277,7 @@ class ShapeSettingsWidget(QtWidgets.QWidget):
             self.settings.scale = None
 
         self.settings.zrot = self.input_zrot.isChecked()
+        self.settings.scale_lines = self.input_scale_lines.isChecked()
 
         self.changed.emit()
     
@@ -356,7 +362,12 @@ class ShapeWizard(GliderSelectionWizard):
         logging.info(f"new shape: {self.shape_backup.area} -> {self.shape.area}")
         shape = self.shape.copy()
         self.project.glider.shape = self.shape_backup
-        self.project.glider.set_area(shape.area) # scale everything
+
+        if self.settings.scale_lines:
+            # scale everything before putting the new shape
+            # (which has an updated area already)
+            self.project.glider.set_area(shape.area)
+
         self.project.glider.shape = shape
         self.project.glider.rescale_curves()
 

@@ -69,6 +69,8 @@ class LineSetTable(BaseModel):
                     line_type_name = str(self.table[row, column + 1])
 
                     name_or_length, trim_correction = self.parse_correction(value)
+                    if trim_correction is not None:
+                        trim_correction = trim_correction.replace("!", "")
 
                     if not len(current_nodes) > line_level:
                         raise ValueError()
@@ -86,7 +88,7 @@ class LineSetTable(BaseModel):
                     else:
                         upper = Node(node_type=Node.NODE_TYPE.KNOT)
                         current_nodes.append(upper)
-                        line_length = Length(name_or_length)
+                        line_length = Length(name_or_length.replace("!", ""))
                         column += 2
                     
                     line_type_name_parts = line_type_name.split("#")
@@ -109,13 +111,13 @@ class LineSetTable(BaseModel):
         return LineSet(lines, v_inf=v_inf)
     
     @staticmethod
-    def parse_correction(value: str) -> tuple[str, Length | None]:
+    def parse_correction(value: str) -> tuple[str, str | None]:
         trim_correction: Length | None = None
-        name_or_length = value
+        name_or_length = str(value)
 
         if match := isinstance(value, str) and re.match(r"(.*)([+-].*)", value):
             name_or_length = match.group(1)
-            trim_correction = Length(match.group(2))
+            trim_correction = match.group(2)
 
         return name_or_length, trim_correction
 
@@ -164,28 +166,63 @@ class LineSetTable(BaseModel):
         return cls(table=table, lower_attachment_points=lower_points)
     
     def scale(self, factor: float, scale_lower_floor: bool) -> Self:
-        offset_2nd_level = Length(0.)
+        offset_upper_level: list[Length] = []
+        offset_table = Table()
+
+        def set_offset(level: int, offset: Length):
+            nonlocal offset_upper_level
+            offset_upper_level = offset_upper_level[:level]
+            if len(offset_upper_level) < level:
+                offset_upper_level += [0] * (level - len(offset_upper_level))
+            
+            offset_upper_level.append(offset)
+
         for row in range(self.table.num_rows):
             column = 1
             while column < self.table.num_columns:
-                if column + 2 < self.table.num_columns and self.table[row, column+2] and self.table[row, column]:
-                    _original_length, trim_correction = self.parse_correction(self.table[row, column])
-                    original_length = Length(_original_length)
-                    scaled_length = original_length * factor
-                    if trim_correction is not None:
-                        trim_correction *= factor
+                if self.table[row, column]:
 
-                    if column == 1 and not scale_lower_floor:
-                        # riser offset
-                        # riser_theoretical = riser_original * factor
-                        # factor < 1 => riser remains longer than it should -> next floor should be shorter to compensate
-                        offset_2nd_level = scaled_length - original_length
-                    else:
-                        if column == 3:
-                            scaled_length += offset_2nd_level
+                    if column + 2 < self.table.num_columns and self.table[row, column+2]:
+                        # not a gallery line
+                        _original_length, trim_correction = self.parse_correction(self.table[row, column])
+                        is_fixed_length = _original_length.endswith("!") or (column == 1 and not scale_lower_floor)
+                        original_length = Length(_original_length.replace("!", ""))
+                        scaled_length = original_length * factor
 
-                        self.table[row, column] = scaled_length
-                    
+                        if trim_correction is not None and not trim_correction.endswith("!"):
+                            trim_correction = str(Length(trim_correction) * factor)
+                            if not trim_correction.startswith("-"):
+                                trim_correction = "+" + trim_correction
+
+
+                        if is_fixed_length:
+                            # riser offset
+                            # riser_theoretical = riser_original * factor
+                            # factor < 1 => riser remains longer than it should -> next floor should be shorter to compensate
+                            target_length = original_length
+                            offset = scaled_length - original_length
+                            if column > 2 and offset_upper_level[column//2-1]:
+                                offset += offset_upper_level[column//2-1]
+                            set_offset(column // 2, offset)
+                        else:
+                            target_length = scaled_length
+                            offset = offset_upper_level[column//2-1]
+                            if offset:
+                                target_length += offset
+                            
+                            offset_table[row, column] = offset
+
+                            set_offset(column // 2, None)
+
+                        cell_content = str(target_length)
+                        if is_fixed_length:
+                            cell_content += "!"
+                        
+                        if trim_correction is not None:
+                            cell_content += trim_correction
+
+                        self.table[row, column] = cell_content
+
                 column += 2
 
         return self
