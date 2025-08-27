@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import types
+import typing
 from typing import Any, ClassVar, Generic, Self, TypeVar
 
 from openglider.utils.dataclass import BaseModel
@@ -74,6 +75,14 @@ class DTO(BaseModel, Generic[ReturnType], abc.ABC):
                 names.append(subtype.__name__)
             
             return " | ".join(names)
+        elif typing.get_origin(type_) == typing.Literal:
+            args = [
+                f"'{x}'" if isinstance(x, str) else x
+                for x in
+                typing.get_args(type_)
+            ]
+            
+            return " | ".join(args)
         else:
             return type_.__name__
     
