@@ -4,7 +4,9 @@ import sys
 
 os.environ["FORCE_QT_API"] = "pyside6"
 os.environ["QT_API"] = "pyside6"
-os.environ["QT_QPA_PLATFORM"] = "xcb"
+
+if sys.platform.startswith("linux"):
+    os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 
 def start_main_window() -> None:

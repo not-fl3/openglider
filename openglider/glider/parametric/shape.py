@@ -102,7 +102,7 @@ class ParametricShape:
         return euklid.vector.PolyLine2D(self.rib_distribution.controlpoints.nodes[1:-1])
 
     @rib_dist_controlpoints.setter
-    def rib_dist_controlpoints(self, arr: list[list[float]]) -> None:
+    def rib_dist_controlpoints(self, arr: list[list[float]] | list[euklid.vector.Vector2D]) -> None:
 
         self.rib_distribution.controlpoints = euklid.vector.PolyLine2D([[0., 0.]] + arr + [[1., 1.]])
 

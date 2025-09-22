@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 import logging
 import math
-from typing import TYPE_CHECKING
+import random
+from typing import TYPE_CHECKING, Self
 from collections.abc import Callable
 
 import euklid
@@ -95,6 +96,55 @@ class ParametricGlider:
             table[1+rib_no, 10] = 0
 
         return table
+    
+    def randomize(self) -> ParametricGlider:
+        new = self.copy()
+
+        def get_factor(spread: float) -> float:
+            return 1 + 2 * spread * (-0.5 + random.random())
+
+        # change profiles
+        for i, foil in enumerate(self.profiles):
+            foil.set_camber(foil.camber * get_factor(0.1))
+            foil.set_thickness(foil.thickness * get_factor(0.1))
+
+        def randomize_nodes(
+                curve: euklid.vector.PolyLine2D, 
+                factor: float,
+                change_first: tuple[bool, bool]=(False, True),
+                change_last: tuple[bool, bool]=(False, True)) -> euklid.vector.PolyLine2D:
+            assert len(curve) > 0
+            new_curve = curve.nodes[:]
+
+            if change_first[0]:
+                new_curve[0][0] *= get_factor(factor) # change x[0] for 2%
+            if change_first[1]:
+                new_curve[0][1] *= get_factor(factor) # change x[0] for 2%
+
+            for p in new_curve[1:-1]:
+                p[0] *= get_factor(factor)
+                p[1] *= get_factor(factor)
+
+            if change_last[0]:
+                new_curve[-1][0] *= get_factor(factor) # change x[0] for 2%
+            if change_last[1]:
+                new_curve[-1][1] *= get_factor(factor) # change x[0] for 2%
+
+            return euklid.vector.PolyLine2D(new_curve)
+            
+
+        # change arc
+        new.arc.curve.controlpoints = randomize_nodes(new.arc.curve.controlpoints, 0.02)
+
+        # change shape
+        new.shape.front_curve.controlpoints = randomize_nodes(new.shape.front_curve.controlpoints, 0.02)
+        new.shape.back_curve.controlpoints = randomize_nodes(new.shape.back_curve.controlpoints, 0.02)
+
+        new.shape.rib_dist_controlpoints = randomize_nodes(new.shape.rib_dist_controlpoints, 0.02, (True, True), (True, True)).nodes
+
+        new.aoa.controlpoints = randomize_nodes(new.aoa.controlpoints, 0.1, (False, True), (False, True))
+
+        return new
 
     def get_arc_angles(self) -> list[float]:
         """

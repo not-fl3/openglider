@@ -165,6 +165,33 @@ class Glider:
         ribs_flat = [p for rib in ribs for p in rib]
 
         return Mesh.from_indexed(ribs_flat, {"hull": polygons}, boundary)
+    
+    def get_mesh_all(self, numribs: int=10) -> Mesh:
+
+        mesh = Mesh()
+
+        for i, cell in enumerate(self.cells):
+            cell_mesh = Mesh()
+            for panel in cell.panels:
+                cell_mesh += panel.get_mesh(cell, numribs=numribs)
+            for strap in cell.straps:
+                cell_mesh += strap.get_mesh(cell)
+            for diagonal in cell.diagonals:
+                cell_mesh += diagonal.get_mesh(cell)
+
+            if not (i == 0 and self.has_center_cell):
+                cell_mesh += cell_mesh.copy().mirror("y")
+            
+            mesh += cell_mesh
+
+        for i, rib in enumerate(self.ribs):
+            rib_mesh = rib.get_mesh(hole_num=30, filled=True)
+            if not (i == 0 and not self.has_center_cell):
+                rib_mesh += rib_mesh.copy().mirror("y")
+            
+            mesh += rib_mesh
+        
+        return mesh
 
     def return_ribs(self, num_midribs: int=0, ballooning: bool=True) -> list[list[euklid.vector.Vector3D]]:
         """

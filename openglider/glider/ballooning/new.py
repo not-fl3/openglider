@@ -139,6 +139,14 @@ class BallooningBezierNeu(BallooningNew):
         self.scale(factor)
         self.apply_splines()
         return self
+    
+    def close_trailing_edge(self, start_x: float) -> None:
+        cp = self.controlpoints.nodes[:]
+        cp[0][1] = 0
+        cp[-1][1] = 0
+        self.controlpoints = euklid.vector.PolyLine2D(cp)
+        
+        return super().close_trailing_edge(start_x)
 
     @property
     def controlpoints(self) -> euklid.vector.PolyLine2D:
