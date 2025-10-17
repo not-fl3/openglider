@@ -250,7 +250,7 @@ class ShapePlot:
             euklid.vector.Vector2D((dist, front[1]))
         ])
 
-        diff = euklid.vector.Vector2D([self.glider_2d.shape.span*0.025, 0])
+        diff = euklid.vector.Vector2D([self.glider_2d.shape.span*0.05, 0])
 
         part.layers["marks"] +=  [
             collapse_side_50,

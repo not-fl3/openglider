@@ -71,14 +71,14 @@ class CurveTable:
         for name, curve in curves.items():
             self.table[0, column] = "Name"
             self.table[0, column+1] = name
-            self.table[0, column] = "Type"
-            self.table[0, column+1] = curve.__class__.__name__
-            self.table[0, column] = "Unit"
-            self.table[0, column+1] = curve.unit
+            self.table[1, column] = "Type"
+            self.table[1, column+1] = curve.__class__.__name__
+            self.table[2, column] = "Unit"
+            self.table[2, column+1] = curve.unit
 
             for row, point in enumerate(curve.controlpoints):
-                self.table[row+1, column] = point[0]
-                self.table[row+1, column+1] = point[1]
+                self.table[row+3, column] = point[0]
+                self.table[row+3, column+1] = point[1]
             
             column += 2
         
