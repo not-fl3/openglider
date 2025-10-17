@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 import logging
 import asyncio
-import qtawesome
 
 from openglider.gui.qt import QtWidgets, QtCore
+from openglider.gui.icons import icon
 
 from openglider.utils.tasks import TaskQueue, Task
 from openglider.gui.views.window import Window
@@ -40,7 +40,7 @@ class QTaskListWidget(QtWidgets.QWidget):
         self.label_runtime = QtWidgets.QLabel()
 
         self.button_view = QtWidgets.QToolButton()
-        self.button_view.setIcon(qtawesome.icon("fa.plus"))
+        self.button_view.setIcon(icon("fa.plus"))
         
 
         if self.view_class is None:
@@ -65,7 +65,7 @@ class QTaskListWidget(QtWidgets.QWidget):
         if self.task.failed:
             button = "fa.thumbs-down"
 
-        icon = qtawesome.icon(button)
+        icon = icon(button)
         
         self.label_status.setPixmap(icon.pixmap(QtCore.QSize(40, 40)))
 

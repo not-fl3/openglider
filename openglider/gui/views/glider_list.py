@@ -8,7 +8,7 @@ import tempfile
 from typing import Any
 
 import openglider
-import qtawesome
+from openglider.gui.icons import icon
 from openglider.glider.project import GliderProject
 from openglider.gui.state.glider_list import GliderListItem, GliderList
 from openglider.gui.qt import QtWidgets
@@ -26,13 +26,13 @@ class GliderListWidgetItemWidget(ListItemWidget[GliderProject]):
 
         self.button_save = QtWidgets.QPushButton()
         self.button_save.setFixedSize(30, 30)
-        self.button_save.setIcon(qtawesome.icon("fa.save"))
+        self.button_save.setIcon(icon("fa.save"))
         self.button_save.clicked.connect(self.save)
         self.layout().addWidget(self.button_save)
 
         self.button_edit = QtWidgets.QPushButton()
         self.button_edit.setFixedSize(30, 30)
-        self.button_edit.setIcon(qtawesome.icon("fa.edit"))
+        self.button_edit.setIcon(icon("fa.edit"))
         self.button_edit.clicked.connect(self.edit)
         self.layout().addWidget(self.button_edit)
 

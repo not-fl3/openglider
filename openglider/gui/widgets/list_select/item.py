@@ -2,8 +2,7 @@ from __future__ import annotations
 import logging
 from typing import Any, TypeVar, Generic, TYPE_CHECKING
 
-import qtawesome
-
+from openglider.gui.icons import icon
 from openglider.gui.state.selection_list.list import SelectionListItem, ItemType
 from openglider.gui.widgets import InputLabel
 from openglider.utils.colors import Color
@@ -49,13 +48,13 @@ class ListItemWidget(QtWidgets.QWidget, Generic[ItemType]):
         self.button_active.clicked.connect(self.toggle_active)
 
         self.button_color = QtWidgets.QPushButton()
-        self.button_color.setIcon(qtawesome.icon("fa.edit"))
+        self.button_color.setIcon(icon("fa.edit"))
         self.button_color.setFixedSize(30, 30)
         self.button_color.clicked.connect(self.choose_color)
         self.layout().addWidget(self.button_color)
 
         self.button_remove = QtWidgets.QPushButton()
-        self.button_remove.setIcon(qtawesome.icon("fa.trash"))
+        self.button_remove.setIcon(icon("fa.trash"))
         self.button_remove.setFixedSize(30, 30)
         self.layout().addWidget(self.button_remove)
 
@@ -67,11 +66,11 @@ class ListItemWidget(QtWidgets.QWidget, Generic[ItemType]):
     
     def update_active_icon(self) -> None:
         if self.list_item.active:
-            self.button_active.setIcon(qtawesome.icon("msc.folder-active"))
+            self.button_active.setIcon(icon("msc.folder-active"))
             #self.button_active.setAttribute(QtCore.WA_StyledBackground, True)
             self.button_active.setStyleSheet(f"background-color: #{self.list_item.color.hex()};")
         else:
-            self.button_active.setIcon(qtawesome.icon("fa.search"))
+            self.button_active.setIcon(icon("fa.search"))
             self.button_active.setStyleSheet('background-color: transparent;')
 
     def mouseDoubleClickEvent(self, e: QtGui.QMouseEvent) -> None:
