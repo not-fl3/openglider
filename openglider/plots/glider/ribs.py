@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import logging
 import math
 from typing import TYPE_CHECKING, Literal
 from collections.abc import Callable
 
 import euklid
-from openglider import logging
+
 from openglider.airfoil import get_x_value
 from openglider.glider.cell.diagonals import DiagonalSide
 from openglider.glider.cell.panel import PANELCUT_TYPES

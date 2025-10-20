@@ -1,21 +1,26 @@
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING, Any, Literal
-from openglider.glider.parametric.table.curve import CurveTable
-from openglider.glider.parametric.table.rigidfoil import CellRigidTable, RibRigidTable
-from openglider.glider.parametric.table.material import CellClothTable, RibClothTable
-from openglider.glider.parametric.table.cell.miniribs import MiniRibTable
 
 from openglider.jsonify.migration.migration import Migration
-from openglider.glider.parametric.table.cell.cuts import CutTable
 from openglider.utils.table import Table
 
 if TYPE_CHECKING:
-    from openglider.jsonify.migration.migration import Migration
+    from openglider.glider.parametric.table.curve import CurveTable
+    from openglider.glider.parametric.table.rigidfoil import CellRigidTable, RibRigidTable
+    from openglider.glider.parametric.table.material import CellClothTable, RibClothTable
+    from openglider.glider.parametric.table.cell.miniribs import MiniRibTable
+    from openglider.glider.parametric.table.cell.cuts import CutTable
 
 logger = logging.getLogger(__name__)
 
 @Migration.add("0.0.9")
 def migrate_diagonals(cls: type[Migration], jsondata: Any) -> Any:
+    from openglider.glider.parametric.table.curve import CurveTable
+    from openglider.glider.parametric.table.material import CellClothTable, RibClothTable
+    from openglider.glider.parametric.table.cell.miniribs import MiniRibTable
+
     nodes = cls.find_nodes(jsondata, name=r"ParametricGlider")
     if not nodes:
         return jsondata
@@ -75,6 +80,7 @@ def migrate_diagonals(cls: type[Migration], jsondata: Any) -> Any:
     return jsondata
 
 def get_cell_rigidfoil_table(rigidfoils: list[dict[str, Any]]) -> CellRigidTable:
+    from openglider.glider.parametric.table.rigidfoil import CellRigidTable
     table = Table()
     rigidfoils.sort(key=lambda r: r["x_start"])
     for rigidfoil in rigidfoils:
@@ -92,6 +98,7 @@ def get_cell_rigidfoil_table(rigidfoils: list[dict[str, Any]]) -> CellRigidTable
 
 
 def get_rib_rigidfoil_table(rigidfoils: list[dict[str, Any]]) -> RibRigidTable:
+    from openglider.glider.parametric.table.rigidfoil import RibRigidTable
     table = Table()
 
     rigidfoils.sort(key=lambda r: r["start"])
@@ -126,6 +133,7 @@ def get_materials_table(materials: list[list[dict[str, Any]]], _cls: Any) -> Any
     return _cls(material_table)
 
 def get_cuts_table(cuts: list[dict[str, Any]]) -> CutTable:
+    from openglider.glider.parametric.table.cell.cuts import CutTable
     cuts_table = Table()
     cuts_per_cell: list[list[tuple[float, float, str]]] = []
 

@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import logging
 import json
 import copy
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from openglider.jsonify.encoder import Encoder
 from openglider.jsonify.migration.migration import Migration
-from openglider.glider.parametric.table.rib.holes import HolesTable
-from openglider.glider.parametric.table.cell.diagonals import DiagonalTable, StrapTable
 from openglider.materials import cloth
 from openglider.utils.table import Table
+
+if TYPE_CHECKING:
+    from openglider.glider.parametric.table.rib.holes import HolesTable
+    from openglider.glider.parametric.table.cell.diagonals import DiagonalTable, StrapTable
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +60,7 @@ def migrate_diagonals(cls: Migration, jsondata: Any) -> Any:
 
 
 def get_hole_table(holes: list[Any]) -> HolesTable:
+    from openglider.glider.parametric.table.rib.holes import HolesTable
     table = Table()
 
     for hole in holes:
@@ -75,6 +80,7 @@ def get_hole_table(holes: list[Any]) -> HolesTable:
 
 
 def get_diagonals_table(diagonals: list[Any]) -> DiagonalTable:
+    from openglider.glider.parametric.table.cell.diagonals import DiagonalTable
     from openglider.glider.cell.diagonals import DiagonalRib
 
 
@@ -117,6 +123,7 @@ def get_diagonals_table(diagonals: list[Any]) -> DiagonalTable:
     return DiagonalTable(table)
 
 def get_straps_table(straps: list[Any], simple: bool=False) -> StrapTable:
+    from openglider.glider.parametric.table.cell.diagonals import StrapTable
     table = Table()
     cell_num = max([max(strap["cells"]) for strap in straps], default=0)
     straps_per_cell: list[list[list[float]]] = []

@@ -8,13 +8,14 @@ import numpy as np
 import euklid
 
 import openglider
+from openglider.config import config
 from pyfoil import Airfoil
 
 class ArcSinc:
     def __init__(self) -> None:
         self.start = 0.
         self.end = math.pi
-        self.interpolate(openglider.config['asinc_interpolation_points'])
+        self.interpolate(config['asinc_interpolation_points'])
 
     def __call__(self, val: float) -> float:
         return self.arsinc.get_value(val)

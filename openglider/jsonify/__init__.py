@@ -6,8 +6,8 @@ import time
 import datetime
 from typing import Any, Dict, Type
 
-import pydantic
-import openglider.config
+from openglider.version import __version__
+from openglider.config import config
 from openglider.jsonify.encoder import Encoder
 from openglider.jsonify.migration import Migration
 from openglider.utils import recursive_getattr
@@ -22,12 +22,12 @@ datetime_format = "%d.%m.%Y %H:%M"
 datetime_format_regex = re.compile(r'^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}$')
 
 def get_element(_module: str, _name: str) -> type[Any]:
-    for rex in openglider.config["json_forbidden_modules"]:
+    for rex in config["json_forbidden_modules"]:
         if re.match(rex, _module):
             raise Exception
         elif re.match(rex, _name):
             raise Exception
-    for rex in openglider.config["json_allowed_modules"]:
+    for rex in config["json_allowed_modules"]:
         match = re.match(rex, _module)
         if match:
             fromlist = [str(w) for w in _module.split(".")]
@@ -85,8 +85,8 @@ def add_metadata(data: Any) -> dict[str, Any]:
         return data
     else:
         return {'MetaData': {'application': 'openglider',
-                             'version': openglider.__version__,
-                             'author': openglider.config["user"],
+                             'version': __version__,
+                             'author': config["user"],
                              'date_created': time.strftime("%d.%m.%y %H:%M"),
                              'date_modified': time.strftime("%d.%m.%y %H:%M")},
                 'data': data}

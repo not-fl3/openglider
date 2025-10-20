@@ -66,8 +66,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, app: GliderApp):
         super().__init__()
         self.setWindowTitle("Glider Schneider")
-        og_dir = os.path.dirname(openglider.__file__)
-        self.setWindowIcon(QtGui.QIcon(os.path.join(og_dir, "gui/openglider.png")))
+        gui_dir = os.path.dirname(os.path.dirname(__file__))
+        filepath = os.path.join(gui_dir, "openglider.png")
+        print(filepath)
+        self.setWindowIcon(QtGui.QIcon(filepath))
         
         self.app = app
         self.state = app.state
@@ -319,8 +321,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.top_panel.setCurrentIndex(0)
 
     def load_demokite(self) -> None:
-        og_dir = os.path.dirname(openglider.__file__)
-        filename = os.path.join(og_dir, "tests/common/demokite.ods")
+        import openglider.tests
+        filename = openglider.tests.get_demokite_path()
         asyncio.ensure_future(self.load_glider(filename))
 
 

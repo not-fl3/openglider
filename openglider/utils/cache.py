@@ -10,6 +10,7 @@ from collections.abc import Callable, Iterator, Sequence
 from typing import TYPE_CHECKING
 
 import openglider
+from openglider.config import config
 
 
 logger = logging.getLogger(__name__)
@@ -105,7 +106,7 @@ class CachedProperty(Generic[Result]):
         return f"<CachedProperty {self.function.__qualname__}>"
 
     def __get__(self, parentclass: CLS, type: Any=None) -> Result:
-        if not openglider.config["caching"]:
+        if not config["caching"]:
             return self.function(parentclass)
         
         hash_value = hash_attributes(parentclass, self.hashlist)

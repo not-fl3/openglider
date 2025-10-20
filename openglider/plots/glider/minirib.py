@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import logging
 import euklid
-from openglider import logging
+
 from openglider.plots.config import PatternConfig
 from openglider.utils.config import Config
 from openglider.vector.drawing import PlotPart

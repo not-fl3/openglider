@@ -3,7 +3,7 @@ from pathlib import Path
 import platform
 from typing import Any
 
-from openglider.utils.config import Config
+from openglider.utils.config_old import Config
 
 
 class GlobalConfig(Config):

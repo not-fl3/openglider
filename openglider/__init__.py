@@ -1,3 +1,4 @@
+import os
 import logging
 from pathlib import Path
 from typing import Any
@@ -27,9 +28,10 @@ def load(filename: str) -> Any:
 
     return res
 
+
 def load_demokite() -> openglider.glider.GliderProject:
-    import os
-    filename = os.path.join(os.path.dirname(os.path.dirname(__file__)), "tests/common/demokite.ods")
+    import openglider.tests
+    filename =  openglider.tests.get_demokite_path()
 
     if not os.path.isfile(filename):
         raise FileNotFoundError()
