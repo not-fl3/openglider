@@ -32,7 +32,6 @@ def get_split_tables(project: GliderProject) -> list[Table]:
     tables.append(get_parametric_sheet(project.glider))
     tables.append(get_airfoil_sheet(project.glider))
     tables.append(BallooningTable.from_list(project.glider.balloonings).table)
-    tables.append(get_lines_sheet(project.glider))
     
     tables += project.glider.tables.get_all_tables()
 

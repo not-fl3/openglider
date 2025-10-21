@@ -508,6 +508,8 @@ class LineSet:
             for l in self.lines:
                 if l.target_length is not None and l.init_length is not None:
                     diff = self.get_line_length(l).get_length() - l.target_length.si
+                    if l.trim_correction is not None:
+                        diff -= l.trim_correction.si
                     l.init_length -= diff
             self.recalc()
 

@@ -6,13 +6,9 @@ import subprocess
 from typing import Any, Iterable
 from pathlib import Path
 
-import openglider.glider
 from openglider.glider.cell.diagonals import DiagonalRib, DiagonalSide
 from openglider.glider.cell.panel import Panel
 from openglider.glider.rib.rib import Rib
-import openglider.plots.cuts
-import openglider.plots.marks
-import openglider.plots.spreadsheets
 import openglider.plots.sketches
 from openglider.glider.glider import Glider
 from openglider.glider.project import GliderProject
@@ -142,9 +138,6 @@ class PatternsNew:
         excel_internal = get_glider_data_internal(self.project)
         excel.saveas(str(outdir / f"{self.project.name}_production.ods"))
         excel_internal.saveas(outdir / f"{self.project.name}_internal.ods")
-
-
-        openglider.save(self.project, outdir / "project.json")
 
 
 class Patterns(PatternsNew):

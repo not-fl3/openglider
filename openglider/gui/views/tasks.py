@@ -65,9 +65,9 @@ class QTaskListWidget(QtWidgets.QWidget):
         if self.task.failed:
             button = "fa.thumbs-down"
 
-        icon = icon(button)
+        _icon = icon(button)
         
-        self.label_status.setPixmap(icon.pixmap(QtCore.QSize(40, 40)))
+        self.label_status.setPixmap(_icon.pixmap(QtCore.QSize(40, 40)))
 
         self.label_runtime.setText(self.task.runtime())
     
