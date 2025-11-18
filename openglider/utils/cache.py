@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterator, Sequence
 
 from typing import TYPE_CHECKING
 
-import openglider
+from openglider.utils.recursive_getattr import recursive_getattr
 from openglider.config import config
 
 
@@ -163,20 +163,6 @@ def cached_function(*hashlist: str, exclude: list[str | None]=None, generator: C
                 
 
         return wrapper
-
-
-def recursive_getattr(obj: Any, attr: str) -> Any:
-    """
-    Recursive Attribute-getter
-    """
-    if attr == "self":
-        return obj
-    elif '.' not in attr:
-        return getattr(obj, attr)
-    else:
-        l = attr.split('.')
-        return recursive_getattr(getattr(obj, l[0]), '.'.join(l[1:]))
-
 
 def c_mul(a: float, b: int) -> int:
     """

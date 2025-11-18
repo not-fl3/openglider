@@ -10,7 +10,7 @@ from openglider.version import __version__
 from openglider.config import config
 from openglider.jsonify.encoder import Encoder
 from openglider.jsonify.migration import Migration
-from openglider.utils import recursive_getattr
+from openglider.utils.recursive_getattr import recursive_getattr
 
 __ALL__ = ['dumps', 'dump', 'loads', 'load']
 

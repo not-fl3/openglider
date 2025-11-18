@@ -1,7 +1,7 @@
 from typing import Any, Generic, List, Tuple, TypeVar
 from collections.abc import Iterator
 
-from openglider.utils.cache import recursive_getattr
+from openglider.utils.recursive_getattr import recursive_getattr
 #from openglider.utils.table import Table
 
 

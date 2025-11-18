@@ -6,7 +6,6 @@ import euklid
 
 import pydantic
 from pydantic import model_validator
-import pydantic.validators
 
 #from pydantic import Field as field
 from pydantic import ConfigDict, Field  # export Field
@@ -130,5 +129,3 @@ class BaseModel(pydantic.BaseModel):
                     data[field_name] = field.annotation(value)
         
         return data
-
-

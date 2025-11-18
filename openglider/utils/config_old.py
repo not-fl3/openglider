@@ -3,7 +3,6 @@ from __future__ import annotations
 import inspect
 import json
 import html
-from pathlib import Path
 from typing import Any
 from collections.abc import Iterator
 
