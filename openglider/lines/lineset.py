@@ -6,8 +6,9 @@ import logging
 import math
 import os
 import re
-from typing import TYPE_CHECKING, Any, Iterable, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar
 from collections.abc import Callable
+from functools import cmp_to_key
 
 import euklid
 from openglider.lines.node import Node
@@ -17,7 +18,6 @@ from openglider.lines.functions import proj_force
 from openglider.lines.knots import KnotCorrections
 from openglider.lines.line_types.linetype import LineType
 from openglider.mesh import Mesh
-from openglider.utils.cache import cached_function
 from openglider.utils.table import Table
 from openglider.vector.unit import Percentage
 
@@ -532,6 +532,100 @@ class LineSet:
         
         return consumption
     
+    def sort_lines_by_attachment_points(self, lines: list[Line]) -> list[Line]:
+        """
+        sort lines by their top-connected nodes.
+        get the layer-prefixes for all nodes and the min/max index from their names.
+        then sort by layer and index
+        """
+        def parse_node_name(name: str) -> tuple[str, float]:
+            """Return (layer_prefix, index) parsed from a node name.
+
+            Examples: 'A3' -> ('A', 3), 'BR12' -> ('BR', 12).
+            If no numeric index found the index returned is +inf so that nodes without
+            numeric parts sort to the end for index comparisons.
+            """
+            if not name:
+                return "", float("inf")
+
+            m = re.match(r"^([A-Za-z]+)([0-9]+)$", name)
+            if m:
+                return m.group(1).upper(), int(m.group(2))
+
+            # fallback: extract letters and first number we find
+            letters = "".join(re.findall(r"[A-Za-z]+", name)).upper()
+            nums = re.findall(r"[0-9]+", name)
+            idx = int(nums[0]) if nums else float("inf")
+            return letters, idx
+
+        line_keys: list[tuple[tuple[dict[str, int], int, int], Line]] = []
+
+        for line in lines:
+            nodes = self.get_upper_influence_nodes(line)
+            layers: dict[str, int] = {}
+            min_idx = float("inf")
+            max_idx = -1
+
+            for node in nodes:
+                layer, idx = parse_node_name(getattr(node, "name", "") or "")
+                if layer:
+                    layers.setdefault(layer, 0)
+                    layers[layer] += 1
+                if idx != float("inf"):
+                    min_idx = min(min_idx, idx)
+                    max_idx = max(max_idx, idx)
+
+            # normalize indices for missing values so they sort to the end
+            if min_idx == float("inf"):
+                min_idx_val = 10 ** 9
+            else:
+                min_idx_val = int(min_idx)
+
+            if max_idx == -1:
+                max_idx_val = 10 ** 9
+            else:
+                max_idx_val = int(max_idx)
+
+            key = (layers, min_idx_val, max_idx_val)
+            line_keys.append((key, line))
+
+        def cmp(a: tuple[tuple[dict[str, int], int, int], Line], b: tuple[tuple[dict[str, int], int, int], Line]) -> int:
+            # compare layers (sets of strings)
+            a_layers, a_min_idx, a_max_idx = a[0]
+            b_layers, b_min_idx, b_max_idx = b[0]
+
+            def get_average_layer_key(layers: dict[str, int]) -> float:
+                return sum([
+                    sum([ord(l) for l in layer.lower()]) / len(layer) * count
+                    for layer, count in layers.items()
+                ]) / sum(layers.values())
+            
+            def compare_by_average_layer_key(a_layers: dict[str, int], b_layers: dict[str, int]) -> int:
+                a_avg = get_average_layer_key(a_layers)
+                b_avg = get_average_layer_key(b_layers)
+                
+                if a_avg < b_avg:
+                    return -1
+                elif a_avg > b_avg:
+                    return 1
+                else:
+                    return 0
+
+            if not len(set(a_layers).intersection(b_layers)):
+                return compare_by_average_layer_key(a_layers, b_layers)
+            
+            # layers are equal, compare by min index
+            if a_min_idx > b_max_idx:
+                return 1
+            elif b_min_idx > a_max_idx:
+                return -1
+            
+            # min indices do not overlap, compare by average layer key
+            return compare_by_average_layer_key(a_layers, b_layers)
+        
+        sorted_keys = sorted(line_keys, key=cmp_to_key(cmp))
+        return [l for _k, l in sorted_keys]
+    
     def sort_lines(self, lines: list[Line] | None=None, x_factor: float=10., by_names: bool=False) -> list[Line]:
         if lines is None:
             lines = self.lines
@@ -589,11 +683,15 @@ class LineSet:
         if start_nodes is None:
             start_nodes = self.lower_attachment_points
 
-        lines = []
+        lines: list[Line] = []
         for node in start_nodes:
             lines += self.get_upper_connected_lines(node)
 
-        return [(line, self.create_tree([line.upper_node])) for line in self.sort_lines(lines, by_names=True)]
+        
+
+        return [
+            (line, self.create_tree([line.upper_node])) for line in self.sort_lines_by_attachment_points(lines)
+        ]
 
     def _get_lines_table(self, callback: Callable[[Line], list[str]], start_nodes: list[Node] | None=None, insert_node_names: bool=True) -> Table:
         line_tree = self.create_tree(start_nodes=start_nodes)
@@ -631,6 +729,39 @@ class LineSet:
     node_group_rex = re.compile(r"[^A-Za-z]*([A-Za-z]*)[^A-Za-z]*")
 
     def rename_lines(self) -> LineSet:
+        """
+        Assign hierarchical, human-readable names to all lines in this LineSet based on their
+        connectivity to upper nodes.
+        This method mutates the `name` attribute of each Line in `self.lines` and returns
+        the LineSet (self) for chaining.
+        Behavior and algorithm:
+        - A recursive helper (get_floor) computes for each line:
+            - floor: an integer depth measured as the number of edges from any line that has
+              no upper-connected lines (these are floor 0).
+            - prefix: a string composed by collecting and lexicographically sorting prefix
+              fragments derived from ancestor upper nodes. If an upper node has no matching
+              prefix, a default "--" is used for that branch.
+        - Lines are grouped by (floor, prefix) into lines_by_floor[floor][prefix] -> list[Line].
+        - Special handling for floor 0: each line in floor 0 is named "1_{upper_node.name}".
+        - For each floor (from 0 up to the maximum computed floor) and for each prefix group:
+            - The lines are sorted via self.sort_lines(lines, by_names=True) to obtain a stable
+              ordering.
+            - Lines are then assigned names of the form "{floor+1}_{prefix}{index}" where
+              index is 1-based within the sorted group. The floor in the name is 1-based.
+        - If this LineSet contains no lines, the method returns immediately without changes.
+        Dependencies and side effects:
+        - Uses self.get_upper_connected_lines(line.upper_node) to traverse connectivity.
+        - Uses self.node_group_rex to extract prefix fragments from node names.
+        - Uses self.sort_lines(...) to deterministically order lines inside each group.
+        - Mutates each Line.name in-place.
+        Returns:
+            LineSet: the same LineSet instance (self) with updated line names.
+        Notes:
+        - The naming scheme guarantees deterministic names when the underlying sort and
+          regex are deterministic.
+        - The prefix for a group is the concatenation of unique, sorted prefix fragments
+          found among upstream lines.
+        """
         def get_floor(line: Line) -> tuple[int, str]:
             upper_lines = self.get_upper_connected_lines(line.upper_node)
             
@@ -644,7 +775,7 @@ class LineSet:
             
             upper_lines_floors = [get_floor(l) for l in upper_lines]
             floor = max([x[0] for x in upper_lines_floors]) + 1
-            prefixes = set()
+            prefixes: set[str] = set()
             for upper in upper_lines_floors:
                 for prefix in upper[1]:
                     prefixes.add(prefix)
@@ -671,9 +802,9 @@ class LineSet:
             for line in lines:
                 line.name = f"1_{line.upper_node.name}"
 
-        for floor in range(max(lines_by_floor)):
+        for floor in range(1, max(lines_by_floor) + 1):
             for prefix, lines in lines_by_floor.get(floor, {}).items():
-                lines_sorted = self.sort_lines(lines, by_names=True)
+                lines_sorted = self.sort_lines_by_attachment_points(lines)
 
                 for i, line in enumerate(lines_sorted):
                     line.name = f"{floor+1}_{prefix}{i+1}"
@@ -804,19 +935,19 @@ class LineSet:
         table[0, 0] = "Name"
         table[0, 1] = "Linetype"
         table[0, 2] = "Color"
-        table[0, 3] = "Raw length"
-        table[0, 4] = "Local Checking Length"
-        table[0, 5] = "Seam Correction"
-        table[0, 6] = "Loop Correction"
+        table[0, 3] = "3D Length"
+        table[0, 4] = "Loop Correction"
+        table[0, 5] = "Manual Correction"
+        table[0, 6] = "Raw Checking length"
         table[0, 7] = "Knot Correction"
-        table[0, 8] = "Manual Correction"
-        table[0, 9] = "Cutting Length"
+        table[0, 8] = "Local Checking Length"
+        table[0, 9] = "Seam Correction"
+        table[0, 10] = "Cutting Length"
 
         if line_load:
-            table[0, 10] = "Force"
-            table[0, 11] = "Min Break Load"
-            table[0, 12] = "Percentage"
-        
+            table[0, 11] = "Force"
+            table[0, 12] = "Min Break Load"
+            table[0, 13] = "Percentage"
 
         lines = self.sort_lines(by_names=True)
         for i, line in enumerate(lines):
@@ -825,19 +956,21 @@ class LineSet:
             table[i+2, 0] = line.name
             table[i+2, 1] = f"{line.line_type}"
             table[i+2, 2] = line.color
-            table[i+2, 3] = round(line_length.get_checklength() * 1000)
-            table[i+2, 4] = round(line_length.get_length() * 1000)
-            table[i+2, 5] = round(line_length.seam_correction * 1000)
-            table[i+2, 6] = round(line_length.loop_correction * 1000)
+            table[i+2, 3] = round(line_length.length * 1000) # 3d-length
+            table[i+2, 4] = round(line_length.loop_correction * 1000)
+            table[i+2, 5] = round(line_length.manual_correction * 1000)
+            table[i+2, 6] = round(line_length.get_checklength() * 1000) # raw check-length
             table[i+2, 7] = round(line_length.knot_correction * 1000)
-            table[i+2, 8] = round(line_length.manual_correction * 1000)
-            table[i+2, 9] = round(line_length.get_cutting_length() * 1000)
+            table[i+2, 8] = round(line_length.get_length() * 1000) # local checking-length
+            table[i+2, 9] = round(line_length.seam_correction * 1000)
+            table[i+2, 10] = round(line_length.get_cutting_length() * 1000)
+
             if line_load:
                 if line.force is None or line.line_type.min_break_load is None:
                     raise ValueError()
-                table[i+2, 10] = round(line.force)
-                table[i+2, 11] = round(line.line_type.min_break_load)
-                table[i+2, 12] = f"{100*line.force/line.line_type.min_break_load:.1f}%"
+                table[i+2, 11] = round(line.force)
+                table[i+2, 12] = round(line.line_type.min_break_load)
+                table[i+2, 13] = f"{100*line.force/line.line_type.min_break_load:.1f}%"
 
         
         return table
@@ -885,8 +1018,6 @@ class LineSet:
         return copy.deepcopy(self)
 
     def __getitem__(self, name: str) -> Line:
-        if isinstance(name, list):
-            return [self[n] for n in name]
         for line in self.lines:
             if name == line.name:
                 return line
