@@ -29,7 +29,7 @@ class RoundReinforcement(BaseModel):
     def get_3d(self, rib: Rib, num_points: int=10) -> list[euklid.vector.PolyLine3D]:
         # create circle with center on the point
         polygons = self.get_flattened(rib, num_points=num_points)
-        aligned_polygons = []
+        aligned_polygons: list[euklid.vector.PolyLine3D] = []
         for polygon in polygons:
 
             aligned_polygons.append(rib.align_all(polygon, scale=False))
@@ -61,7 +61,7 @@ class AttachmentPoint(Node):
     protoloops: int = 0
     protoloop_distance: Percentage | Length = Percentage("2%")
 
-    re_name: ClassVar[re.Pattern] = re.compile(r"^(?P<n>[0-9]+_)?([A-Za-z]+)([0-9]+)")
+    re_name: ClassVar[re.Pattern[Any]] = re.compile(r"^(?P<n>[0-9]+_)?([A-Za-z]+)([0-9]+)")
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: '{self.name}' ({self.rib_pos})>"
@@ -76,7 +76,7 @@ class AttachmentPoint(Node):
         }
     
     @classmethod
-    def __from_json__(self, **data: Any) -> AttachmentPoint:
+    def __from_json__(cls, **data: Any) -> AttachmentPoint:
         data["force"] = euklid.vector.Vector3D(data["force"])
         return AttachmentPoint(**data)
     
@@ -88,7 +88,7 @@ class AttachmentPoint(Node):
 
         if self.protoloops:
             hull = rib.get_hull()
-            ik_start = hull.get_ik(self.rib_pos)
+            ik_start = hull.get_ik(self.rib_pos.si)
 
             for i in range(self.protoloops):
                 diff = (i+1) * self.protoloop_distance
@@ -104,11 +104,9 @@ class AttachmentPoint(Node):
         
         return positions
     
-    @classmethod
-    def calculate_force_rib_aligned(self, rib: Rib, force: float | None=None) -> euklid.vector.Vector3D:
-        if force is None:
-            force = self.force.length()
-        return rib.rotation_matrix.apply([0, force, 0])
+    @staticmethod
+    def calculate_force_rib_aligned(rib: Rib, force: float) -> euklid.vector.Vector3D:
+        return rib.rotation_matrix.apply(euklid.vector.Vector3D([0, force, 0]))
 
     def get_position(self, rib: Rib) -> euklid.vector.Vector3D:
         hull = rib.get_hull()

@@ -1,6 +1,5 @@
 import enum
 import logging
-import sys
 import typing
 from typing import Any, Generic, TypeVar
 
@@ -24,10 +23,10 @@ class TableType(enum.Enum):
 
 class ElementTable(Generic[ElementType]):
     table_type: TableType = TableType.general
-    keywords: dict[str, Keyword] = {}
-    dtos: dict[str, type[DTO]] = {}
+    keywords: dict[str, Keyword[Any]] = {}
+    dtos: dict[str, type[DTO[Any]]] = {}
 
-    def __init__(self, table: Table=None, migrate_header: bool=False):
+    def __init__(self, table: Table | None=None, migrate_header: bool=False):
         self.table = Table()
         if table is not None:
             if migrate_header:
@@ -36,18 +35,17 @@ class ElementTable(Generic[ElementType]):
             else:
                 _table = table
 
-            if _table is not None:
-                def add_data(keyword: str, data_length: int) -> None:
-                    for column in self.get_columns(_table, keyword, data_length):
-                        self.table.append_right(column)
+            def add_data(keyword: str, data_length: int) -> None:
+                for column in self.get_columns(_table, keyword, data_length):
+                    self.table.append_right(column)
 
-                for keyword in self.keywords:
-                    data_length = self.keywords[keyword].attribute_length
-                    add_data(keyword, data_length)
+            for keyword in self.keywords:
+                data_length = self.keywords[keyword].attribute_length
+                add_data(keyword, data_length)
 
-                for dto in self.dtos:
-                    data_length = self.dtos[dto].column_length()
-                    add_data(dto, data_length)
+            for dto in self.dtos:
+                data_length = self.dtos[dto].column_length()
+                add_data(dto, data_length)
     
     def __json__(self) -> dict[str, Any]:
         return {
@@ -56,7 +54,7 @@ class ElementTable(Generic[ElementType]):
     
     @classmethod
     def get_columns(cls, table: Table, keyword: str, data_length: int) -> list[Table]:
-        columns = []
+        columns: list[Table] = []
         column = 0
 
         if keyword in cls.keywords:
@@ -69,6 +67,8 @@ class ElementTable(Generic[ElementType]):
             header[0, 0] = keyword
             for i, (field_name, field_type) in enumerate(types):
                 header[1, i] = f"{field_name}: {field_type}"
+        else:
+            raise ValueError(f"unknown keyword {keyword}")
 
         while column < table.num_columns:
             if table[0, column] == keyword:
@@ -85,7 +85,7 @@ class ElementTable(Generic[ElementType]):
     
     def get(self, row_no: int, keywords: list[str] | None=None, **kwargs: Any) -> list[ElementType]:
         row_no += 2  # skip header line
-        elements = []
+        elements: list[ElementType] = []
         
         for keyword in list(self.keywords.keys()) + list(self.dtos.keys()):
             if keyword in self.keywords:
@@ -136,14 +136,14 @@ class ElementTable(Generic[ElementType]):
         
         return None
 
-    def _prepare_dto_data(self, row: int, dto: type[DTO], data: list[Any], resolvers: list[Parser]) -> dict[str, Any]:
+    def _prepare_dto_data(self, row: int, dto: type[DTO[Any]], data: list[Any], resolvers: list[Parser]) -> dict[str, Any]:
         fields = dto.model_fields.items()
         
         dct: dict[str, Any] = {}
         index = 0
 
         for field_name, field in fields:
-            if tuple_type := dto._is_cell_tuple(field.annotation):
+            if tuple_type := dto.check_is_cell_tuple(field.annotation):
                 offset1, offset2 = tuple_type.index_offset
                 dct[field_name] = (
                     resolvers[row].parse(data[index+offset1]),
@@ -176,11 +176,11 @@ class ElementTable(Generic[ElementType]):
             raise ValueError()
 
     def _repr_html_(self) -> str:
-        return self.table._repr_html_()
+        return self.table._repr_html_() # type: ignore
 
 
-class CellTable(ElementTable):
+class CellTable(ElementTable[Any]):
     table_type = TableType.cell
 
-class RibTable(ElementTable):
+class RibTable(ElementTable[Any]):
     table_type = TableType.rib

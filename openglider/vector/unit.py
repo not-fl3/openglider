@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 import math
 import operator
@@ -25,10 +26,10 @@ class Quantity(pydantic.BaseModel):
 
     re_number: ClassVar[str] = r"[+-]?(?:(?:\d+\.?\d*)|(?:\.\d+))(?:[eE][+-]?\d+)?|\d+"
     re_unit: ClassVar[str] = r"[\w°%]+)(?!\S"
-    re_number_only: ClassVar[re.Pattern] = re.compile(f"^\s*({re_number})\s*$")
-    re_combined: ClassVar[re.Pattern] = re.compile(f"({re_number})\s*({re_unit})")
+    re_number_only: ClassVar[re.Pattern[Any]] = re.compile(fr"^\s*({re_number})\s*$")
+    re_combined: ClassVar[re.Pattern[Any]] = re.compile(fr"({re_number})\s*({re_unit})")
 
-    def __init__(self, value: float | str, unit: str | None=None, display_unit: str | None=None):
+    def __init__(self, value: float | str | Quantity, unit: str | None=None, display_unit: str | None=None):
         data = self._get_init_args(value, unit, display_unit)
         super().__init__(**data)
 
@@ -37,8 +38,13 @@ class Quantity(pydantic.BaseModel):
         return cls(0.)
     
     @classmethod
-    def _get_init_args(cls, value: float | str, unit: str | None=None, display_unit: str | None=None) -> dict[str, Any]:
+    def _get_init_args(cls, value: float | str | Quantity, unit: str | None=None, display_unit: str | None=None) -> dict[str, Any]:
         value_float = None
+        if isinstance(value, Quantity):
+            return {
+                "value": value.value,
+                "display_unit": value.display_unit
+            }
         if isinstance(value, str):
             if cls.re_number_only.match(value):
                 value_float = float(value)
@@ -210,7 +216,7 @@ class Quantity(pydantic.BaseModel):
         return cls.re_number
 
 class Length(Quantity):
-    def __init__(self, value: float | str, unit: str | None=None, display_unit: str | None=None):
+    def __init__(self, value: float | str | Quantity, unit: str | None=None, display_unit: str | None=None):
         super().__init__(value, unit, display_unit)
 
     unit: ClassVar[str] = "m"
@@ -221,7 +227,7 @@ class Length(Quantity):
     }
 
 class Percentage(Quantity):
-    def __init__(self, value: float | str, unit: str | None=None, display_unit: str | None=None):
+    def __init__(self, value: float | str | Quantity, unit: str | None=None, display_unit: str | None=None):
         super().__init__(value, unit, display_unit)
 
     unit: ClassVar[str] = ""
@@ -231,7 +237,7 @@ class Percentage(Quantity):
     display_unit: str = "%"
 
 class Angle(Quantity):
-    def __init__(self, value: float | str, unit: str | None=None, display_unit: str | None=None):
+    def __init__(self, value: float | str | Quantity, unit: str | None=None, display_unit: str | None=None):
         super().__init__(value, unit, display_unit)
 
     unit: ClassVar[str] = "rad"

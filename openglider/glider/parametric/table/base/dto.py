@@ -37,22 +37,22 @@ class CellTuple(BaseModel, Generic[TupleType]):
     @pydantic.model_validator(mode="before")
     @classmethod
     def _validate(cls, v: Any) -> dict[str, Any] | Self:
-        if isinstance(v, tuple) and len(v) == 2:
-            return {
-                "first": v[0],
-                "second": v[1]
-            }
-        else:
-            return {
-                "first": v,
-                "second": v
-            }
-
+        if isinstance(v, tuple):
+            v_tuple = typing.cast(tuple[Any, Any], v)
+            if len(v_tuple) == 2:
+                return {
+                    "first": v_tuple[0],
+                    "second": v_tuple[1]
+                }
+        return {
+            "first": v,
+            "second": v
+        }
 class SingleCellTuple(CellTuple[TupleType], Generic[TupleType]):
     index_offset: ClassVar[tuple[int, int]] = (0, 0)
 
 
-_type_cache: dict[type[DTO], list[tuple[str, str]]] = {}
+_type_cache: dict[type[DTO[Any]], list[tuple[str, str]]] = {}
 
 class DTO(BaseModel, Generic[ReturnType], abc.ABC):
     model_config = pydantic.ConfigDict(
@@ -66,12 +66,12 @@ class DTO(BaseModel, Generic[ReturnType], abc.ABC):
         raise NotImplementedError
     
     @staticmethod
-    def _get_type_string(type_: type | None) -> str:
+    def _get_type_string(type_: type | types.UnionType | None) -> str:
         assert type_ is not None
 
         if isinstance(type_, types.UnionType):
-            names = []
-            for subtype in type_.__args__:
+            names: list[str] = []
+            for subtype in typing.get_args(type_):
                 names.append(subtype.__name__)
             
             return " | ".join(names)
@@ -87,10 +87,10 @@ class DTO(BaseModel, Generic[ReturnType], abc.ABC):
             return type_.__name__
     
     @staticmethod
-    def _is_cell_tuple(type: Any) -> CellTuple | None:
+    def check_is_cell_tuple(type_: Any) -> type[CellTuple[Any]] | None:
         try:
-            if issubclass(type, CellTuple):
-                return type
+            if isinstance(type_, type) and issubclass(type_, CellTuple):
+                return typing.cast(type[CellTuple[Any]], type_)
         except TypeError:
             pass
 
@@ -99,12 +99,12 @@ class DTO(BaseModel, Generic[ReturnType], abc.ABC):
     @classmethod
     def describe(cls) -> list[tuple[str, str]]:
         if cls not in _type_cache:
-            result = []
+            result: list[tuple[str, str]] = []
             for field_name, field in cls.model_fields.items():
-                is_cell_tuple = cls._is_cell_tuple(field.annotation)
+                is_cell_tuple = cls.check_is_cell_tuple(field.annotation)
 
                 if is_cell_tuple:
-                    inner_type = is_cell_tuple.__fields__["first"].annotation
+                    inner_type = is_cell_tuple.model_fields["first"].annotation
                     inner_type_str = cls._get_type_string(inner_type)
 
                     if sum(is_cell_tuple.index_offset) > 0:

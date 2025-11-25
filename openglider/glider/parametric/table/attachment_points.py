@@ -10,7 +10,6 @@ import euklid
 
 from openglider.glider.cell.attachment_point import CellAttachmentPoint
 from openglider.glider.cell.cell import Cell
-from openglider.glider.curve import GliderCurveType
 from openglider.glider.parametric.table.base import CellTable, Keyword, RibTable, dto
 from openglider.glider.parametric.table.base.parser import Parser
 from openglider.glider.rib.attachment_point import AttachmentPoint
@@ -25,7 +24,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-class ATP(dto.DTO):
+class ATP(dto.DTO[AttachmentPoint]):
     name: str
     rib_pos: Percentage
     force: float | euklid.vector.Vector3D
@@ -92,7 +91,7 @@ class AttachmentPointTable(RibTable):
         #"AHP": ATP,
     }
 
-    def get_element(self, row: int, keyword: str, data: list[Any], resolvers: list[Parser]=None, rib: Rib=None, **kwargs: Any) -> AttachmentPoint:
+    def get_element(self, row: int, keyword: str, data: list[Any], resolvers: list[Parser] | None=None, rib: Rib | None=None, **kwargs: Any) -> AttachmentPoint:
         # rib_no, rib_pos, cell_pos, force, name, is_cell
         force = data[2]
 
@@ -123,7 +122,8 @@ class AttachmentPointTable(RibTable):
                         if name in forces:
                             force = forces[name]
                             try:
-                                if isinstance(force, float):
+                                # TODO: why?
+                                if isinstance(force, (float, int)):
                                     raise TypeError()
                                 column[row, force_position] = str(list(force))
                             except TypeError:
@@ -157,7 +157,7 @@ class CellAttachmentPointTable(CellTable):
         "ATPDIFF": Keyword([("name", str), ("cell_pos", float), ("rib_pos", float), ("force", Union[float, str]), ("offset", float)], target_cls=CellAttachmentPoint)
     }
 
-    def get_element(self, row: int, keyword: str, data: list[Any], resolvers: list[Parser], cell: Cell=None, **kwargs: Any) -> CellAttachmentPoint:
+    def get_element(self, row: int, keyword: str, data: list[Any], resolvers: list[Parser], cell: Cell | None=None, **kwargs: Any) -> CellAttachmentPoint: # type: ignore
         force = data[3]
 
         if isinstance(force, str):
@@ -171,7 +171,8 @@ class CellAttachmentPointTable(CellTable):
         if len(data) > 4:
             offset = resolvers[row].parse(data[4])
             
-            node.offset = offset
+            if offset is not None:
+                node.offset = Length(offset)
 
         return node
 

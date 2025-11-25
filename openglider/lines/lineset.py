@@ -6,7 +6,7 @@ import logging
 import math
 import os
 import re
-from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, TypeAlias
 from collections.abc import Callable
 from functools import cmp_to_key
 
@@ -58,8 +58,7 @@ class LineLength:
         return length
 
 
-T = TypeVar('T')
-LineTreePart: TypeAlias = tuple[Line, list[T]]
+LineTreePart: TypeAlias = tuple[Line, list["LineTreePart"]]
 
 class LineSet:
     """
@@ -69,7 +68,7 @@ class LineSet:
     knot_corrections = KnotCorrections.read_csv(os.path.join(os.path.dirname(__file__), "knots.csv"))
     mat: SagMatrix
 
-    def __init__(self, lines: list[Line], v_inf: euklid.vector.Vector3D=None):
+    def __init__(self, lines: list[Line], v_inf: euklid.vector.Vector3D | None=None):
         self._v_inf = v_inf or euklid.vector.Vector3D([0,0,0])
         self.lines = lines or []
 
@@ -101,7 +100,7 @@ class LineSet:
 
     @classmethod
     def __from_json__(cls, lines: list[dict[str, Any]], nodes: list[Node], v_inf: euklid.vector.Vector3D) -> LineSet:
-        lines_new = []
+        lines_new: list[Line] = []
         for line in lines:
             if isinstance(line["upper_node"], int):
                 line["upper_node"] = nodes[line["upper_node"]]
@@ -137,8 +136,9 @@ class LineSet:
 
     @property
     def nodes(self) -> list[Node]:
-        nodes = set()
+        nodes: set[Node] = set()
         for line in self.lines:
+            # Collect unique Node instances from each line
             nodes.add(line.upper_node)
             nodes.add(line.lower_node)
         return list(nodes)
@@ -207,7 +207,7 @@ class LineSet:
 
         return {n: recursive_count_floors(n) for n in self.lower_attachment_points}
 
-    def get_lines_by_floor(self, target_floor: int=0, node: Node=None, en_style: bool=True) -> list[Line]:
+    def get_lines_by_floor(self, target_floor: int=0, node: Node | None=None, en_style: bool=True) -> list[Line]:
         """
         starting from node: walk up "target_floor" floors and return all the lines.
 
@@ -229,8 +229,8 @@ class LineSet:
                     
         return recursive_level(node, 0)
 
-    def get_floor_strength(self, node: Node=None) -> list[float]:
-        strength_list = []
+    def get_floor_strength(self, node: Node | None=None) -> list[float]:
+        strength_list: list[float] = []
         node =  node or self.get_main_attachment_point()
         for i in range(self.floors[node]):
             lines = self.get_lines_by_floor(i, node, en_style=True)
@@ -637,7 +637,7 @@ class LineSet:
             matches = {line.name: re_name.match(line.name) for line in lines_new}
 
             if all(matches.values()):
-                line_values = {}
+                line_values: dict[str, tuple[float, int, int]] = {}
                 for name, match in matches.items():
                     if match is None:
                         raise ValueError(f"this is unreachable")
@@ -888,7 +888,7 @@ class LineSet:
             if not len(upper_lines):
                 return [(line.upper_node.name, line_length)]
             else:
-                lengths = []
+                lengths: list[tuple[str, float]] = []
                 for upper in upper_lines:
                     lengths += get_checklength(*upper)
                 
@@ -896,7 +896,7 @@ class LineSet:
                     (name, length + line_length) for name, length in lengths
                 ]
         
-        checklength_values = []
+        checklength_values: list[tuple[str, float]] = []
         for line, upper_line in self.create_tree():
             checklength_values += get_checklength(line, upper_line)
 
