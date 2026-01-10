@@ -95,7 +95,7 @@ class PanelCut(BaseModel):
         return hash_list(self.x_left, self.x_right, self.cut_type)
 
     @cached_function("self")
-    def _get_ik_values(self, cell: Cell, x_values: list[float] | int, exact: bool=True) -> list[float]:
+    def get_ik_values(self, cell: Cell, x_values: list[float] | int, exact: bool=True) -> list[float]:
         if isinstance(x_values, int):
             x_values = [0] + [i/(x_values+1) for i in range(1, x_values+1)] + [1]
 
@@ -117,7 +117,7 @@ class PanelCut(BaseModel):
         else:
             curve = euklid.vector.Interpolation(points_2d)
         
-        ik_values = []
+        ik_values: list[float] = []
 
         for x in x_values:
             if x == 0:
@@ -134,7 +134,7 @@ class PanelCut(BaseModel):
         if not exact:
             return ik_values
 
-        ik_values_new = []
+        ik_values_new: list[float] = []
         flattened = cell.get_flattened_cell()  # noqa: F821
         inner = [flattened.at_position(Percentage(x)) for x in x_values]
 
@@ -170,8 +170,8 @@ class PanelCut(BaseModel):
 
 
     @cached_function("self")
-    def _get_ik_interpolation(self, cell: Cell, numribs: int=5, exact: bool=True) -> euklid.vector.Interpolation:
-        ik_values = self._get_ik_values(cell, x_values=numribs, exact=exact)
+    def get_ik_interpolation(self, cell: Cell, numribs: int=5, exact: bool=True) -> euklid.vector.Interpolation:
+        ik_values = self.get_ik_values(cell, x_values=numribs, exact=exact)
         numpoints = len(ik_values)-1
         ik_interpolation = euklid.vector.Interpolation(
             [[i/numpoints, x] for i, x in enumerate(ik_values)]
@@ -180,7 +180,7 @@ class PanelCut(BaseModel):
         return ik_interpolation
     
     def get_curve_2d(self, cell: Cell, numribs: int=0, exact: bool=True) -> euklid.vector.PolyLine2D:
-        ik_values = self._get_ik_values(cell, x_values=numribs, exact=exact)
+        ik_values = self.get_ik_values(cell, x_values=numribs, exact=exact)
 
         ribs = cell.get_flattened_cell(num_inner=numribs+2).inner
         points_2d = [rib.get(ik) for rib, ik in zip(ribs, ik_values)]
@@ -188,7 +188,7 @@ class PanelCut(BaseModel):
         return euklid.vector.PolyLine2D(points_2d)
     
     def get_curve_3d(self, cell: Cell, numribs: int=0, exact: bool=True) -> euklid.vector.PolyLine3D:
-        ik_values = self._get_ik_values(cell, numribs, exact)
+        ik_values = self.get_ik_values(cell, numribs, exact)
 
         ribs = cell.get_midribs(numribs+2)
         points = [rib.get(ik) for rib, ik in zip(ribs, ik_values)]
@@ -271,9 +271,9 @@ class Panel(BaseModel):
 
     def __add__(self, other: Panel) -> Panel | None:
         if self.cut_front == other.cut_back:
-            return Panel(other.cut_front, self.cut_back, material=self.material)
+            return Panel(cut_front=other.cut_front, cut_back=self.cut_back, material=self.material)
         elif self.cut_back == other.cut_front:
-            return Panel(self.cut_front, other.cut_back, material=self.material)
+            return Panel(cut_front=self.cut_front, cut_back=other.cut_back, material=self.material)
         else:
             return None
 
@@ -291,7 +291,7 @@ class Panel(BaseModel):
         :return: List of rib-pieces (Vectorlist)
         """
         xvalues = cell.rib1.profile_2d.x_values
-        ribs = []
+        ribs: list[euklid.vector.PolyLine3D] = []
         for i in range(numribs + 1):
             y = i / numribs
 
@@ -327,7 +327,7 @@ class Panel(BaseModel):
         nodes: list[euklid.vector.Vector3D] = []
         rib_node_indices: list[list[int]] = []
 
-        ik_values = self._get_ik_values(cell, numribs, exact=exact)
+        ik_values = self.get_ik_values(cell, numribs, exact=exact)
 
         for rib_no in range(numribs + 2):
             y = rib_no / max(numribs+1, 1)
@@ -343,9 +343,9 @@ class Panel(BaseModel):
 
             nodes += list(midrib.get(front, back))
 
-        points = [mesh.Vertex(*p) for p in nodes]
+        points = [mesh.Vertex(p[0], p[1], p[2]) for p in nodes]
 
-        polygons = []
+        polygons: list[mesh.Polygon] = []
 
         # helper functions
         def left_triangle(l_i: int, r_i: int) -> list[mesh.Polygon]:
@@ -370,6 +370,7 @@ class Panel(BaseModel):
             l_i = r_i = 0            
 
             while l_i < len(indices_left)-1 or r_i < len(indices_right)-1:
+                poly: list[mesh.Polygon] | None = None
                 if l_i == len(indices_left) - 1:
                     poly = right_triangle(indices_left[l_i], indices_right[r_i])
                     r_i += 1
@@ -398,10 +399,11 @@ class Panel(BaseModel):
                 if r_i < len(iks_right) - 1:
                     iks.append(iks_right[r_i+1])
                 
-                for p in poly:
-                    p.attributes["center"] = [x, x_value_interpolation.get_value(sum(iks)/len(iks))]
+                if poly is not None:
+                    for p in poly:
+                        p.attributes["center"] = [x, x_value_interpolation.get_value(sum(iks)/len(iks))]
 
-                polygons += poly
+                    polygons += poly
 
         mesh_data = {
             f"panel_{self.material}#{self.material.color_code}": polygons,
@@ -430,21 +432,21 @@ class Panel(BaseModel):
         self.cut_front.x_right = Percentage(p_r.find_nearest_x_value(self.cut_front.x_right.si))
 
     @cached_function("self")
-    def _get_ik_values(self, cell: Cell, numribs: int=0, exact: bool=True) -> list[tuple[float, float]]:
+    def get_ik_values(self, cell: Cell, numribs: int=0, exact: bool=True) -> list[tuple[float, float]]:
         """
         :param cell: the parent cell of the panel
         :param numribs: number of interpolation steps between ribs
         :return: [[front_ik_0, back_ik_0], ..[front_ik_n, back_ik_n]] with n is numribs + 1
         """
-        ik_front = self.cut_front._get_ik_values(cell, x_values=numribs, exact=exact)
-        ik_back = self.cut_back._get_ik_values(cell, x_values=numribs, exact=exact)
+        ik_front = self.cut_front.get_ik_values(cell, x_values=numribs, exact=exact)
+        ik_back = self.cut_back.get_ik_values(cell, x_values=numribs, exact=exact)
 
         return [(ik1, ik2) for ik1, ik2 in zip(ik_front, ik_back)]
         
     @cached_function("self")
-    def _get_ik_interpolation(self, cell: Cell, numribs: int=0, exact: bool=True) -> tuple[euklid.vector.Interpolation, euklid.vector.Interpolation]:
-        i1 = self.cut_front._get_ik_interpolation(cell, numribs, exact)
-        i2 = self.cut_back._get_ik_interpolation(cell, numribs, exact)
+    def get_ik_interpolation(self, cell: Cell, numribs: int=0, exact: bool=True) -> tuple[euklid.vector.Interpolation, euklid.vector.Interpolation]:
+        i1 = self.cut_front.get_ik_interpolation(cell, numribs, exact)
+        i2 = self.cut_back.get_ik_interpolation(cell, numribs, exact)
 
         return i1, i2
 
@@ -462,10 +464,10 @@ class Panel(BaseModel):
         else:
             ribs = midribs
 
-        positions = self._get_ik_values(cell, numribs, exact=True)
+        positions = self.get_ik_values(cell, numribs, exact=True)
 
-        front = []
-        back = []
+        front: list[float] = []
+        back: list[float] = []
 
 
         for rib_no in range(numribs + 2):

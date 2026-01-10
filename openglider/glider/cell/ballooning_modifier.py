@@ -53,7 +53,7 @@ class EntryRamp(BallooningModifier):
             if panel_no < len(panels) - 1:
                 cuts.add(x2)
 
-        all_cuts = list(cuts)
+        all_cuts = sorted(list(cuts))
         
         for start, end in zip(all_cuts[::2], all_cuts[1::2]):
             ballooning = BallooningFixed(start=Percentage(start), end=Percentage(end), ramp_distance=self.ramp_distance).apply(ballooning, cell)

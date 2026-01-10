@@ -897,8 +897,8 @@ class LineSet:
                 ]
         
         checklength_values: list[tuple[str, float]] = []
-        for line, upper_line in self.create_tree():
-            checklength_values += get_checklength(line, upper_line)
+        for bottom_line, upper_line in self.create_tree():
+            checklength_values += get_checklength(bottom_line, upper_line)
 
         return dict(checklength_values)
 

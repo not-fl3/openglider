@@ -3,9 +3,8 @@ import logging
 from typing import TYPE_CHECKING
 
 import euklid
-import openglider.jsonify
 from openglider.utils.dataclass import dataclass
-import openglider.vector
+import openglider.vector.drawing
 
 if TYPE_CHECKING:
     from openglider.glider.cell import Cell
@@ -41,7 +40,7 @@ class PanelRigidFoil:
         line, ik_front, ik_back = self._get_flattened_line(cell)
 
         #ik_values = panel._get_ik_values(cell, numribs=5)
-        ik_interpolation_front, ik_interpolation_back = panel._get_ik_interpolation(cell, numribs=5)
+        ik_interpolation_front, ik_interpolation_back = panel.get_ik_interpolation(cell, numribs=5)
 
         start = max(ik_front, ik_interpolation_front.get_value(self.y))
         stop = min(ik_back, ik_interpolation_back.get_value(self.y))
@@ -66,7 +65,7 @@ class PanelRigidFoil:
 
         panel_iks = []
         for panel in cell.panels:
-            interpolations = panel._get_ik_interpolation(cell, numribs=5)
+            interpolations = panel.get_ik_interpolation(cell, numribs=5)
 
             panel_iks.append(interpolations[0].get_value(self.y))
             panel_iks.append(interpolations[1].get_value(self.y))

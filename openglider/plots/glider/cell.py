@@ -61,8 +61,8 @@ class PanelPlot:
             PANELCUT_TYPES.round: self.config.cut_round
         }
 
-        ik_front = self.panel.cut_front._get_ik_values(self.cell, x_values=self.config.midribs, exact=True)
-        ik_back = self.panel.cut_back._get_ik_values(self.cell, x_values=self.config.midribs, exact=True)
+        ik_front = self.panel.cut_front.get_ik_values(self.cell, x_values=self.config.midribs, exact=True)
+        ik_back = self.panel.cut_back.get_ik_values(self.cell, x_values=self.config.midribs, exact=True)
 
         allowance_front = -self.panel.cut_front.seam_allowance
         allowance_back = self.panel.cut_back.seam_allowance
@@ -184,7 +184,7 @@ class PanelPlot:
         return plotpart
     
     def get_endcurves(self) -> tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]:
-        ik_values = self.panel._get_ik_values(self.cell, self.config.midribs, exact=True)
+        ik_values = self.panel.get_ik_values(self.cell, self.config.midribs, exact=True)
         front = euklid.vector.PolyLine2D([
             line.get(ik[0]) for line, ik in zip(self.inner, ik_values)
         ])
@@ -506,8 +506,8 @@ class PanelPlot:
             line2 = self.draw_straight_line(minirib.yvalue, minirib.front_cut, back_cut, cut_front_result, cut_back_result)
 
             result.append((
-                line1 and line1.get_length() or 0.,
-                line2 and line2.get_length() or 0.
+                line1.get_length() if line1 is not None else 0.,
+                line2.get_length() if line2 is not None else 0.
             ))
 
             for line in (line1, line2):
@@ -587,7 +587,7 @@ class CellPlotMaker:
         )
 
     def get_panels(self, panels: list[Panel] | None=None) -> list[PlotPart]:
-        cell_panels = []
+        cell_panels: list[PlotPart] = []
         self.cell.calculate_3d_shaping(numribs=self.config.midribs)
 
         if panels is None:
@@ -612,7 +612,7 @@ class CellPlotMaker:
     def get_dribs(self) -> list[PlotPart]:
         diagonals = self.cell.diagonals[:]
         diagonals.sort(key=lambda d: d.name)
-        dribs = []
+        dribs: list[PlotPart] = []
         for drib in diagonals[::-1]:
             drib_plot = self.DribPlot(drib, self.cell, self.config)
             dribs.append(drib_plot.flatten())
@@ -623,8 +623,8 @@ class CellPlotMaker:
     def get_straps(self) -> tuple[list[PlotPart], list[PlotPart]]:
         straps = self.cell.straps[:]
         straps.sort(key=lambda d: (d.is_upper, d.get_average_x().si))
-        upper = []
-        lower = []
+        upper: list[PlotPart] = []
+        lower: list[PlotPart] = []
         for strap in straps:
             plot = self.StrapPlot(strap, self.cell, self.config)
             dwg = plot.flatten()
@@ -637,7 +637,7 @@ class CellPlotMaker:
         return upper, lower
     
     def get_rigidfoils(self) -> list[PlotPart]:
-        rigidfoils = []
+        rigidfoils: list[PlotPart] = []
         for rigidfoil in self.cell.rigidfoils:
             rigidfoils.append(rigidfoil.get_flattened(self.cell))
         
@@ -647,7 +647,7 @@ class CellPlotMaker:
     def get_miniribs(self) -> list[PlotPart]:
         miniribs = self.cell.miniribs[:]
         miniribs.sort(key=lambda d: d.name)
-        mribs = []
+        mribs: list[PlotPart] = []
         for mrib in miniribs[::-1]:
             mrib_plot = self.MiniRibPlot(mrib, self.cell, self.config)
             mribs.append(mrib_plot.flatten())
