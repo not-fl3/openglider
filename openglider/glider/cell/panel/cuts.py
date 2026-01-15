@@ -26,17 +26,16 @@ class CutResult(BaseModel):
         )
 
     def get_inner_index(self, y: float) -> float:
-        divisor = len(self.inner_indices)-1
+        steps = len(self.inner_indices)-1
+        i1 = math.floor(y * steps)
 
-        for i in range(divisor):
-            y1 = i / divisor
-            y2 = (i+1) / divisor
+        if i1 >= len(self.inner_indices)-1:
+            raise ValueError("y out of bounds")
 
-            if y2 > y:
-                break
-        
-        x1 = self.inner_indices[i]
-        x2 = self.inner_indices[i+1]
+        x1 = self.inner_indices[i1]
+        x2 = self.inner_indices[i1+1]
+        y1 = i1 / steps
+        y2 = (i1+1) / steps
         
         return x1 + (y-y1) / (y2-y1) * (x2-x1)
 
@@ -81,7 +80,7 @@ class DesignCut(Cut):
 
 
     def _get_indices(self, inner_lists: InnerLists, amount_3d: list[float] | None) -> list[float]:
-        indices = []
+        indices: list[float] = []
         for i, lst in enumerate(inner_lists):
             line, ik = lst
             if amount_3d is not None:
@@ -104,7 +103,7 @@ class DesignCut(Cut):
         
         normvector = euklid.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
 
-        newlist = []
+        newlist: list[euklid.vector.Vector2D] = []
         # todo: sort by distance
         cuts_left = outer_left.cut(p1, p2)
         cuts_left.sort(key=lambda cut: -abs(cut[1]))
@@ -194,11 +193,11 @@ class Cut3D(DesignCut):
         :return:
         """
 
-        inner_ik = []
-        inner_points = []
+        inner_ik: list[float] = []
+        inner_points: list[euklid.vector.Vector2D] = []
 
         if amount_3d is None:
-            amount_3d = [0] * len(inner_lists)
+            amount_3d = [0.] * len(inner_lists)
 
         for offset, lst in zip(amount_3d, inner_lists):
             curve, ik = lst
@@ -257,11 +256,11 @@ class Cut3D_2(DesignCut):
         :param amount_3d: list of 3d-shaping amounts
         :return:
         """
-        inner_new = []
-        point_list = []
+        inner_new: list[tuple[euklid.vector.PolyLine2D, float]] = []
+        point_list: list[euklid.vector.Vector2D] = []
         
         if amount_3d is None:
-            amount_3d = [0] * len(inner_lists)
+            amount_3d = [0.] * len(inner_lists)
 
         for offset, lst in zip(amount_3d, inner_lists):
             curve, ik = lst
@@ -385,9 +384,3 @@ class ParallelCut(DesignCut):
         #iks[0] = inner_lists[0][0].walk()
 
         return CutResult(curve, leftcut_index[0], rightcut_index[0], indices)
-
-
-# TODO: used?
-cuts = {"orthogonal": DesignCut,
-        "folded": FoldedCut,
-        "parallel": ParallelCut}

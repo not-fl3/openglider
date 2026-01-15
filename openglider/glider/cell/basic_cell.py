@@ -33,8 +33,8 @@ class BasicCell(BaseModel):
             # 3: 2 * sin(phi2) * ballooning_radius = norm(diff_vector)
 
             x_values: list[float] = []
-            distances = []
-            heights = []
+            distances: list[float] = []
+            heights: list[float] = []
             node_len = len(self.prof1.curve)
 
             diff = self.prof2.curve.sub(self.prof1.curve)
@@ -82,7 +82,7 @@ class BasicCell(BaseModel):
         t_2 = self.prof2.tangents
         # cross (differenzvektor, tangentialvektor)
 
-        normals = []
+        normals: list[euklid.vector.Vector3D] = []
 
         for p1, p2, t1, t2 in zip(prof1, prof2, t_1, t_2):
             normal = (t1 + t2).cross(p1 - p2).normalized()

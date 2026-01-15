@@ -54,12 +54,13 @@ def get_cell_length_table(glider: Glider) -> Table:
 
     for cell_no, cell in enumerate(glider.cells):
         for rigidfoil in cell.rigidfoils:
+            assert rigidfoil.total_length is not None
             table[current_row, 0] = f"{cell.name} {rigidfoil.y}"
             table[current_row, 1] = cell_no
             table[current_row, 2] = rigidfoil.y
             table[current_row, 3] = rigidfoil.x_start
             table[current_row, 4] = rigidfoil.x_end
-            table[current_row, 5] = round(1000*rigidfoil.get_length(cell), 1)
+            table[current_row, 5] = round(1000*rigidfoil.total_length, 1)
 
             current_row += 1
 

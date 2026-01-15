@@ -5,16 +5,14 @@ import logging
 import math
 
 import euklid
-import numpy as np
 from openglider.airfoil import get_x_value
 from openglider.glider.cell.cell import FlattenedCell
-from openglider.glider.cell.panel import Panel, PANELCUT_TYPES
+from openglider.glider.cell.panel import Panel
+from openglider.glider.cell.panel.panel import FlattenedPanel
 from openglider.plots.config import PatternConfig
-from openglider.plots.cuts import Cut, CutResult
 from openglider.plots.glider.diagonal import DribPlot, StrapPlot
 from openglider.plots.glider.minirib import MiniRibPlot
 from openglider.plots.usage_stats import MaterialUsage
-from openglider.utils.cache import cached_property
 from openglider.utils.config import Config
 from openglider.vector.drawing import PlotPart
 from openglider.vector.text import Text
@@ -46,143 +44,65 @@ class PanelPlot:
         self.outer_orig = flattended_cell.outer_orig
 
         self.x_values = self.cell.rib1.profile_2d.x_values
+        self.flattened_panel: FlattenedPanel | None = None
+        self.plotpart: PlotPart | None = None
 
-        self.logger = logging.getLogger(r"{self.__class__.__module__}.{self.__class__.__name__}")
+    def prepare(self) -> None:
+        cut_types = self.config.get_cut_types()
+        self.flattened_panel = self.panel.get_flattened(self.cell, self.config.midribs, cut_types=cut_types)
 
-    def flatten(self) -> PlotPart:
-        plotpart = PlotPart(material_code=str(self.panel.material), name=self.panel.name)
+    def flatten(self, extra_marks: list[euklid.vector.PolyLine2D] | None=None) -> PlotPart:
+        assert self.flattened_panel is not None, "Call prepare() before flatten()"
+        self.plotpart = PlotPart(material_code=str(self.panel.material), name=self.panel.name)
 
-        cut_types: dict[PANELCUT_TYPES, type[Cut]] = {
-            PANELCUT_TYPES.folded: self.config.cut_entry,
-            PANELCUT_TYPES.parallel: self.config.cut_trailing_edge,
-            PANELCUT_TYPES.orthogonal: self.config.cut_design,
-            PANELCUT_TYPES.singleskin: self.config.cut_entry,
-            PANELCUT_TYPES.cut_3d: self.config.cut_3d,
-            PANELCUT_TYPES.round: self.config.cut_round
-        }
-
-        ik_front = self.panel.cut_front.get_ik_values(self.cell, x_values=self.config.midribs, exact=True)
-        ik_back = self.panel.cut_back.get_ik_values(self.cell, x_values=self.config.midribs, exact=True)
-
-        allowance_front = -self.panel.cut_front.seam_allowance
-        allowance_back = self.panel.cut_back.seam_allowance
-
-        # cuts -> cut-line, index left, index right
-        self.cut_front = cut_types[self.panel.cut_front.cut_type](amount=allowance_front)
-        self.cut_back = cut_types[self.panel.cut_back.cut_type](amount=allowance_back)
-
-        inner_front = [(line, ik) for line, ik in zip(self.inner, ik_front)]
-        inner_back = [(line, ik) for line, ik in zip(self.inner, ik_back)]
-
-        shape_3d_amount_front = [-x for x in self.panel.cut_front.cut_3d_amount]
-        shape_3d_amount_back = self.panel.cut_back.cut_3d_amount
-
-        # zero-out 3d-shaping if there is none
-        if self.panel.cut_front.cut_type != PANELCUT_TYPES.cut_3d:
-            dist = np.linspace(shape_3d_amount_front[0], shape_3d_amount_front[-1], len(shape_3d_amount_front))
-            shape_3d_amount_front = list(dist)
-
-        if self.panel.cut_back.cut_type != PANELCUT_TYPES.cut_3d:
-            dist = np.linspace(shape_3d_amount_back[0], shape_3d_amount_back[-1], len(shape_3d_amount_back))
-            shape_3d_amount_back = list(dist)
-
-        left = inner_front[0][0].get(inner_front[0][1], inner_back[0][1])
-        right = inner_front[-1][0].get(inner_front[-1][1], inner_back[-1][1])
-
-        outer_left = left.offset(-self.cell.rib1.seam_allowance.si)
-        outer_right = right.offset(self.cell.rib2.seam_allowance.si)
-
-        cut_front_result = self.cut_front.apply(inner_front, outer_left, outer_right, shape_3d_amount_front)
-        cut_back_result = self.cut_back.apply(inner_back, outer_left, outer_right, shape_3d_amount_back)
-
-        panel_left: euklid.vector.PolyLine2D | None = None
-        if cut_front_result.index_left < cut_back_result.index_left:
-            panel_left = outer_left.get(cut_front_result.index_left, cut_back_result.index_left).fix_errors()
-        panel_back = cut_back_result.outline.copy()
-
-        panel_right: euklid.vector.PolyLine2D | None = None
-        if cut_back_result.index_right > cut_front_result.index_right:
-            panel_right = outer_right.get(cut_back_result.index_right, cut_front_result.index_right).fix_errors()
-        panel_front = cut_front_result.outline.copy()
-
-        # spitzer schnitt
-        # rechts
-        # TODO: FIX!
-        # if cut_front_result.index_right >= cut_back_result.index_right:
-        #     panel_right = euklid.vector.PolyLine2D([])
-
-        #     _cuts = panel_front.cut_with_polyline(panel_back, startpoint=len(panel_front) - 1)
-        #     try:
-        #         ik_front, ik_back = next(_cuts)
-        #         panel_back = panel_back.get(0, ik_back)
-        #         panel_front = panel_front.get(0, ik_front)
-        #     except StopIteration:
-        #         pass  # todo: fix!!
-
-        # # lechts
-        # if cut_front_result.index_left >= cut_back_result.index_left:
-        #     panel_left = euklid.vector.PolyLine2D([])
-
-        #     _cuts = panel_front.cut_with_polyline(panel_back, startpoint=0)
-        #     try:
-        #         ik_front, ik_back = next(_cuts)
-        #         panel_back = panel_back.get(ik_back, len(panel_back)-1)
-        #         panel_front = panel_front[ik_front, len(panel_back)-1]
-        #     except StopIteration:
-        #         pass  # todo: fix as well!
-
-        panel_back = panel_back.get(len(panel_back)-1, 0)
-        if panel_right:
-            envelope = panel_right.reverse() + panel_back
-        else:
-            envelope = panel_back
-
-        if panel_left:
-            envelope += panel_left.reverse()
-        envelope += panel_front
-        envelope += euklid.vector.PolyLine2D([envelope.nodes[0]])
-
-        plotpart.layers["envelope"].append(envelope)
+        self.plotpart.layers["envelope"].append(self.flattened_panel.envelope)
 
         if self.config.debug:
-            plotpart.layers["debug"].append(euklid.vector.PolyLine2D([line.get(ik) for line, ik in inner_front]))
-            plotpart.layers["debug"].append(euklid.vector.PolyLine2D([line.get(ik) for line, ik in inner_back]))
-            for front, back in zip(inner_front, inner_back):
-                plotpart.layers["debug"].append(front[0].get(front[1], back[1]))
+            inner_curves = self.flattened_panel.flattened_cell.inner
+            ik_front = self.flattened_panel.cut_front.inner_indices
+            ik_back = self.flattened_panel.cut_back.inner_indices
+
+            for curve, ikf, ikb in zip(inner_curves, ik_front, ik_back):
+                self.plotpart.layers["debug"].append(curve.get(ikf, ikb))
 
         # sewings
-        plotpart.layers["stitches"] += [
-            self.inner[0].get(cut_front_result.inner_indices[0], cut_back_result.inner_indices[0]),
-            self.inner[-1].get(cut_front_result.inner_indices[-1], cut_back_result.inner_indices[-1])
+        self.plotpart.layers["stitches"] += [
+            self.inner[0].get(self.flattened_panel.cut_front.inner_indices[0], self.flattened_panel.cut_back.inner_indices[0]),
+            self.inner[-1].get(self.flattened_panel.cut_front.inner_indices[-1], self.flattened_panel.cut_back.inner_indices[-1])
             ]
 
         # folding line
         self.front_curve = euklid.vector.PolyLine2D([
-                line.get(x) for line, x in zip(self.inner, cut_front_result.inner_indices)
+                line.get(x) for line, x in zip(self.inner, self.flattened_panel.cut_front.inner_indices)
             ])
         self.back_curve = euklid.vector.PolyLine2D([
-                line.get(x) for line, x in zip(self.inner, cut_back_result.inner_indices)
+                line.get(x) for line, x in zip(self.inner, self.flattened_panel.cut_back.inner_indices)
             ])
 
-        plotpart.layers["marks"] += [
+        self.plotpart.layers["marks"] += [
             self.front_curve,
             self.back_curve
         ]
 
-        plotpart.layers["cuts"].append(envelope.copy())
+        if extra_marks is not None:
+            for mark in extra_marks:
+                if len(mark) < 2:
+                    self.plotpart.layers["L0"].append(mark.copy())
+                else:
+                    self.plotpart.layers["marks"].append(mark.copy())
 
-        self._insert_text(plotpart)
-        self._insert_controlpoints(plotpart)
-        self._insert_attachment_points(plotpart)
-        self._insert_diagonals(plotpart)
-        self._insert_rigidfoils(plotpart, cut_front_result, cut_back_result)
-        self._insert_miniribs(plotpart, cut_front_result, cut_back_result)
+        self.plotpart.layers["cuts"].append(self.flattened_panel.envelope.copy())
 
-        self._align_upright(plotpart)
+        self._insert_text(self.plotpart)
+        self._insert_controlpoints(self.plotpart)
+        self._insert_attachment_points(self.plotpart)
+        self._insert_diagonals(self.plotpart)
+        self._insert_miniribs(self.plotpart)
 
-        self.plotpart = plotpart
-        return plotpart
-    
+        self._align_upright(self.plotpart)
+
+        return self.plotpart
+
     def get_endcurves(self) -> tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]:
         ik_values = self.panel.get_ik_values(self.cell, self.config.midribs, exact=True)
         front = euklid.vector.PolyLine2D([
@@ -196,8 +116,8 @@ class PanelPlot:
 
 
     def get_material_usage(self) -> MaterialUsage:
-        part = self.flatten()
-        envelope = part.layers["envelope"].polylines[0]
+        assert self.plotpart is not None
+        envelope = self.plotpart.layers["envelope"].polylines[0]
         area = envelope.get_area()
 
         return MaterialUsage().consume(self.panel.material, area)
@@ -301,12 +221,12 @@ class PanelPlot:
 
         front = (
             self.front_curve,
-            self.front_curve.offset(-float(self.cut_front.amount))
+            self.front_curve.offset(float(self.panel.cut_front.seam_allowance))
         )
 
         back = (
             self.back_curve,
-            self.back_curve.offset(-float(self.cut_back.amount))
+            self.back_curve.offset(-float(self.panel.cut_back.seam_allowance))
         )
 
         for i in range(x_dots):
@@ -453,14 +373,14 @@ class PanelPlot:
                                                         size=0.01,  # 1cm
                                                         align=text_align, valign=0, height=0.8).get_vectors()  # type: ignore
                         
-    def draw_straight_line(
+    def get_straight_line(
             self,
             y: float,
             start: float,
             end: float,
-            cut_front_result: CutResult,
-            cut_back_result: CutResult
             ) -> euklid.vector.PolyLine2D | None:
+        assert self.flattened_panel is not None, "Call prepare() before draw_straight_line()"
+
         if start > max(self.panel.cut_back.x_left, self.panel.cut_back.x_right):
             return None
         if end < min(self.panel.cut_front.x_left, self.panel.cut_front.x_right):
@@ -468,42 +388,29 @@ class PanelPlot:
 
         flattened_cell = self.cell.get_flattened_cell()
 
-        ik_min = cut_front_result.get_inner_index(y)
-        ik_max = cut_back_result.get_inner_index(y)
+        ik_min = self.flattened_panel.cut_front.get_inner_index(y)
+        ik_max = self.flattened_panel.cut_back.get_inner_index(y)
 
         line = flattened_cell.at_position(Percentage(y))
 
         ik_front = self.cell.rib1.profile_2d(start)
         ik_back = self.cell.rib1.profile_2d(end)
-        #ik_front = mix(self.cell.rib1.profile_2d(start), self.cell.rib2.profile_2d(start), y)
-        #ik_back = mix(self.cell.rib1.profile_2d(end), self.cell.rib2.profile_2d(end), y)
         
         ik_front = max(ik_front, ik_min)
         ik_back = min(ik_back, ik_max)
 
-        logger.warning(f"ok2 {ik_front} {ik_back}")
         if ik_front < ik_back:
             return line.get(ik_front, ik_back)
         
         return None
-    
-    def _insert_rigidfoils(self, plotpart: PlotPart, cut_front_result: CutResult, cut_back_result: CutResult) -> None:
-        for rigidfoil in self.cell.rigidfoils:
-            line = self.draw_straight_line(rigidfoil.y, rigidfoil.x_start, rigidfoil.x_end, cut_front_result, cut_back_result)
-            if line is not None:
-                plotpart.layers["marks"].append(line)
 
-                # laser dots
-                plotpart.layers["L0"].append(euklid.vector.PolyLine2D([line.get(0)]))
-                plotpart.layers["L0"].append(euklid.vector.PolyLine2D([line.get(len(line)-1)]))
-
-    def _insert_miniribs(self, plotpart: PlotPart, cut_front_result: CutResult, cut_back_result: CutResult) -> list[tuple[float, float]]:
+    def _insert_miniribs(self, plotpart: PlotPart) -> list[tuple[float, float]]:
         result: list[tuple[float, float]] = []
         for minirib in self.cell.miniribs:
 
             back_cut = minirib.back_cut or 1.
-            line1 = self.draw_straight_line(minirib.yvalue, -back_cut, -minirib.front_cut, cut_front_result, cut_back_result)
-            line2 = self.draw_straight_line(minirib.yvalue, minirib.front_cut, back_cut, cut_front_result, cut_back_result)
+            line1 = self.get_straight_line(minirib.yvalue, -back_cut, -minirib.front_cut)
+            line2 = self.get_straight_line(minirib.yvalue, minirib.front_cut, back_cut)
 
             result.append((
                 line1.get_length() if line1 is not None else 0.,
@@ -554,11 +461,20 @@ class CellPlotMaker:
         self.consumption_drib = MaterialUsage()
         self.consumption_straps = MaterialUsage()
         self.consumption_mribs = MaterialUsage()
-        
-        self._flattened_cell = None
+
+        self.prepare()
+
+    def prepare(self) -> None:
+        flattened_cell = self.get_flattened_cell()
+        self.cell.calculate_3d_shaping(numribs=self.config.midribs)
+        self.panel_plots = {
+            panel: self.PanelPlot(panel, self.cell, flattened_cell, config=self.config)
+            for panel in self.cell.panels
+        }
+        for panel_plot in self.panel_plots.values():
+            panel_plot.prepare()
     
-    @cached_property("cell", "config.midribs")
-    def flattened_cell(self) -> FlattenedCellWithAllowance:
+    def get_flattened_cell(self) -> FlattenedCellWithAllowance:
         flattened_cell = self.cell.get_flattened_cell(self.config.midribs)
 
         left_bal, right_bal = flattened_cell.ballooned
@@ -586,28 +502,31 @@ class CellPlotMaker:
             outer_orig=outer_orig
         )
 
-    def get_panels(self, panels: list[Panel] | None=None) -> list[PlotPart]:
+    def get_panels(self, panels: list[Panel] | None=None, extra_marks: dict[Panel, list[euklid.vector.PolyLine2D]] | None = None) -> list[PlotPart]:
         cell_panels: list[PlotPart] = []
-        self.cell.calculate_3d_shaping(numribs=self.config.midribs)
 
         if panels is None:
             panels = self.cell.panels
 
         for panel in panels:
-            plot = self.PanelPlot(panel, self.cell, self.flattened_cell, config=self.config)
-            dwg = plot.flatten()
+            plot = self.panel_plots[panel]
+            panel_marks = None
+            if extra_marks is not None and panel in extra_marks:
+                panel_marks = extra_marks[panel]
+            
+            dwg = plot.flatten(extra_marks=panel_marks)
             cell_panels.append(dwg)
             self.consumption += plot.get_material_usage()
         
         return cell_panels
 
-    def get_panels_lower(self) -> list[PlotPart]:
+    def get_panels_lower(self, extra_marks: dict[Panel, list[euklid.vector.PolyLine2D]] | None = None) -> list[PlotPart]:
         panels = [p for p in self.cell.panels if p.is_lower()]
-        return self.get_panels(panels)
+        return self.get_panels(panels, extra_marks=extra_marks)
 
-    def get_panels_upper(self) -> list[PlotPart]:
+    def get_panels_upper(self, extra_marks: dict[Panel, list[euklid.vector.PolyLine2D]] | None = None) -> list[PlotPart]:
         panels = [p for p in self.cell.panels if not p.is_lower()]
-        return self.get_panels(panels)
+        return self.get_panels(panels, extra_marks=extra_marks)
 
     def get_dribs(self) -> list[PlotPart]:
         diagonals = self.cell.diagonals[:]
@@ -636,12 +555,18 @@ class CellPlotMaker:
 
         return upper, lower
     
-    def get_rigidfoils(self) -> list[PlotPart]:
+    def get_rigidfoils(self) -> tuple[list[PlotPart], dict[Panel, list[euklid.vector.PolyLine2D]]]:
         rigidfoils: list[PlotPart] = []
+        panel_marks: dict[Panel, list[euklid.vector.PolyLine2D]] = {}
         for rigidfoil in self.cell.rigidfoils:
-            rigidfoils.append(rigidfoil.get_flattened(self.cell))
+            drawing, marks = rigidfoil.get_flattened(self.cell, self.config.midribs, cut_types=self.config.get_cut_types())
+            drawing.rotate(90, radians=False)
+            rigidfoils.append(drawing)
+            for panel in marks:
+                panel_marks.setdefault(panel, [])
+                panel_marks[panel] += marks[panel]
         
-        return rigidfoils
+        return rigidfoils, panel_marks
     
 
     def get_miniribs(self) -> list[PlotPart]:

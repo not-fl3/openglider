@@ -6,16 +6,19 @@ import math
 from typing import TYPE_CHECKING, Any
 
 import euklid
+import numpy as np
 from openglider.airfoil.profile_3d import Profile3D
 import openglider.mesh as mesh
 from openglider.airfoil import get_x_value
 from openglider.materials import Material, cloth
 from openglider.utils.cache import cached_function, hash_list
 from openglider.utils.dataclass import BaseModel, Field
+from openglider.vector.drawing.part import PlotPart
 from openglider.vector.unit import Length, Percentage
+import openglider.glider.cell.panel.cuts as cuts
 
 if TYPE_CHECKING:
-    from openglider.glider.cell.cell import Cell
+    from openglider.glider.cell.cell import Cell, FlattenedCell
 
 
 logger = logging.getLogger(__name__)
@@ -195,6 +198,35 @@ class PanelCut(BaseModel):
 
         return euklid.vector.PolyLine3D(points)
 
+class FlattenedPanel(BaseModel):
+    panel: Panel
+    flattened_cell: FlattenedCell
+    envelope: euklid.vector.PolyLine2D
+    cut_front: cuts.CutResult
+    cut_back: cuts.CutResult
+    x_distribution: list[float]
+
+    def draw_straight_line(self, y: Percentage, start: Percentage, end: Percentage,) -> euklid.vector.PolyLine2D | None:
+        if start > max(self.panel.cut_back.x_left, self.panel.cut_back.x_right):
+            return None
+        if end < min(self.panel.cut_front.x_left, self.panel.cut_front.x_right):
+            return None
+
+        ik_min = self.cut_front.get_inner_index(y.si)
+        ik_max = self.cut_back.get_inner_index(y.si)
+
+        line = self.flattened_cell.at_position(y)
+
+        ik_front = get_x_value(self.x_distribution, start)
+        ik_back = get_x_value(self.x_distribution, end)
+
+        ik_front = max(ik_front, ik_min)
+        ik_back = min(ik_back, ik_max)
+
+        if ik_front < ik_back:
+            return line.get(ik_front, ik_back)
+        
+        return None
 
 class Panel(BaseModel):
     """
@@ -527,5 +559,87 @@ class Panel(BaseModel):
             back.append(amount_back)
 
         return front, back
+    
+    @cached_function("cut_front", "cut_back")
+    def get_flattened(self, cell: Cell, midribs: int, cut_types: dict[PANELCUT_TYPES, type[cuts.Cut]] | None = None) -> FlattenedPanel:
+        plotpart = PlotPart(material_code=str(self.material), name=self.name)
 
-#PanelCut.__pydantic_model__.update_forward_refs()  # type: ignore
+        if cut_types is None:
+            _cut_types: dict[PANELCUT_TYPES, type[cuts.Cut]] = {
+                PANELCUT_TYPES.folded: cuts.SimpleCut,
+                PANELCUT_TYPES.parallel: cuts.SimpleCut,
+                PANELCUT_TYPES.orthogonal: cuts.SimpleCut,
+                PANELCUT_TYPES.singleskin: cuts.SimpleCut,
+                PANELCUT_TYPES.cut_3d: cuts.Cut3D,
+                PANELCUT_TYPES.round: cuts.Cut3D
+            }
+        else:
+            _cut_types = cut_types
+
+        flattened = cell.get_flattened_cell(num_inner=midribs)
+
+        ik_front = self.cut_front.get_ik_values(cell, x_values=midribs, exact=True)
+        ik_back = self.cut_back.get_ik_values(cell, x_values=midribs, exact=True)
+
+        allowance_front = -self.cut_front.seam_allowance
+        allowance_back = self.cut_back.seam_allowance
+
+        # cuts -> cut-line, index left, index right
+        cut_front = _cut_types[self.cut_front.cut_type](amount=allowance_front)
+        cut_back = _cut_types[self.cut_back.cut_type](amount=allowance_back)
+
+        inner_front = [(line, ik) for line, ik in zip(flattened.inner, ik_front)]
+        inner_back = [(line, ik) for line, ik in zip(flattened.inner, ik_back)]
+
+        shape_3d_amount_front = [-x for x in self.cut_front.cut_3d_amount]
+        shape_3d_amount_back = self.cut_back.cut_3d_amount
+
+        # zero-out 3d-shaping if there is none
+        if self.cut_front.cut_type != PANELCUT_TYPES.cut_3d:
+            dist = np.linspace(shape_3d_amount_front[0], shape_3d_amount_front[-1], len(shape_3d_amount_front))
+            shape_3d_amount_front = list(dist)
+
+        if self.cut_back.cut_type != PANELCUT_TYPES.cut_3d:
+            dist = np.linspace(shape_3d_amount_back[0], shape_3d_amount_back[-1], len(shape_3d_amount_back))
+            shape_3d_amount_back = list(dist)
+
+        left = inner_front[0][0].get(inner_front[0][1], inner_back[0][1])
+        right = inner_front[-1][0].get(inner_front[-1][1], inner_back[-1][1])
+
+        outer_left = left.offset(-cell.rib1.seam_allowance.si)
+        outer_right = right.offset(cell.rib2.seam_allowance.si)
+
+        cut_front_result = cut_front.apply(inner_front, outer_left, outer_right, shape_3d_amount_front)
+        cut_back_result = cut_back.apply(inner_back, outer_left, outer_right, shape_3d_amount_back)
+
+        panel_left: euklid.vector.PolyLine2D | None = None
+        if cut_front_result.index_left < cut_back_result.index_left:
+            panel_left = outer_left.get(cut_front_result.index_left, cut_back_result.index_left).fix_errors()
+        panel_back = cut_back_result.outline.copy()
+
+        panel_right: euklid.vector.PolyLine2D | None = None
+        if cut_back_result.index_right > cut_front_result.index_right:
+            panel_right = outer_right.get(cut_back_result.index_right, cut_front_result.index_right).fix_errors()
+        panel_front = cut_front_result.outline.copy()
+
+        panel_back = panel_back.get(len(panel_back)-1, 0)
+        if panel_right:
+            envelope = panel_right.reverse() + panel_back
+        else:
+            envelope = panel_back
+
+        if panel_left:
+            envelope += panel_left.reverse()
+        envelope += panel_front
+        envelope += euklid.vector.PolyLine2D([envelope.nodes[0]])
+
+        plotpart.layers["envelope"].append(envelope)
+
+        return FlattenedPanel(
+            panel=self,
+            flattened_cell=flattened,
+            envelope=envelope,
+            cut_front=cut_front_result,
+            cut_back=cut_back_result,
+            x_distribution=cell.x_values
+        )

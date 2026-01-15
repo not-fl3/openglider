@@ -3,12 +3,11 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Sequence
-from typing import ClassVar, Literal
+from typing import Literal
 
 import euklid
 import openglider.utils
-import openglider.vector
-import pyfoil
+import pyfoil.airfoil
 from openglider.airfoil import Profile3D
 from openglider.glider.ballooning.base import BallooningBase
 from openglider.glider.cell.attachment_point import CellAttachmentPoint
@@ -45,15 +44,15 @@ class Cell(BaseModel):
     rib2: Rib
 
     ballooning: BallooningBase
-    ballooning_modifiers: list[BallooningModifier] = Field(default_factory=list)
+    ballooning_modifiers: list[BallooningModifier] = Field(default_factory=lambda: [])
     ballooning_reference: Literal["local", "cell"] = "local"
 
-    panels: list[Panel] = Field(default_factory=list)
-    diagonals: list[DiagonalRib] = Field(default_factory=list)
-    straps: list[TensionStrap] = Field(default_factory=list)
-    rigidfoils: list[PanelRigidFoil] = Field(default_factory=list)
-    attachment_points: list[CellAttachmentPoint] = Field(default_factory=list)
-    miniribs: list[MiniRib] = Field(default_factory=list)
+    panels: list[Panel] = Field(default_factory=lambda: [])
+    diagonals: list[DiagonalRib] = Field(default_factory=lambda: [])
+    straps: list[TensionStrap] = Field(default_factory=lambda: [])
+    rigidfoils: list[PanelRigidFoil] = Field(default_factory=lambda: [])
+    attachment_points: list[CellAttachmentPoint] = Field(default_factory=lambda: [])
+    miniribs: list[MiniRib] = Field(default_factory=lambda: [])
 
     name: str = "unnamed"
     
@@ -135,7 +134,7 @@ class Cell(BaseModel):
         if len(profile2) != profile_numpoints:
             profile2 = self.rib2.get_profile_3d(x_values=profile_x_values)
         
-        return BasicCell(prof1=profile1, prof2=profile2, ballooning_phi=self.ballooning_phi)
+        return BasicCell(prof1=profile1, prof2=profile2, ballooning_phi=list(self.ballooning_phi))
 
     def get_normvector(self) -> euklid.vector.Vector3D:
         p1 = self.rib1.point(-1)
@@ -147,7 +146,7 @@ class Cell(BaseModel):
         return (p1-p2).cross(p3-p4).normalized()
 
     @cached_property('miniribs', 'rib1', 'rib2')
-    def rib_profiles_3d(self) -> list:
+    def rib_profiles_3d(self) -> list[Profile3D]:
         """
         Get all the ribs 3d-profiles, including miniribs
         """
@@ -261,11 +260,11 @@ class Cell(BaseModel):
         return consistent_value(self.ribs, 'profile_2d.x_values')
 
     @property
-    def prof1(self) -> openglider.airfoil.Profile3D:
+    def prof1(self) -> Profile3D:
         return self.rib1.profile_3d
 
     @property
-    def prof2(self) -> openglider.airfoil.Profile3D:
+    def prof2(self) -> Profile3D:
         return self.rib2.profile_3d
 
     def point(self, y: float=0, i: int=0, k: float=0.) -> euklid.vector.Vector3D:
@@ -296,7 +295,7 @@ class Cell(BaseModel):
     
     @cached_property('ballooning', 'rib1.profile_2d.x_values', 'rib2.profile_2d.x_values', 'panels')
     def ballooning_modified(self) -> BallooningBase:
-        if self.ballooning_modifiers is None or not len(self.ballooning_modifiers):
+        if not len(self.ballooning_modifiers):
             return self.ballooning
         
         ballooning = self.ballooning
@@ -401,8 +400,8 @@ class Cell(BaseModel):
 
         for strap in self.straps:
             strap.mirror()
-        
-        cuts = list()
+
+        cuts: list[PanelCut] = []
         for panel in self.panels:
             if panel.cut_front not in cuts:
                 cuts.append(panel.cut_front)
@@ -412,7 +411,7 @@ class Cell(BaseModel):
         for cut in cuts:
             cut.mirror()
 
-    def mean_airfoil(self, num_midribs: int=8) -> pyfoil.Airfoil:
+    def mean_airfoil(self, num_midribs: int=8) -> pyfoil.airfoil.Airfoil:
         mean_rib = self.midrib(0).flatten().normalized()
 
         for i in range(1, num_midribs):
@@ -447,9 +446,9 @@ class Cell(BaseModel):
 
         grid = self.get_mesh_grid(numribs=numribs, half_cell=half_cell)
 
-        trailing_edge = []
+        trailing_edge: list[Vertex] = []
 
-        quads = []
+        quads: list[Polygon] = []
         for rib_left, rib_right in zip(grid[:-1], grid[1:]):
             numpoints = len(rib_left)
             for i in range(numpoints):
@@ -472,11 +471,11 @@ class Cell(BaseModel):
         midribs = self.get_midribs(numribs)
         numpoints = len(midribs[0].curve.nodes)
 
-        len_dct = {}
+        len_dct: dict[str, float] = {}
         def get_length(ik1: float, ik2: float) -> float:
             index_str = f"{ik1}:{ik2}"
             if index_str not in len_dct:
-                points = []
+                points: list[euklid.vector.Vector3D] = []
                 for i, rib in enumerate(midribs):
                     x = ik1 + i/(numribs-1) * (ik2-ik1)
                     points.append(rib[x])
@@ -537,7 +536,7 @@ class Cell(BaseModel):
             euklid.vector.PolyLine2D(right_bal)
         )
 
-        inner = []
+        inner: list[euklid.vector.PolyLine2D] = []
 
         if num_inner is None:
             num_inner = numribs+2
@@ -597,4 +596,3 @@ class Cell(BaseModel):
                 panel.cut_back.cut_3d_amount = get_amount(panel.cut_back)
             else:
                 panel.cut_back.cut_3d_amount = [0] * (numribs+2)
-

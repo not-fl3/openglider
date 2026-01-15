@@ -1,8 +1,11 @@
 import math
 from collections.abc import Callable
 
+from openglider.glider.cell.panel import cuts
+from openglider.glider.cell.panel.panel import PANELCUT_TYPES
+from openglider.glider.cell.panel.panel import PANELCUT_TYPES
 from openglider.glider.rib.rib import Rib
-from openglider.plots import cuts, marks
+from openglider.plots import marks
 from openglider.utils.config import Config
 from openglider.utils.distribution import Distribution
 
@@ -11,7 +14,7 @@ class PatternConfigOld(Config):
     patterns_scale = 1000 # mm
     complete_glider = True
     debug = False
-    profile_numpoints = 400
+    profile_numpoints = 380
 
     cut_entry: type[cuts.Cut] = cuts.FoldedCut
     cut_trailing_edge: type[cuts.Cut] = cuts.ParallelCut
@@ -58,6 +61,16 @@ class PatternConfigOld(Config):
             return self.distribution_controlpoints
         
         return self.distribution_controlpoints(rib)
+    
+    def get_cut_types(self) -> dict[PANELCUT_TYPES, type[cuts.Cut]]:
+        return {
+            PANELCUT_TYPES.folded: self.cut_entry,
+            PANELCUT_TYPES.parallel: self.cut_trailing_edge,
+            PANELCUT_TYPES.orthogonal: self.cut_design,
+            PANELCUT_TYPES.singleskin: self.cut_entry,
+            PANELCUT_TYPES.cut_3d: self.cut_3d,
+            PANELCUT_TYPES.round: self.cut_round
+        }
 
 
 class OtherPatternConfig(PatternConfigOld):

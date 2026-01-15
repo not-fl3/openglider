@@ -171,7 +171,7 @@ class TaskQueue:
                             if self.exception_hook:
                                 self.exception_hook(*sys.exc_info())
                             else:
-                                logger.error("fuck")
+                                logger.error("error in task queue")
                                 logger.error(e)
 
             

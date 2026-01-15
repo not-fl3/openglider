@@ -118,7 +118,7 @@ class GliderApp(QtWidgets.QApplication):
                 data = await self.loop.run_in_executor(None, func)
             return data
         except Exception as e:
-            logger.error("fuck")
+            logger.error("error in executor")
             logger.error(e)
             self.show_exception(*sys.exc_info())
             #raise e

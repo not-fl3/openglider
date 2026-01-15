@@ -2,7 +2,10 @@ from __future__ import annotations
 import collections
 import logging
 from typing import Any, TypeAlias
+import euklid
+
 from openglider.glider.cell.cell import Cell
+from openglider.glider.cell.panel.panel import Panel
 from openglider.glider.glider import Glider
 from openglider.utils.config import Config
 
@@ -27,7 +30,7 @@ class PlotMaker:
     ribs: list[PlotPart]
     dribs: PlotPartDict
     straps: collections.OrderedDict[Cell, tuple[list[PlotPart], list[PlotPart]]]
-    rigidfoils: PlotPartDict
+    rigidfoils: list[PlotPart]
     miniribs: PlotPartDict
     seam_allowance: Length
 
@@ -38,14 +41,14 @@ class PlotMaker:
     MibiRibPlot = MiniRibPlot
     
     def __init__(self, glider_3d: Glider, config: Config | None=None):
-        self.glider_3d = glider_3d.copy()
+        self.glider_3d = glider_3d
         self.config = self.DefaultConf(config)
         self.panels = Layout()
         self.ribs = []
 
         self.dribs = collections.OrderedDict()
         self.straps = collections.OrderedDict()
-        self.rigidfoils = collections.OrderedDict()
+        self.rigidfoils = []
         self.miniribs = collections.OrderedDict()
         self.extra_parts: list[PlotPart] = []
         self._cellplotmakers: dict[Cell, DefaultCellPlotMaker] = dict()
@@ -76,10 +79,11 @@ class PlotMaker:
     def _get_cellplotmaker(self, cell: Cell) -> CellPlotMaker:
         if cell not in self._cellplotmakers:
             self._cellplotmakers[cell] = self.CellPlotMaker(cell, self.config)
+            self._cellplotmakers[cell].prepare()
 
         return self._cellplotmakers[cell]
 
-    def get_panels(self) -> Layout:
+    def get_panels(self, extra_marks: list[dict[Panel, list[euklid.vector.PolyLine2D]]] | None = None) -> Layout:
         self.panels.clear()
         panels_upper: list[Layout | PlotPart] = []
         panels_lower: list[Layout | PlotPart] = []
@@ -89,8 +93,9 @@ class PlotMaker:
         for cell_no, cell in enumerate(self.glider_3d.cells):
             logger.info(f"Plotting Cell: {cell_no}")
             pm = self._get_cellplotmaker(cell)
-            lower = pm.get_panels_lower()
-            upper = pm.get_panels_upper()
+            _extra_marks = extra_marks[cell_no] if extra_marks is not None else None
+            lower = pm.get_panels_lower(extra_marks=_extra_marks)
+            upper = pm.get_panels_upper(extra_marks=_extra_marks)
             panels_lower.append(Layout.stack_column(lower, self.config.patterns_align_dist_y))
             panels_upper.append(Layout.stack_column(upper, self.config.patterns_align_dist_y))
 
@@ -127,6 +132,7 @@ class PlotMaker:
             if rib.profile_2d.thickness < 1e-5:
                 continue
             
+            logger.info(f"plotting rib {rib.name}")
             rib_plot: SingleSkinRibPlot | RibPlot
             if isinstance(rib, SingleSkinRib):
                 rib_plot = self.SingleSkinRibPlot(rib, self.config)
@@ -159,6 +165,7 @@ class PlotMaker:
         weight = MaterialUsage()
 
         for cell in self.glider_3d.cells:
+            logger.info(f"plotting diagonals for cell {cell.name}")
             # missing attachmentpoints []
             pm = self._get_cellplotmaker(cell)
             dribs = pm.get_dribs()
@@ -176,6 +183,7 @@ class PlotMaker:
         weight = MaterialUsage()
 
         for cell in self.glider_3d.cells:
+            logger.info(f"plotting straps for cell {cell.name}")
             # missing attachmentpoints []
             pm = self._get_cellplotmaker(cell)
             upper, lower = pm.get_straps()
@@ -189,21 +197,24 @@ class PlotMaker:
 
         return self.straps
 
-    def get_rigidfoils(self) -> PlotPartDict:
-        # TODO: rib rigids
+    def get_rigidfoils(self) -> tuple[list[PlotPart], list[dict[Panel, list[euklid.vector.PolyLine2D]]]]:
         self.rigidfoils.clear()
+        extra_marks: list[dict[Panel, list[euklid.vector.PolyLine2D]]] = []
 
         for cell in self.glider_3d.cells:
-            rigidfoils = self._get_cellplotmaker(cell).get_rigidfoils()
-            self.rigidfoils[cell] = rigidfoils
+            logger.info(f"plotting rigidfoils for cell: {cell.name}")
+            rigidfoils, _extra_marks = self._get_cellplotmaker(cell).get_rigidfoils()
+            self.rigidfoils += rigidfoils
+            extra_marks.append(_extra_marks)
         
-        return self.rigidfoils
+        return self.rigidfoils, extra_marks
     
     def get_miniribs(self) -> PlotPartDict:
         self.miniribs.clear()
         weight = MaterialUsage()
 
         for cell in self.glider_3d.cells:
+            logger.info(f"plotting miniribs for cell: {cell.name}")
             pm = self._get_cellplotmaker(cell)
             miniribs = pm.get_miniribs()
             self.miniribs[cell] = miniribs
@@ -236,7 +247,7 @@ class PlotMaker:
             Layout.stack_column(c[1][::-1], self.config.patterns_align_dist_y) for c in list(self.straps.values())[::-1]
         ], distance=self.config.patterns_align_dist_x)
         straps = straps_upper.append_left(straps_lower, distance=self.config.patterns_align_dist_x)
-        rigidfoils = stack_grid(self.rigidfoils)
+        rigidfoils = Layout.stack_row(self.rigidfoils, self.config.patterns_align_dist_x)
         miniribs = stack_grid(self.miniribs)
 
         def group(layout: Layout, prefix: str) -> list[Layout]:
@@ -278,10 +289,10 @@ class PlotMaker:
         return Layout.stack_column(all_layouts, 0.1, center_x=False)
 
     def unwrap(self) -> PlotMaker:
-        self.get_panels()
+        _, extra_marks = self.get_rigidfoils()
+        self.get_panels(extra_marks=extra_marks)
         self.get_ribs()
         self.get_dribs()
         self.get_straps()
-        self.get_rigidfoils()
         self.get_miniribs()
         return self
