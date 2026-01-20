@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, get_type_hints
 
 from openglider.gui.qt import QtWidgets, QtCore
 
@@ -20,9 +20,10 @@ class DtoChooser(QtWidgets.QWidget):
         layout = QtWidgets.QHBoxLayout()
         self.setLayout(layout)
 
+        annotations = get_type_hints(GliderTables)
         self.all_dtos = {
             f"{_cls.table_type.name} -> {table_name}": _cls
-            for table_name, _cls in GliderTables.__annotations__.items()
+            for table_name, _cls in annotations.items()
             if issubclass(_cls, ElementTable)
         }
         table_names = list(self.all_dtos.keys())

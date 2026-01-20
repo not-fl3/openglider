@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import logging
-from typing import Any
+from typing import Any, get_type_hints
 from openglider.glider.parametric.table.base.table import ElementTable
 from openglider.glider.parametric.table.lines import LineSetTable
 
@@ -40,9 +42,10 @@ class GliderTables:
     lines: LineSetTable
 
     def __init__(self, **kwargs: Any):
-        used_names = []
+        used_names: list[str] = []
 
-        for name, _cls in self.__annotations__.items():
+        annotations = get_type_hints(self.__class__)
+        for name, _cls in annotations.items():
             if name in kwargs:
                 table = kwargs[name]
                 used_names.append(name)
@@ -57,7 +60,7 @@ class GliderTables:
         
     
     def __json__(self) -> dict[str, Any]:
-        dct = {}
+        dct: dict[str, Any] = {}
         for name in self.__annotations__:
             dct[name] = getattr(self, name)
         
@@ -122,7 +125,7 @@ class GliderTables:
         return table
     
     def get_all_tables(self) -> list[Table]:
-        tables = []
+        tables: list[Table] = []
 
         for name in self.__annotations__.keys():
             parametric_table = getattr(self, name)
