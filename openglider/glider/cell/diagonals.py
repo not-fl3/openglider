@@ -327,6 +327,18 @@ class DiagonalRib(BaseModel):
         inner, outer = self.get_3d(cell)
         
         return flatten_list(inner, outer)
+    
+    def get_area(self, cell: Cell) -> float:
+        inner, outer = self.get_flattened(cell)
+
+        inner_offset = inner.offset(-cell.rib1.seam_allowance.si)
+        outer_offset = outer.offset(cell.rib2.seam_allowance.si)
+
+        outline = (inner_offset + outer_offset.reverse()).close()
+
+        area = outline.get_area() - sum([hole.get_area() for hole in self.get_holes(cell)[0]])
+
+        return area
 
     def get_average_x(self) -> Percentage:
         """

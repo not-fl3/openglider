@@ -14,7 +14,7 @@ from openglider.plots.usage_stats import MaterialUsage
 if TYPE_CHECKING:
     from openglider.glider import GliderProject
 
-def get_glider_data(project: GliderProject, consumption: dict[str, MaterialUsage]=None) -> ezodf.document.PackagedDocument:
+def get_glider_data(project: GliderProject, consumption: dict[str, MaterialUsage] | None=None) -> ezodf.document.PackagedDocument:
     specsheet = project.get_data_table()
     glider = project.get_glider_3d()
     #specsheet = get_specs(glider)

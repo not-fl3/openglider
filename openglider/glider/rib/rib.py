@@ -191,6 +191,16 @@ class Rib(RibBase):
             return self.sharknose.get_modified_airfoil(self)
 
         return self.profile_2d
+    
+    def get_weight(self):
+        outline = self.get_hull().curve * self.chord
+        crossports = [hole.get_flattened(self, layer_name="cuts") for hole in self.holes]
+
+        area = outline.get_area() - sum([
+            sum([line.get_area() for line in crossport.layers["cuts"].polylines]) for crossport in crossports
+        ])
+
+        return area * self.material.weight
 
     @property
     def normalized_normale(self) -> euklid.vector.Vector3D:
