@@ -58,8 +58,6 @@ class Action():
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    main_widget_class = GliderPreview
-
     # actions need to be saved in a dict (prevent garbage collection)
     action_store: dict[str, Action]
 

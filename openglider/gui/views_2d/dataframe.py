@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 import pandas
+from pydantic import BaseModel
 import pyqtgraph
 from openglider.utils.colors import Color, colorwheel
 
@@ -19,9 +20,10 @@ class DataFramePlot(pyqtgraph.PlotWidget):
         self.column_plots = {}
         self.addLegend()
     
-    def plotDataFrameColumns(self, dataframe: pandas.DataFrame, config: Any, color: Color, name: str | None=None) -> None:
+    def plotDataFrameColumns(self, dataframe: pandas.DataFrame, config: BaseModel, color: Color, name: str | None=None) -> None:
+        config_cls = type(config)
         x = dataframe.index.tolist()
-        for attr in config.__annotations__:
+        for attr in config_cls.model_fields:
             if getattr(config, attr):
                 y = dataframe[attr].dropna().tolist()
 

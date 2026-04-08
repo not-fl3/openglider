@@ -30,7 +30,7 @@ class ConfigWidget(QtWidgets.QWidget):
             return toggle_prop
 
 
-        for prop in self.config.__annotations__:
+        for prop in Config.model_fields:
             checkbox = QtWidgets.QCheckBox(self)
             checkbox.setChecked(getattr(self.config, prop))
             checkbox.setText(f"{prop}")
