@@ -11,27 +11,35 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def setup_plugins(app: Optional[GliderApp] = None) -> list[str]:
+def setup_plugins(app: Optional["GliderApp"] = None) -> list[str]:
     """
     Discover and initialize OpenGlider plugins.
     """
     plugins = []
-    potential_plugins = _discover_plugins()
-    
-    for plugin_name in potential_plugins:
+    seen = set()
+
+    for plugin_name in _discover_plugins():
+        if plugin_name in seen:
+            continue
+        seen.add(plugin_name)
+
         logger.info(f"Loading plugin: {plugin_name}")
-        
+
         if not _load_plugin(plugin_name, app):
             continue
-            
+
         plugins.append(plugin_name)
-    
+
     if plugins:
         logger.info(f"Successfully loaded {len(plugins)} plugin(s): {', '.join(plugins)}")
     else:
         logger.info("No plugins loaded")
-        
+
     return plugins
+
+
+def _normalize(name: str) -> str:
+    return name.lower().replace("-", "_").strip()
 
 
 def _discover_plugins() -> list[str]:
@@ -45,70 +53,52 @@ def _discover_plugins() -> list[str]:
     Returns:
         List of plugin package names
     """
-    plugins = []
-    
+    plugins = {}
+
     try:
-        # Get all installed distributions
-        distributions = importlib.metadata.distributions()
-        
-        for dist in distributions:
-            name = dist.metadata.get("Name", "")
-            
-            # Match openglider-* or openglider_* but not openglider itself
-            if name and name != "openglider":
-                # Normalize name for comparison (PEP 503)
-                normalized = name.lower().replace("-", "_")
-                if normalized.startswith("openglider_"):
-                    # Use the normalized form as module name
-                    plugins.append(normalized)
-                    
+        for dist in importlib.metadata.distributions():
+            name = dist.metadata.get("Name") or dist.name
+            if not name:
+                continue
+
+            normalized = _normalize(name)
+
+            # only match plugins
+            if not normalized.startswith("openglider_"):
+                continue
+
+            # deduplicate by normalized name
+            plugins[normalized] = dist
+
     except Exception as e:
         logger.error(f"Error discovering plugins: {e}", exc_info=True)
-    
-    return plugins
+
+    return list(plugins.keys())
 
 
-def _load_plugin(plugin_name: str, app: Optional[GliderApp]) -> bool:
-    """
-    Load and initialize a single plugin.
-    
-    Args:
-        plugin_name: Name of the plugin module to load
-        app: The GliderApp instance to pass to the init function
-        fail_fast: Whether to raise exceptions or just log them
-        
-    Returns:
-        True if plugin loaded successfully, False otherwise
-        
-    Raises:
-        Exception: If fail_fast=True and loading fails
-    """
+def _load_plugin(plugin_name: str, app: Optional["GliderApp"]) -> bool:
     try:
         module = importlib.import_module(plugin_name)
         
         # Look for the init function
         init_func: Optional[Callable] = getattr(module, "init", None)
-        
+
         if init_func is None:
-            logger.warning(f"Plugin '{plugin_name}' has no init() function - skipping initialization")
-            logger.info(f"dir: {dir(module)}")
+            logger.warning(f"Plugin '{plugin_name}' has no init() function")
             return False
-        
+
         if not callable(init_func):
-            logger.warning(f"Plugin '{plugin_name}' has non-callable init attribute - skipping")
+            logger.warning(f"Plugin '{plugin_name}' init is not callable")
             return False
-        
-        # Call the plugin's init function
+
         init_func(app)
-        logger.debug(f"Successfully initialized plugin: {plugin_name}")
+        logger.debug(f"Initialized plugin: {plugin_name}")
         return True
-        
+
     except ImportError as e:
-        error_msg = f"Failed to import plugin '{plugin_name}': {e}"
-        logger.error(error_msg, exc_info=True)
+        logger.error(f"Failed to import plugin '{plugin_name}': {e}", exc_info=True)
         return False
-        
+
     except Exception as e:
-        error_msg = f"Error initializing plugin '{plugin_name}': {e}"
-        logger.error(error_msg)
+        logger.error(f"Error initializing plugin '{plugin_name}': {e}", exc_info=True)
         raise
