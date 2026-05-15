@@ -12,7 +12,7 @@ KeywordsType = list[Union[tuple[str, typing.Any], str]]
 
 class Keyword(Generic[ElementType]):
     NoneType = typing.Any
-    target_cls: typing.Any = dict
+    target_cls: typing.Any
     def __init__(self, attributes: KeywordsType | None=None, description: str="", target_cls: type[ElementType]=None):
         if attributes is None:
             if target_cls is not None:
@@ -77,4 +77,6 @@ class Keyword(Generic[ElementType]):
             
             init_kwargs[name] = value
 
+        if self.target_cls is None:
+            return init_kwargs  # type: ignore
         return self.target_cls(**init_kwargs)

@@ -1,6 +1,6 @@
 from openglider.glider.parametric.table.base import CellTable, RibTable, Keyword
 
-from openglider.glider.cell.rigidfoil import PanelRigidFoil
+from openglider.glider.cell.rigidfoil import EntryStrap, PanelRigidFoil
 from openglider.glider.rib.rigidfoils import RigidFoil, RigidFoil2
 from openglider.glider.parametric.table.base.dto import DTO
 import logging
@@ -49,7 +49,24 @@ class RibRigidTable(RibTable):
         "RIGIDFOIL9": RigidFoil9
     }
 
+class EntryStrapDTO(DTO):
+    position: Percentage
+    opening_index: int
+    material: str
+    extra_material: Length
+
+    def get_object(self) -> EntryStrap:
+        return EntryStrap(
+            position=self.position,
+            opening_index=self.opening_index,
+            material=self.material,
+            extra_material=self.extra_material
+        )
+
 class CellRigidTable(CellTable):
     keywords = {
         "RIGIDFOIL": Keyword(["x_start", "x_end", "y"], target_cls=PanelRigidFoil)
+    }
+    dtos = {
+        "ENTRYSTRAP": EntryStrapDTO
     }

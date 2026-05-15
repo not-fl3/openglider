@@ -9,6 +9,7 @@ from openglider.airfoil import get_x_value
 from openglider.glider.cell.cell import FlattenedCell
 from openglider.glider.cell.panel import Panel
 from openglider.glider.cell.panel.panel import FlattenedPanel
+from openglider.glider.cell.rigidfoil import EntryStrap
 from openglider.plots.config import PatternConfig
 from openglider.plots.glider.diagonal import DribPlot, StrapPlot
 from openglider.plots.glider.minirib import MiniRibPlot
@@ -559,9 +560,12 @@ class CellPlotMaker:
         rigidfoils: list[PlotPart] = []
         panel_marks: dict[Panel, list[euklid.vector.PolyLine2D]] = {}
         for rigidfoil in self.cell.rigidfoils:
-            drawing, marks = rigidfoil.get_flattened(self.cell, self.config.midribs, cut_types=self.config.get_cut_types())
-            drawing.rotate(90, radians=False)
-            rigidfoils.append(drawing)
+            if not isinstance(rigidfoil, EntryStrap):
+                drawing, marks = rigidfoil.get_flattened(self.cell, self.config.midribs, cut_types=self.config.get_cut_types())
+                drawing.rotate(90, radians=False)
+                rigidfoils.append(drawing)
+            else:
+                marks = rigidfoil.get_marks(self.cell, self.config.midribs, cut_types=self.config.get_cut_types())
             for panel in marks:
                 panel_marks.setdefault(panel, [])
                 panel_marks[panel] += marks[panel]

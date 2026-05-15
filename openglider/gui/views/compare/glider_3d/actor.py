@@ -100,6 +100,13 @@ class GliderActors:
                 mesh += cell_mesh
                 if cell_no > 0 or not self.glider_3d.has_center_cell:
                     mesh += cell_mesh.copy().mirror("y")
+
+            for rigidfoil in cell.rigidfoils:
+                cell_mesh = rigidfoil.get_mesh(cell, numribs)
+
+                mesh += cell_mesh
+                if cell_no > 0 or not self.glider_3d.has_center_cell:
+                    mesh += cell_mesh.copy().mirror("y")
         
         mesh_view = MeshView()
         mesh_view.draw_mesh(mesh)

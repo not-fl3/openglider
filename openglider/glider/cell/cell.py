@@ -15,7 +15,7 @@ from openglider.glider.cell.ballooning_modifier import BallooningModifier
 from openglider.glider.cell.basic_cell import BasicCell
 from openglider.glider.cell.diagonals import DiagonalRib, TensionStrap
 from openglider.glider.cell.panel import PANELCUT_TYPES, Panel, PanelCut
-from openglider.glider.cell.rigidfoil import PanelRigidFoil
+from openglider.glider.cell.rigidfoil import EntryStrap, PanelRigidFoil
 from openglider.glider.rib import MiniRib, Rib
 from openglider.mesh import Mesh, Polygon, Vertex
 from openglider.utils import consistent_value, linspace
@@ -50,7 +50,7 @@ class Cell(BaseModel):
     panels: list[Panel] = Field(default_factory=lambda: [])
     diagonals: list[DiagonalRib] = Field(default_factory=lambda: [])
     straps: list[TensionStrap] = Field(default_factory=lambda: [])
-    rigidfoils: list[PanelRigidFoil] = Field(default_factory=lambda: [])
+    rigidfoils: list[PanelRigidFoil | EntryStrap] = Field(default_factory=lambda: [])
     attachment_points: list[CellAttachmentPoint] = Field(default_factory=lambda: [])
     miniribs: list[MiniRib] = Field(default_factory=lambda: [])
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from openglider.glider.cell.rigidfoil import EntryStrap
 from openglider.utils.table import Table
 
 if TYPE_CHECKING:
@@ -45,22 +46,29 @@ def get_cell_length_table(glider: Glider) -> Table:
     table = Table(name="Rigidfoils (cell)")
     current_row = 1
 
-    table[0, 0] = "Name"
-    table[0, 1] = "Cell no."
-    table[0, 2] = "Cell position"
-    table[0, 3] = "Start"
-    table[0, 4] = "Stop"
-    table[0, 5] = "Length"
+    table[0, 0] = "Type"
+    table[0, 1] = "Name"
+    table[0, 2] = "Cell no."
+    table[0, 3] = "Cell position"
+    table[0, 4] = "Start"
+    table[0, 5] = "Stop"
+    table[0, 6] = "Length"
 
     for cell_no, cell in enumerate(glider.cells):
         for rigidfoil in cell.rigidfoils:
-            assert rigidfoil.total_length is not None
-            table[current_row, 0] = f"{cell.name} {rigidfoil.y}"
-            table[current_row, 1] = cell_no
-            table[current_row, 2] = rigidfoil.y
-            table[current_row, 3] = rigidfoil.x_start
-            table[current_row, 4] = rigidfoil.x_end
-            table[current_row, 5] = round(1000*rigidfoil.total_length, 1)
+            if isinstance(rigidfoil, EntryStrap):
+                table[current_row, 0] = "Strap"
+                table[current_row, 1] = f"{cell.name} {rigidfoil.position} {rigidfoil.opening_index+1}"
+                table[current_row, 3] = rigidfoil.position
+                table[current_row, 6] = round(1000*rigidfoil.get_data(cell, 10)[3], 1)
+            else:
+                assert rigidfoil.total_length is not None
+                table[current_row, 0] = "Wire"
+                table[current_row, 1] = f"{cell.name} {rigidfoil.y}"
+                table[current_row, 3] = rigidfoil.y
+                table[current_row, 6] = round(1000*rigidfoil.total_length, 1)
+
+            table[current_row, 2] = cell_no
 
             current_row += 1
 

@@ -4,7 +4,9 @@ import math
 from typing import TYPE_CHECKING
 
 import euklid
+from openglider.glider.cell import cell
 from openglider.glider.cell.panel import cuts
+from openglider.mesh.mesh import Mesh
 from openglider.glider.cell.panel.panel import PANELCUT_TYPES, FlattenedPanel
 from openglider.utils.dataclass import dataclass
 import openglider.vector.drawing
@@ -16,7 +18,88 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class EntryStrap:
+    position: Percentage
+    opening_index: int
+    material: str
+    extra_material: Length
 
+    def _get_entry_index(self, cell: Cell, midribs: int) -> int:
+        entry_count = 0
+
+        for i in range(len(cell.panels)-1):
+            panel1 = cell.panels[i]
+            panel2 = cell.panels[i+1]
+
+            if panel1.cut_back != panel2.cut_front:
+                if entry_count < self.opening_index:
+                    entry_count += 1
+                else:
+                    return i
+            
+        raise ValueError(f"invalid opening index {self.opening_index} for EntryStrap on cell {cell.name}: not enough openings in cell (only {entry_count})")
+
+    def get_data(self, cell: Cell, midribs: int):
+        profile_3d = cell.midrib(self.position.si)
+        panel_1_index = self._get_entry_index(cell, midribs)
+
+        cut_front = cell.panels[panel_1_index].cut_back
+        cut_back = cell.panels[panel_1_index+1].cut_front
+        
+        ik1 = cut_front.get_ik_values(cell, [self.position.si], False)[0]
+        ik2 = cut_back.get_ik_values(cell, [self.position.si], False)[0]
+
+        p1 = profile_3d.curve.get(ik1)
+        p2 = profile_3d.curve.get(ik2)
+
+        length = (p2 - p1).length() + self.extra_material.si
+
+        return panel_1_index, ik1, ik2, length
+    
+    def get_marks(self, cell: Cell, midribs: int, cut_types: dict[PANELCUT_TYPES, type[cuts.Cut]] | None) -> dict[Panel, list[euklid.vector.PolyLine2D]]:
+        data = self.get_data(cell, midribs)
+        panel_1_index = data[0]
+
+        panel_front = cell.panels[panel_1_index]
+        panel_back = cell.panels[panel_1_index+1]
+
+        def get_mark(panel: Panel, is_first: bool) -> list[euklid.vector.PolyLine2D]:
+            flattended = panel.get_flattened(cell, midribs=midribs, cut_types=cut_types)
+
+            if is_first:
+                cut = panel.cut_back
+                cut_result = flattended.cut_back
+                offset = cut.seam_allowance
+            else:
+                cut = panel.cut_front
+                cut_result = flattended.cut_front
+                offset = -cut.seam_allowance
+
+            curve = flattended.flattened_cell.at_position(self.position)
+            index = cut_result.get_inner_index(self.position.si)
+
+            p1 = curve.get(curve.walk(index, offset * 0.25))
+            p2 = curve.get(curve.walk(index, offset * 0.75))
+
+            return [euklid.vector.PolyLine2D([p1]), euklid.vector.PolyLine2D([p2])]      
+
+        return {
+            panel_front: get_mark(panel_front, True),
+            panel_back: get_mark(panel_back, False)
+        }
+    
+    def get_mesh(self, cell: Cell, midribs: int) -> Mesh:
+        data = self.get_data(cell, midribs)
+        print(data)
+        midrib = cell.midrib(self.position.si)
+        nodes = [
+            midrib.curve.get(data[1]),
+            midrib.curve.get(data[2])
+        ]
+        print((nodes[1] - nodes[0]).length())
+
+        return Mesh.from_indexed(nodes, {"EntryStrap": [([0, 1], {})]}, name="EntryStrap")
 
 @dataclass
 class PanelRigidFoil:
@@ -27,6 +110,15 @@ class PanelRigidFoil:
     pocket_length: Length = Length("2cm")
 
     total_length: float | None = None
+
+    def get_mesh(self, cell: Cell, midribs: int) -> Mesh:
+        profile_3d = cell.midrib(self.y.si)
+        nodes = profile_3d.curve.get(
+            cell.rib1.profile_2d.get_ik(self.x_start.si)[0],
+            cell.rib1.profile_2d.get_ik(self.x_end.si)[0]
+        ).nodes
+
+        return Mesh.from_indexed(nodes, {"PanelRigidFoil": [([i, i+1], {}) for i in range(len(nodes)-1)]}, name="PanelRigidFoil")
 
     def get_flattened(self, cell: Cell, midribs: int, cut_types: dict[PANELCUT_TYPES, type[cuts.Cut]] | None) -> tuple[openglider.vector.drawing.PlotPart, dict[Panel, list[euklid.vector.PolyLine2D]]]:
         dwg = openglider.vector.drawing.PlotPart(material_code="rigidfoil")
