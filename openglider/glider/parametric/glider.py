@@ -234,7 +234,7 @@ class ParametricGlider:
             for cut1, cut2 in ZipCmp(cuts):
                 
                 if cut1.x_right > cut2.x_right or cut1.x_left > cut2.x_left:
-                    error_str = "Invalid cut: C{} {:.02f}/{:.02f}/{} + {:.02f}/{:.02f}/{}".format(
+                    error_str = "Invalid cuts for panel: C{} {:.02f}/{:.02f}/{} + {:.02f}/{:.02f}/{}".format(
                         cell_no+1,
                         cut1.x_left, cut1.x_right, cut1.cut_type,
                         cut2.x_left, cut2.x_right, cut2.cut_type

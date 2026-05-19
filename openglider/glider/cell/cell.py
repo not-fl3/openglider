@@ -257,7 +257,11 @@ class Cell(BaseModel):
 
     @property
     def x_values(self) -> list[float]:
-        return consistent_value(self.ribs, 'profile_2d.x_values')
+        for i, (x1, x2) in enumerate(zip(self.prof1.x_values, self.prof2.x_values)):
+            if (x2 - x1) > 1e-5:
+                raise ValueError(f"Invalid x values at ({i}): {x1, x2}")
+            
+        return self.prof1.x_values
 
     @property
     def prof1(self) -> Profile3D:

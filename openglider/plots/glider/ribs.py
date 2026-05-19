@@ -102,8 +102,8 @@ class RigidFoilPlot:
 
             
             self.center_curve = curve.fix_errors()
-            self.inner_curve = curve.offset(-d_inner.si)
-            self.outer_curve = curve.offset(d_outer.si)
+            self.inner_curve = self.center_curve.offset(-d_inner.si)
+            self.outer_curve = self.center_curve.offset(d_outer.si)
 
         return self.center_curve, self.inner_curve, self.outer_curve  # type: ignore
     
@@ -408,22 +408,31 @@ class RibPlot:
             curves += list(plotpart.layers["cuts"])
 
         return curves
+    
+    def get_outside_ik(self, x: float):
+        ik_inner = get_x_value(self.x_values, x)
+        inner_point = self.inner.get(ik_inner)
+        outer_point = inner_point + self.inner_normals.get(ik_inner)#
+
+        ik = self.outer.cut(inner_point, outer_point, min(ik_inner, len(self.outer)-1))
+        return ik[0]
 
     def draw_outline(self, glider: Glider) -> euklid.vector.PolyLine2D:
         """
         Cut trailing edge of outer rib
         """
         if self.rib.trailing_edge_extra is not None and self.rib.trailing_edge_extra.si < 0.:
+            # cut trailing edge
             x = 1. + self.rib.convert_to_percentage(self.rib.trailing_edge_extra).si
-            start = get_x_value(self.x_values, -x)
-            inner_start = start
+            inner_start = get_x_value(self.x_values, -x)
+            start = self.get_outside_ik(-x)
 
-            stop = get_x_value(self.x_values, x)
-            inner_end = stop
+            inner_end = get_x_value(self.x_values, x)
+            stop = self.get_outside_ik(x)
 
             trailing_edge = [
-                self.inner.get(stop),
-                self.inner.get(start),
+                self.inner.get(inner_end),
+                self.inner.get(inner_start),
                 self.outer.get(start)
             ]        
         else:
@@ -477,8 +486,8 @@ class RibPlot:
                 x1 = max(self.rib.sharknose.start, x1)
                 x2 = min(self.rib.sharknose.end, x2)
                 
-                sharknose_start = get_x_value(self.x_values, x1)
-                sharknose_end = get_x_value(self.x_values, x2)
+                sharknose_start = self.get_outside_ik(x1)
+                sharknose_end = self.get_outside_ik(x2)
 
                 line1 = self.outer.get(start, sharknose_start).nodes
                 line2 = self.outer.get(sharknose_end, stop).nodes

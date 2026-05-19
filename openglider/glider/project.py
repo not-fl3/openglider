@@ -196,8 +196,8 @@ class GliderProject:
         name, ext = os.path.splitext(filename)
         return cls(glider_2d, name=name)
 
-    def get_glider_3d(self) -> Glider:
-        if self.glider_3d is None:
+    def get_glider_3d(self, force: bool=False) -> Glider:
+        if self.glider_3d is None or force:
             self.glider_3d = self.glider.get_glider_3d()
         
         return self.glider_3d

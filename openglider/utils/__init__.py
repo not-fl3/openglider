@@ -15,7 +15,7 @@ def consistent_value(elements: list[Any], attribute: str) -> Any:
     if vals[1:] == vals[:-1]:
         return vals[0]
     
-    raise Exception("values not consistent: {attribute}, {elements}")
+    raise Exception(f"values not consistent: {attribute}, {elements}")
 
 
 def linspace(start: float, stop: float, count: int) -> list[float]:

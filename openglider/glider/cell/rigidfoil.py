@@ -114,8 +114,8 @@ class PanelRigidFoil:
     def get_mesh(self, cell: Cell, midribs: int) -> Mesh:
         profile_3d = cell.midrib(self.y.si)
         nodes = profile_3d.curve.get(
-            cell.rib1.profile_2d.get_ik(self.x_start.si)[0],
-            cell.rib1.profile_2d.get_ik(self.x_end.si)[0]
+            cell.rib1.profile_2d.get_ik(self.x_start.si),
+            cell.rib1.profile_2d.get_ik(self.x_end.si)
         ).nodes
 
         return Mesh.from_indexed(nodes, {"PanelRigidFoil": [([i, i+1], {}) for i in range(len(nodes)-1)]}, name="PanelRigidFoil")

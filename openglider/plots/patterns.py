@@ -31,8 +31,8 @@ class PatternsNew:
     DefaultConf = PlotMaker.DefaultConf
 
     def __init__(self, project: GliderProject, config: Config | None=None):
-        self.project = self.prepare_glider_project(project)
         self.config = self.DefaultConf(config)
+        self.project = self.prepare_glider_project(project)
 
 
         self.glider_2d = self.project.glider
@@ -47,6 +47,9 @@ class PatternsNew:
     
     def prepare_glider_project(self, project: GliderProject) -> GliderProject:
         project = project.copy()
+        if self.config.profile_numpoints is not None:
+            project.glider.num_profile = self.config.profile_numpoints
+        project.get_glider_3d(force=True)
         return project
 
     def _get_sketches(self) -> list[Layout]:
@@ -105,10 +108,6 @@ class PatternsNew:
     def unwrap(self, outdir: Path | str) -> None:
         if not isinstance(outdir, Path):
             outdir = Path(outdir)
-        if self.config.profile_numpoints is not None:
-            self.project.glider.num_profile = self.config.profile_numpoints
-            self.project.glider_3d = self.project.glider.get_glider_3d()
-            self.project = self.prepare_glider_project(self.project)
 
         subprocess.call(f"mkdir -p {outdir}", shell=True)
 
@@ -146,11 +145,10 @@ class Patterns(PatternsNew):
     """
     
     def prepare_glider_project(self, project: GliderProject) -> GliderProject:
-        new_project: GliderProject = project.copy()
-        glider = new_project.get_glider_3d()
+        new_project = super().prepare_glider_project(project)
 
-        self.set_names_straps(glider)
-        self.set_names_panels(glider)
+        self.set_names_straps(new_project.glider_3d)
+        self.set_names_panels(new_project.glider_3d)
 
         return new_project
 
