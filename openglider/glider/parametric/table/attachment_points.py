@@ -40,6 +40,15 @@ class ATP(dto.DTO[AttachmentPoint]):
             **data,
             force=force
         )
+    
+class ATP4(ATP):
+    type_name: str
+
+    def get(self, force: euklid.vector.Vector3D) -> AttachmentPoint:
+        atp = super().get(force)
+        atp.type_name = self.type_name
+
+        return atp
 
 
 class ATPPROTO(ATP):
@@ -85,6 +94,7 @@ class AttachmentPointTable(RibTable):
     }
     dtos = {
         "ATP": ATP,
+        "ATP4": ATP4,
         "ATPPROTO": ATPPROTO,
         "ATPPROTO5": ATPPROTO5,
         "ATPSingleSkin": ATPSingleSkin

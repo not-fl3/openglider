@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 import ezodf
 
+from openglider.plots.spreadsheets.attachment_points import get_attachment_point_table
 from openglider.utils.table import Table
 from openglider.lines.line_types.linetype import LineType
 from openglider.plots.spreadsheets.rigidfoils import get_length_table as get_rigidfoils
@@ -21,6 +22,7 @@ def get_glider_data(project: GliderProject, consumption: dict[str, MaterialUsage
     glider.lineset.recalc(glider=glider, iterations=30)
     linesheet = glider.lineset.get_table()
     linesheet2 = glider.lineset.get_table_2()
+    attachment_points = get_attachment_point_table(glider=glider)
     
     checksheet = glider.lineset.get_checksheet()
     rigidfoils = get_rigidfoils(glider)
@@ -74,6 +76,7 @@ def get_glider_data(project: GliderProject, consumption: dict[str, MaterialUsage
         linesheet2,
         checksheet,
         rigidfoils,
+        attachment_points,
         straps,
         consumption_table
     ) + material_sheets

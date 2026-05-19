@@ -61,6 +61,8 @@ class AttachmentPoint(Node):
     protoloops: int = 0
     protoloop_distance: Percentage | Length = Percentage("2%")
 
+    type_name: str = "-"
+
     re_name: ClassVar[re.Pattern[Any]] = re.compile(r"^(?P<n>[0-9]+_)?([A-Za-z]+)([0-9]+)")
 
     def __repr__(self) -> str:
