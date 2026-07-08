@@ -2,7 +2,28 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 use nalgebra::{DMatrix, DVector};
 
-use crate::vector::{extract_vector2d, Interpolation, PolyLine2D, Vector2D};
+use crate::vector::{Interpolation, PolyLine2D, Vector2D};
+
+#[derive(FromPyObject)]
+enum SplinePointInput {
+    Vector(Vector2D),
+    Values(Vec<f64>),
+}
+
+impl SplinePointInput {
+    fn into_vector(self) -> PyResult<Vector2D> {
+        match self {
+            Self::Vector(vector) => Ok(vector),
+            Self::Values(values) => Vector2D::from_components(&values),
+        }
+    }
+}
+
+#[derive(FromPyObject)]
+enum SplineControlPointsInput {
+    PolyLine(PolyLine2D),
+    Points(Vec<SplinePointInput>),
+}
 
 #[derive(Clone, Copy)]
 enum CurveBase {
@@ -391,26 +412,27 @@ macro_rules! define_curve_type {
             }
 
             #[setter(controlpoints)]
-            fn set_controlpoints(&mut self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<()> {
-                if let Ok(polyline) = value.extract::<PolyLine2D>() {
-                    self.controlpoints = polyline;
-                    return Ok(());
+            fn set_controlpoints(&mut self, value: SplineControlPointsInput) -> PyResult<()> {
+                match value {
+                    SplineControlPointsInput::PolyLine(polyline) => {
+                        self.controlpoints = polyline;
+                    }
+                    SplineControlPointsInput::Points(points) => {
+                        let mut parsed = Vec::with_capacity(points.len());
+                        for point in points {
+                            parsed.push(point.into_vector()?);
+                        }
+                        self.controlpoints = PolyLine2D { nodes: parsed };
+                    }
                 }
-
-                let points = value.extract::<Vec<Py<PyAny>>>()?;
-                let mut parsed = Vec::with_capacity(points.len());
-                for point in points {
-                    parsed.push(extract_vector2d(point.bind(py).as_any())?);
-                }
-                self.controlpoints = PolyLine2D { nodes: parsed };
                 Ok(())
             }
 
             #[new]
-            fn new(py: Python<'_>, controlpoints: Vec<Py<PyAny>>) -> PyResult<Self> {
+            fn new(controlpoints: Vec<SplinePointInput>) -> PyResult<Self> {
                 let mut parsed = Vec::with_capacity(controlpoints.len());
                 for point in controlpoints {
-                    parsed.push(extract_vector2d(point.bind(py).as_any())?);
+                    parsed.push(point.into_vector()?);
                 }
                 Ok(Self { controlpoints: PolyLine2D { nodes: parsed }, numpoints: 100 })
             }

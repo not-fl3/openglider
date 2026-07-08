@@ -1,8 +1,34 @@
 use nalgebra::{Matrix3, Vector3};
 use pyo3::prelude::*;
-use pyo3::types::PyAny;
 
 use crate::vector::{PolyLine2D, PolyLine3D, Transformation, Vector2D, Vector3D};
+
+#[derive(FromPyObject)]
+enum PlaneVectorInput {
+    Vector(Vector3D),
+    Values(Vec<f64>),
+}
+
+impl PlaneVectorInput {
+    fn into_vector(self) -> PyResult<Vector3D> {
+        match self {
+            Self::Vector(vector) => Ok(vector),
+            Self::Values(values) => Vector3D::from_components(&values),
+        }
+    }
+}
+
+#[derive(FromPyObject)]
+enum PlaneInitInput {
+    Transformation(Transformation),
+    Vector(PlaneVectorInput),
+}
+
+#[derive(FromPyObject)]
+enum PlaneProjectInput {
+    Point(PlaneVectorInput),
+    PolyLine(PolyLine3D),
+}
 
 #[pyclass]
 #[derive(Clone, Debug)]
@@ -33,43 +59,58 @@ impl Plane {
 impl Plane {
     #[new]
     #[pyo3(signature = (arg0, arg1 = None, arg2 = None))]
-    fn new(arg0: &Bound<'_, PyAny>, arg1: Option<Vector3D>, arg2: Option<Vector3D>) -> PyResult<Self> {
-        if arg1.is_none() && arg2.is_none() {
-            let transformation = arg0.extract::<Transformation>()?;
-            let x_vector = transformation.apply_vector3(Vector3D { x: 1.0, y: 0.0, z: 0.0 });
-            let y_vector = transformation.apply_vector3(Vector3D { x: 0.0, y: 1.0, z: 0.0 });
-            let p0 = transformation.apply_vector3(Vector3D::zero());
-            let normvector = x_vector.cross(&y_vector).normalized();
-            return Ok(Self {
-                x_vector,
-                y_vector,
-                normvector,
-                p0,
-                transformation,
-            });
-        }
+    fn new(arg0: PlaneInitInput, arg1: Option<PlaneVectorInput>, arg2: Option<PlaneVectorInput>) -> PyResult<Self> {
+        match arg0 {
+            PlaneInitInput::Transformation(transformation) => {
+                if arg1.is_some() || arg2.is_some() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "when arg0 is a Transformation, arg1 and arg2 must be omitted",
+                    ));
+                }
 
-        let x_vector = arg0.extract::<Vector3D>()?;
-        let y_vector = arg1.ok_or_else(|| PyErr::new::<pyo3::exceptions::PyTypeError, _>("expected three vectors"))?;
-        let p0 = arg2.ok_or_else(|| PyErr::new::<pyo3::exceptions::PyTypeError, _>("expected three vectors"))?;
-        let normvector = x_vector.cross(&y_vector).normalized();
-        Ok(Self {
-            x_vector,
-            y_vector,
-            normvector,
-            p0,
-            transformation: Transformation::new(),
-        })
+                let x_vector = transformation.apply_vector3(Vector3D { x: 1.0, y: 0.0, z: 0.0 });
+                let y_vector = transformation.apply_vector3(Vector3D { x: 0.0, y: 1.0, z: 0.0 });
+                let p0 = transformation.apply_vector3(Vector3D::zero());
+                let normvector = x_vector.cross(&y_vector).normalized();
+                Ok(Self {
+                    x_vector,
+                    y_vector,
+                    normvector,
+                    p0,
+                    transformation,
+                })
+            }
+            PlaneInitInput::Vector(x_vector) => {
+                let x_vector = x_vector.into_vector()?;
+                let y_vector = arg1
+                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyTypeError, _>("expected three vectors"))?
+                    .into_vector()?;
+                let p0 = arg2
+                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyTypeError, _>("expected three vectors"))?
+                    .into_vector()?;
+                let normvector = x_vector.cross(&y_vector).normalized();
+                Ok(Self {
+                    x_vector,
+                    y_vector,
+                    normvector,
+                    p0,
+                    transformation: Transformation::new(),
+                })
+            }
+        }
     }
 
-    fn project(&self, value: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        if let Ok(point) = value.extract::<Vector3D>() {
-            return Py::new(py, self.project_vector(point)).map(|value| value.into_bound(py).into_any().unbind());
+    fn project(&self, value: PlaneProjectInput, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        match value {
+            PlaneProjectInput::Point(point) => {
+                Py::new(py, self.project_vector(point.into_vector()?))
+                    .map(|value| value.into_bound(py).into_any().unbind())
+            }
+            PlaneProjectInput::PolyLine(polyline) => {
+                Py::new(py, self.project_polyline(polyline))
+                    .map(|value| value.into_bound(py).into_any().unbind())
+            }
         }
-        if let Ok(polyline) = value.extract::<PolyLine3D>() {
-            return Py::new(py, self.project_polyline(polyline)).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("project expects Vector3D or PolyLine3D"))
     }
 
     fn project_vector(&self, point: Vector3D) -> Vector2D {

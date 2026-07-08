@@ -219,7 +219,7 @@ class MiniRib:
 
         # check for intersection between offset lines
         try:
-            cut = top_curve.cut(bottom_curve, len(top_curve.nodes)-1)
+            cut = top_curve.cut(bottom_curve, nearest_ik=len(top_curve.nodes)-1)
             top_curve = top_curve.get(0, cut[0])
             bottom_curve = bottom_curve.get(0, cut[1])
         except RuntimeError:

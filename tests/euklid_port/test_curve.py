@@ -33,5 +33,5 @@ class TestCurve(unittest.TestCase):
         p2 = openglider.rs.vector.Vector2D([4.176588348946094, -1.3933998974232116])
 
         line = openglider.rs.vector.PolyLine2D([p1, p2])
-        cuts = self.curve.cut(line, None)
+        cuts = self.curve.cut(line)
         self.assertEqual(len(cuts), 1)

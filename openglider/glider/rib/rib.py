@@ -39,12 +39,18 @@ class RibBase(BaseModel):
 
     def align_all(self, data: openglider.rs.vector.PolyLine2D, scale: bool=True) -> openglider.rs.vector.PolyLine3D:
         """align 2d coordinates to the 3d pos of the rib"""
+        if not isinstance(data, openglider.rs.vector.PolyLine2D):
+            data = openglider.rs.vector.PolyLine2D(data)
+
         if scale:
-            return self.transformation.apply(data)
+            return self.transformation.apply_polyline(data)
         else:
-            return self.rotation_matrix.apply(data).move(self.pos)
+            return self.rotation_matrix.apply_polyline(data).move(self.pos)
 
     def align(self, point: openglider.rs.vector.Vector2D, scale: bool=True) -> openglider.rs.vector.Vector3D:
+        if not isinstance(point, openglider.rs.vector.Vector2D):
+            point = openglider.rs.vector.Vector2D(point)
+
         if scale:
             return self.transformation.apply(point)
         else:
@@ -70,7 +76,7 @@ class RibBase(BaseModel):
 
     @cached_property('profile_3d')
     def normvectors(self) -> list[openglider.rs.vector.Vector3D]:
-        return [self.rotation_matrix.apply(p) for p in self.profile_2d.normvectors.nodes]
+        return [self.rotation_matrix.apply(openglider.rs.vector.Vector2D(p)) for p in self.profile_2d.normvectors.nodes]
     
     @cached_property('profile_2d', 'transformation')
     def profile_3d(self) -> Profile3D:
@@ -210,7 +216,7 @@ class Rib(RibBase):
 
     @property
     def normalized_normale(self) -> openglider.rs.vector.Vector3D:
-        return self.rotation_matrix.apply([0., 0., 1.])
+        return self.rotation_matrix.apply(openglider.rs.vector.Vector3D([0., 0., 1.]))
 
     def get_mesh(self, hole_num: int=10, filled: bool=False, max_area: float=None) -> Mesh:
         if self.is_closed():

@@ -77,7 +77,7 @@ class TestVector2D(TestVector3D):
     @staticmethod
     def _cut_line(polyline, p1, p2, nearest_ik=None):
         line = PolyLine2D([p1, p2])
-        result = polyline.cut(line, nearest_ik)
+        result = polyline.cut(line, nearest_ik=nearest_ik)
         if nearest_ik is not None:
             if len(result) == 0:
                 return ()

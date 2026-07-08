@@ -2,7 +2,20 @@
 requires = ["setuptools>=69", "setuptools-rust>=1.12", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools-rust]
+[project]
+name = "openglider"
+description = "OpenGlider"
+requires-python = ">=3.8"
+readme = {file = "README.md", content-type = "text/markdown"}
+license = "GPL-3.0-or-later"
+authors = [
+    {name = "airG products", email = "simon@airg.family"},
+]
+keywords = ["paraglider", "flying"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dynamic = ["version"]
 
 dependencies = [
     "euklid",
@@ -41,7 +54,17 @@ Homepage = "https://www.openglider.org"
 Repository = "https://github.com/booya-at/OpenGlider"
 
 [tool.setuptools]
-packages = ["openglider"]
+include-package-data = false
+
+[tool.setuptools.dynamic]
+version = {attr = "openglider.version.__version__"}
+
+[tool.setuptools.package-data]
+"*" = ["py.typed", "*.pyi", "rs/*.pyi", "*.csv", "*.svg", "tests/common/*.ods"]
+
+[tool.setuptools.packages.find]
+include = ["openglider*"]
+exclude = ["*.tests", "*.tests.*"]
 
 [tool.setuptools-rust]
 [[tool.setuptools-rust.ext-modules]]
@@ -49,8 +72,8 @@ target = "openglider.rs"
 path = "Cargo.toml"
 binding = "PyO3"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=7.0",
     "mypy>=1.0",
 ]

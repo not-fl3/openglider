@@ -17,7 +17,7 @@ class TestNumericalStability(unittest.TestCase):
     @staticmethod
     def _cut_line(polyline, p1, p2, nearest_ik=None):
         line = PolyLine2D([p1, p2])
-        result = polyline.cut(line, nearest_ik)
+        result = polyline.cut(line, nearest_ik=nearest_ik)
         if nearest_ik is not None:
             if len(result) == 0:
                 return ()
@@ -30,7 +30,7 @@ class TestNumericalStability(unittest.TestCase):
         p1 = PolyLine2D([[0, 0], [10, 0]])
         p2 = PolyLine2D([[0, 0.1], [10, 0.1 + 10 * math.tan(angle)]])
 
-        cuts = p1.cut(p2, None)
+        cuts = p1.cut(p2)
         if len(cuts) > 0:
             self.assertIsInstance(cuts[0][0], float)
             self.assertIsInstance(cuts[0][1], float)
@@ -39,21 +39,21 @@ class TestNumericalStability(unittest.TestCase):
         p1 = PolyLine2D([[0, 0], [10, 0]])
         p2 = PolyLine2D([[5, -1], [5, -1 + 1e-9]])
 
-        cuts = p1.cut(p2, None)
+        cuts = p1.cut(p2)
         self.assertEqual(len(cuts), 0)
 
     def test_cut_2d_exact_parallel_lines(self):
         p1 = PolyLine2D([[0, 0], [10, 0]])
         p2 = PolyLine2D([[0, 1], [10, 1]])
 
-        cuts = p1.cut(p2, None)
+        cuts = p1.cut(p2)
         self.assertEqual(len(cuts), 0)
 
     def test_cut_2d_perpendicular_lines(self):
         p1 = PolyLine2D([[0, 0], [10, 0]])
         p2 = PolyLine2D([[5, -5], [5, 5]])
 
-        cuts = p1.cut(p2, None)
+        cuts = p1.cut(p2)
         self.assertEqual(len(cuts), 1)
 
         ik1, ik2 = cuts[0]
@@ -104,7 +104,7 @@ class TestNumericalStability(unittest.TestCase):
         p1 = PolyLine2D([[0, 0], [1e6, 0]])
         p2 = PolyLine2D([[5e5, -1e-3], [5e5, 1e-3]])
 
-        cuts = p1.cut(p2, None)
+        cuts = p1.cut(p2)
 
         if len(cuts) > 0:
             ik1, _ik2 = cuts[0]
@@ -117,8 +117,8 @@ class TestProjectionBasedIntersection(unittest.TestCase):
         p1 = PolyLine2D([[0, 0], [10, 0]])
         p2 = PolyLine2D([[5, -5], [5, 5]])
 
-        cuts1 = p1.cut(p2, None)
-        cuts2 = p2.cut(p1, None)
+        cuts1 = p1.cut(p2)
+        cuts2 = p2.cut(p1)
 
         self.assertEqual(len(cuts1), 1)
         self.assertEqual(len(cuts2), 1)
@@ -133,7 +133,7 @@ class TestProjectionBasedIntersection(unittest.TestCase):
         p1 = PolyLine2D([[0, 0], [10, 0]])
         p2 = PolyLine2D([[10, -5], [10, 5]])
 
-        cuts = p1.cut(p2, None)
+        cuts = p1.cut(p2)
 
         self.assertEqual(len(cuts), 1)
         ik1, _ik2 = cuts[0]
@@ -144,7 +144,7 @@ class TestProjectionBasedIntersection(unittest.TestCase):
         p1 = PolyLine2D([[0, 0], [10, 0]])
         p2 = PolyLine2D([[0, 5], [10, 5]])
 
-        cuts = p1.cut(p2, None)
+        cuts = p1.cut(p2)
 
         self.assertEqual(len(cuts), 0)
 
@@ -152,7 +152,7 @@ class TestProjectionBasedIntersection(unittest.TestCase):
         p1 = PolyLine2D([[0, 0], [10, 10]])
         p2 = PolyLine2D([[0, 10], [10, 0]])
 
-        cuts = p1.cut(p2, None)
+        cuts = p1.cut(p2)
 
         self.assertEqual(len(cuts), 1)
         ik1, ik2 = cuts[0]

@@ -5,23 +5,119 @@ use pyo3::types::{PyAny, PyList, PyModule};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-pub(crate) fn values_from_any(any: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> {
-    any.extract::<Vec<f64>>()
-        .map_err(|_| PyTypeError::new_err("expected a sequence of floats"))
+#[derive(FromPyObject)]
+enum Vector2DInput {
+    Vector(Vector2D),
+    Values(Vec<f64>),
 }
 
-pub(crate) fn extract_vector2d(any: &Bound<'_, PyAny>) -> PyResult<Vector2D> {
-    if let Ok(value) = any.extract::<Vector2D>() {
-        return Ok(value);
+impl Vector2DInput {
+    fn into_vector(self) -> PyResult<Vector2D> {
+        match self {
+            Self::Vector(vector) => Ok(vector),
+            Self::Values(values) => Vector2D::from_components(&values),
+        }
     }
-    Vector2D::from_components(&values_from_any(any)?)
 }
 
-pub(crate) fn extract_vector3d(any: &Bound<'_, PyAny>) -> PyResult<Vector3D> {
-    if let Ok(value) = any.extract::<Vector3D>() {
-        return Ok(value);
+enum Vector2DScale {
+    Scalar(f64),
+    Vector(Vector2D),
+}
+
+#[derive(FromPyObject)]
+enum Vector2DScaleInput {
+    Scalar(f64),
+    Vector(Vector2D),
+    Values(Vec<f64>),
+}
+
+impl Vector2DScaleInput {
+    fn into_scale(self) -> PyResult<Vector2DScale> {
+        match self {
+            Self::Scalar(scalar) => Ok(Vector2DScale::Scalar(scalar)),
+            Self::Vector(vector) => Ok(Vector2DScale::Vector(vector)),
+            Self::Values(values) => Ok(Vector2DScale::Vector(Vector2D::from_components(&values)?)),
+        }
     }
-    Vector3D::from_components(&values_from_any(any)?)
+}
+
+#[derive(FromPyObject)]
+enum Vector3DInput {
+    Vector(Vector3D),
+    Values(Vec<f64>),
+}
+
+impl Vector3DInput {
+    fn into_vector(self) -> PyResult<Vector3D> {
+        match self {
+            Self::Vector(vector) => Ok(vector),
+            Self::Values(values) => Vector3D::from_components(&values),
+        }
+    }
+}
+
+enum Vector3DScale {
+    Scalar(f64),
+    Vector(Vector3D),
+}
+
+#[derive(FromPyObject)]
+enum Vector3DScaleInput {
+    Scalar(f64),
+    Vector(Vector3D),
+    Values(Vec<f64>),
+}
+
+impl Vector3DScaleInput {
+    fn into_scale(self) -> PyResult<Vector3DScale> {
+        match self {
+            Self::Scalar(scalar) => Ok(Vector3DScale::Scalar(scalar)),
+            Self::Vector(vector) => Ok(Vector3DScale::Vector(vector)),
+            Self::Values(values) => Ok(Vector3DScale::Vector(Vector3D::from_components(&values)?)),
+        }
+    }
+}
+
+#[derive(FromPyObject)]
+enum VectorXD {
+    Vector2(Vector2D),
+    Vector3(Vector3D),
+    Values(Vec<f64>),
+}
+impl VectorXD {
+    fn into_vector_3d(self) -> PyResult<Vector3D> {
+        match self {
+            Self::Vector3(vector) => Ok(vector),
+            Self::Vector2(vector) => Ok(vector.to_3d()),
+            Self::Values(values) => {
+                if values.len() == 2  {
+                    Ok(Vector3D::from_xyz(values[0], values[1], 0.))
+                } else {
+                    Vector3D::from_components(&values)
+                }
+            }
+        }
+    }
+}
+
+#[derive(FromPyObject)]
+enum PolyLineXD {
+    PolyLine2(PolyLine2D),
+    PolyLine3(PolyLine3D),
+}
+
+#[derive(FromPyObject)]
+enum PolyLine2DCutInput {
+    Vector(Vector2DInput),
+    PolyLine(PolyLine2D),
+}
+
+#[derive(FromPyObject)]
+enum InterpolationNodesInput {
+    Interpolation(Interpolation),
+    PolyLine(PolyLine2D),
+    Points(Vec<Vector2DInput>),
 }
 
 trait VectorOps: Sized + Copy + Clone {
@@ -235,14 +331,11 @@ impl Vector2D {
         self.sub(*other)
     }
 
-    fn __mul__(&self, other: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        if let Ok(vector) = extract_vector2d(other) {
-            return Py::new(py, self.mul(vector)).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        if let Ok(scalar) = other.extract::<f64>() {
-            return Py::new(py, self.scale(scalar)).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        Err(PyTypeError::new_err("expected Vector2D or float"))
+    fn __mul__(&self, other: Vector2DScaleInput) -> PyResult<Self> {
+        Ok(match other.into_scale()? {
+            Vector2DScale::Scalar(scalar) => self.scale(scalar),
+            Vector2DScale::Vector(vector) => self.mul(vector),
+        })
     }
 
     fn __truediv__(&self, factor: f64) -> Self {
@@ -452,14 +545,11 @@ impl Vector3D {
         self.sub(*other)
     }
 
-    fn __mul__(&self, other: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        if let Ok(vector) = extract_vector3d(other) {
-            return Py::new(py, self.mul(vector)).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        if let Ok(scalar) = other.extract::<f64>() {
-            return Py::new(py, self.scale(scalar)).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        Err(PyTypeError::new_err("expected Vector3D or float"))
+    fn __mul__(&self, other: Vector3DScaleInput) -> PyResult<Self> {
+        Ok(match other.into_scale()? {
+            Vector3DScale::Scalar(scalar) => self.scale(scalar),
+            Vector3DScale::Vector(vector) => self.mul(vector),
+        })
     }
 
     fn __truediv__(&self, factor: f64) -> Self {
@@ -539,15 +629,15 @@ fn line_intersection_2d(a1: Vector2D, a2: Vector2D, b1: Vector2D, b2: Vector2D) 
 
 #[pyfunction]
 fn cut_2d(
-    l1_p1: &Bound<'_, PyAny>,
-    l1_p2: &Bound<'_, PyAny>,
-    l2_p1: &Bound<'_, PyAny>,
-    l2_p2: &Bound<'_, PyAny>,
+    l1_p1: Vector2DInput,
+    l1_p2: Vector2DInput,
+    l2_p1: Vector2DInput,
+    l2_p2: Vector2DInput,
 ) -> PyResult<CutResult> {
-    let l1_p1 = extract_vector2d(l1_p1)?;
-    let l1_p2 = extract_vector2d(l1_p2)?;
-    let l2_p1 = extract_vector2d(l2_p1)?;
-    let l2_p2 = extract_vector2d(l2_p2)?;
+    let l1_p1 = l1_p1.into_vector()?;
+    let l1_p2 = l1_p2.into_vector()?;
+    let l2_p1 = l2_p1.into_vector()?;
+    let l2_p2 = l2_p2.into_vector()?;
 
     Ok(if let Some((ik_1, ik_2, point)) = line_intersection_2d(l1_p1, l1_p2, l2_p1, l2_p2) {
         CutResult { success: true, ik_1, ik_2, point }
@@ -558,10 +648,10 @@ fn cut_2d(
 
 #[pyfunction(name = "cut")]
 fn cut(
-    l1_p1: &Bound<'_, PyAny>,
-    l1_p2: &Bound<'_, PyAny>,
-    l2_p1: &Bound<'_, PyAny>,
-    l2_p2: &Bound<'_, PyAny>,
+    l1_p1: Vector2DInput,
+    l1_p2: Vector2DInput,
+    l2_p1: Vector2DInput,
+    l2_p2: Vector2DInput,
 ) -> PyResult<CutResult> {
     cut_2d(l1_p1, l1_p2, l2_p1, l2_p2)
 }
@@ -579,8 +669,8 @@ impl Rotation2D {
         Self { angle }
     }
 
-    fn apply(&self, vector: &Bound<'_, PyAny>) -> PyResult<Vector2D> {
-        let vector = extract_vector2d(vector)?;
+    fn apply(&self, vector: Vector2DInput) -> PyResult<Vector2D> {
+        let vector = vector.into_vector()?;
         let (sin_angle, cos_angle) = self.angle.sin_cos();
         Ok(Vector2D {
             x: vector.x * cos_angle - vector.y * sin_angle,
@@ -615,6 +705,18 @@ impl Transformation {
         }
         Self { matrix: values }
     }
+
+    fn apply_polyline2(&self, polyline: PolyLine2D) -> PolyLine3D {
+        PolyLine3D {
+            nodes: polyline.nodes.into_iter().map(|node| self.apply_vector3(node.to_3d())).collect(),
+        }
+    }
+
+    fn apply_polyline3(&self, polyline: PolyLine3D) -> PolyLine3D {
+        PolyLine3D {
+            nodes: polyline.nodes.into_iter().map(|node| self.apply_vector3(node)).collect(),
+        }
+    }
 }
 
 #[pymethods]
@@ -632,8 +734,8 @@ impl Transformation {
     }
 
     #[staticmethod]
-    fn rotation(angle: f64, axis: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let axis = extract_vector3d(axis)?.normalized();
+    fn rotation(angle: f64, axis: Vector3DInput) -> PyResult<Self> {
+        let axis = axis.into_vector()?.normalized();
         let (sin_angle, cos_angle) = angle.sin_cos();
         let one_minus = 1.0 - cos_angle;
         let matrix = Matrix4::new(
@@ -658,23 +760,19 @@ impl Transformation {
     }
 
     #[staticmethod]
-    fn translation(vector: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn translation(vector: VectorXD) -> PyResult<Self> {
         let mut matrix = Self::new().as_matrix4();
-        if let Ok(vector) = extract_vector3d(vector) {
-            matrix[(0, 3)] = vector.x;
-            matrix[(1, 3)] = vector.y;
-            matrix[(2, 3)] = vector.z;
-            return Ok(Self::from_matrix4(matrix));
-        }
-        let vector = extract_vector2d(vector)?;
+        let vector = vector.into_vector_3d()?;
         matrix[(0, 3)] = vector.x;
         matrix[(1, 3)] = vector.y;
+        matrix[(2, 3)] = vector.z;
+        
         Ok(Self::from_matrix4(matrix))
     }
 
     #[staticmethod]
-    fn reflection(normal: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let normal = extract_vector3d(normal)?.normalized();
+    fn reflection(normal: Vector3DInput) -> PyResult<Self> {
+        let normal = normal.into_vector()?.normalized();
         let nx = normal.x;
         let ny = normal.y;
         let nz = normal.z;
@@ -723,53 +821,15 @@ impl Transformation {
         *self
     }
 
-    fn apply(&self, value: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        if let Ok(vector) = extract_vector3d(value) {
-            return Py::new(py, self.apply_vector3(vector)).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        if let Ok(vector) = extract_vector2d(value) {
-            return Py::new(py, self.apply_vector3(vector.to_3d())).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        if let Ok(polyline) = value.extract::<PolyLine2D>() {
-            return Py::new(py, self.apply_polyline2(polyline)).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        if let Ok(polyline) = value.extract::<PolyLine3D>() {
-            return Py::new(py, self.apply_polyline3(polyline)).map(|value| value.into_bound(py).into_any().unbind());
-        }
+    fn apply(&self, vector: VectorXD) -> PyResult<Vector3D> {
+        Ok(self.apply_vector3(vector.into_vector_3d()?))
+    }
 
-        // Compatibility path for polyline-like objects from other modules/versions.
-        // First try an explicit `.nodes` attribute, then generic iterable extraction.
-        if let Ok(nodes_obj) = value.getattr("nodes") {
-            if let Ok(nodes_any) = nodes_obj.extract::<Vec<Py<PyAny>>>() {
-                let mut transformed = Vec::with_capacity(nodes_any.len());
-                for node in nodes_any {
-                    let node = node.bind(py).as_any();
-                    if let Ok(vector) = extract_vector3d(node) {
-                        transformed.push(self.apply_vector3(vector));
-                    } else {
-                        transformed.push(self.apply_vector2(extract_vector2d(node)?).to_3d());
-                    }
-                }
-                return Py::new(py, PolyLine3D { nodes: transformed })
-                    .map(|value| value.into_bound(py).into_any().unbind());
-            }
+    fn apply_polyline(&self, polyline: PolyLineXD) -> PolyLine3D {
+        match polyline {
+            PolyLineXD::PolyLine2(polyline) => self.apply_polyline2(polyline),
+            PolyLineXD::PolyLine3(polyline) => self.apply_polyline3(polyline),
         }
-
-        if let Ok(points) = value.extract::<Vec<Py<PyAny>>>() {
-            let mut transformed = Vec::with_capacity(points.len());
-            for point in points {
-                let point = point.bind(py).as_any();
-                if let Ok(vector) = extract_vector3d(point) {
-                    transformed.push(self.apply_vector3(vector));
-                } else {
-                    transformed.push(self.apply_vector2(extract_vector2d(point)?).to_3d());
-                }
-            }
-            return Py::new(py, PolyLine3D { nodes: transformed })
-                .map(|value| value.into_bound(py).into_any().unbind());
-        }
-
-        Err(PyTypeError::new_err("unsupported value for Transformation.apply"))
     }
 
     pub(crate) fn apply_vector3(&self, vector: Vector3D) -> Vector3D {
@@ -778,23 +838,6 @@ impl Transformation {
         Vector3D { x: result.x, y: result.y, z: result.z }
     }
 
-    fn apply_vector2(&self, vector: Vector2D) -> Vector2D {
-        let matrix = self.as_matrix4();
-        let result = matrix * Vector4::new(vector.x, vector.y, 0.0, 1.0);
-        Vector2D { x: result.x, y: result.y }
-    }
-
-    fn apply_polyline2(&self, polyline: PolyLine2D) -> PolyLine3D {
-        PolyLine3D {
-            nodes: polyline.nodes.into_iter().map(|node| self.apply_vector3(node.to_3d())).collect(),
-        }
-    }
-
-    fn apply_polyline3(&self, polyline: PolyLine3D) -> PolyLine3D {
-        PolyLine3D {
-            nodes: polyline.nodes.into_iter().map(|node| self.apply_vector3(node)).collect(),
-        }
-    }
 }
 
 #[pyclass]
@@ -1077,11 +1120,11 @@ fn polyline_walk<V: VectorOps>(nodes: &[V], start: f64, amount: f64) -> f64 {
 impl PolyLine2D {
     #[new]
     #[pyo3(signature = (nodes = None))]
-    fn new(py: Python<'_>, nodes: Option<Vec<Py<PyAny>>>) -> PyResult<Self> {
+    fn new(nodes: Option<Vec<Vector2DInput>>) -> PyResult<Self> {
         let mut parsed = Vec::new();
         if let Some(nodes) = nodes {
             for node in nodes {
-                parsed.push(extract_vector2d(node.bind(py).as_any())?);
+                parsed.push(node.into_vector()?);
             }
         }
         Ok(Self { nodes: parsed })
@@ -1141,18 +1184,28 @@ impl PolyLine2D {
 
     fn resample(&self, num_points: usize) -> Self { Self { nodes: polyline_resample(&self.nodes, num_points) } }
 
-    fn scale(&self, factor: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        if let Ok(scalar) = factor.extract::<f64>() {
-            return Py::new(py, Self { nodes: self.nodes.iter().map(|node| node.scale(scalar)).collect() }).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        let vector = extract_vector2d(factor)?;
-        Py::new(py, Self { nodes: self.nodes.iter().map(|node| node.mul(vector)).collect() }).map(|value| value.into_bound(py).into_any().unbind())
+    fn scale(&self, factor: Vector2DScaleInput) -> PyResult<Self> {
+        Ok(match factor.into_scale()? {
+            Vector2DScale::Scalar(scalar) => Self {
+                nodes: self.nodes.iter().map(|node| node.scale(scalar)).collect(),
+            },
+            Vector2DScale::Vector(vector) => Self {
+                nodes: self.nodes.iter().map(|node| node.mul(vector)).collect(),
+            },
+        })
     }
 
     #[pyo3(name = "move")]
-    fn r#move(&self, offset: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let offset = extract_vector2d(offset)?;
-        Py::new(py, Self { nodes: self.nodes.iter().copied().map(|node| node.add(offset)).collect() }).map(|value| value.into_bound(py).into_any().unbind())
+    fn r#move(&self, offset: Vector2DInput) -> PyResult<Self> {
+        let offset = offset.into_vector()?;
+        Ok(Self {
+            nodes: self
+                .nodes
+                .iter()
+                .copied()
+                .map(|node| node.add(offset))
+                .collect(),
+        })
     }
 
     fn add(&self, other: &PolyLine2D) -> Self {
@@ -1174,7 +1227,7 @@ impl PolyLine2D {
     }
     fn __add__(&self, other: &PolyLine2D) -> Self { self.add(other) }
     fn __sub__(&self, other: &PolyLine2D) -> Self { self.sub(other) }
-    fn __mul__(&self, factor: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> { self.scale(factor, py) }
+    fn __mul__(&self, factor: Vector2DScaleInput) -> PyResult<Self> { self.scale(factor) }
 
     fn segment_normals(&self) -> Self {
         let nodes = self.nodes.windows(2).map(|pair| {
@@ -1295,19 +1348,10 @@ impl PolyLine2D {
         Self { nodes: result }
     }
 
-    #[pyo3(signature = (other, arg2 = None, nearest_ik = None))]
-    fn cut(&self, other: &Bound<'_, PyAny>, arg2: Option<&Bound<'_, PyAny>>, nearest_ik: Option<f64>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut nearest = nearest_ik;
-        if nearest.is_none() {
-            if let Some(arg2) = arg2 {
-                if let Ok(value) = arg2.extract::<f64>() {
-                    nearest = Some(value);
-                }
-            }
-        }
-
+    #[pyo3(signature = (other, second_point = None, nearest_ik = None))]
+    fn cut(&self, other: PolyLine2DCutInput, second_point: Option<Vector2DInput>, nearest_ik: Option<f64>, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let finalize_result = |mut intersections: Vec<(f64, f64)>| -> PyResult<Py<PyAny>> {
-            if let Some(nearest_ik) = nearest {
+            if let Some(nearest_ik) = nearest_ik {
                 intersections.sort_by(|left, right| (left.0 - nearest_ik).abs().partial_cmp(&(right.0 - nearest_ik).abs()).unwrap_or(std::cmp::Ordering::Equal));
                 if let Some(cut) = intersections.first() {
                     return Ok((cut.0, cut.1).into_pyobject(py)?.into_any().unbind());
@@ -1318,32 +1362,33 @@ impl PolyLine2D {
             Ok(intersections.into_pyobject(py)?.into_any().unbind())
         };
 
-        if let Ok(vector) = extract_vector2d(other) {
-            let intersections = if let Some(arg2) = arg2 {
-                if let Ok(vector2) = extract_vector2d(arg2) {
-                    polyline2d_cut_line(&self.nodes, vector, vector2)
-                } else {
-                    polyline2d_cut_line(&self.nodes, vector, vector.add(Vector2D { x: 1.0, y: 0.0 }))
+        match other {
+            PolyLine2DCutInput::Vector(vector) => {
+                let p1 = vector.into_vector()?;
+                let p2 = match second_point {
+                    Some(point) => point.into_vector()?,
+                    None => p1.add(Vector2D { x: 1.0, y: 0.0 }),
+                };
+                finalize_result(polyline2d_cut_line(&self.nodes, p1, p2))
+            }
+            PolyLine2DCutInput::PolyLine(other) => {
+                if second_point.is_some() {
+                    return Err(PyTypeError::new_err("second_point is only valid when 'other' is a Vector2D"));
                 }
-            } else {
-                polyline2d_cut_line(&self.nodes, vector, vector.add(Vector2D { x: 1.0, y: 0.0 }))
-            };
 
-            return finalize_result(intersections);
-        }
-
-        let other = other.extract::<PolyLine2D>()?;
-        let tolerance = 1e-5;
-        let mut intersections = Vec::new();
-        for index_b in 0..other.nodes.len().saturating_sub(1) {
-            let cuts = polyline2d_cut_line(&self.nodes, other.nodes[index_b], other.nodes[index_b + 1]);
-            for cut in cuts {
-                if -tolerance < cut.1 && cut.1 < 1.0 + tolerance && -tolerance < cut.0 && cut.0 < self.nodes.len() as f64 - 1.0 + tolerance {
-                    intersections.push((cut.0, index_b as f64 + cut.1));
+                let tolerance = 1e-5;
+                let mut intersections = Vec::new();
+                for index_b in 0..other.nodes.len().saturating_sub(1) {
+                    let cuts = polyline2d_cut_line(&self.nodes, other.nodes[index_b], other.nodes[index_b + 1]);
+                    for cut in cuts {
+                        if -tolerance < cut.1 && cut.1 < 1.0 + tolerance && -tolerance < cut.0 && cut.0 < self.nodes.len() as f64 - 1.0 + tolerance {
+                            intersections.push((cut.0, index_b as f64 + cut.1));
+                        }
+                    }
                 }
+                finalize_result(intersections)
             }
         }
-        finalize_result(intersections)
     }
 
     fn bool_union(&self, other: &PolyLine2D) -> Vec<PolyLine2D> { vec![self.clone(), other.clone()] }
@@ -1374,8 +1419,8 @@ impl PolyLine2D {
 
     fn boundary(&self) -> Vec<Vector2D> { self.nodes.clone() }
 
-    fn contains(&self, point: &Bound<'_, PyAny>) -> PyResult<bool> {
-        let point = extract_vector2d(point)?;
+    fn contains(&self, point: Vector2DInput) -> PyResult<bool> {
+        let point = point.into_vector()?;
         if self.nodes.len() < 3 {
             return Ok(false);
         }
@@ -1393,9 +1438,9 @@ impl PolyLine2D {
     }
 
     #[pyo3(signature = (p1 = None, p2 = None))]
-    fn mirror(&self, p1: Option<&Bound<'_, PyAny>>, p2: Option<&Bound<'_, PyAny>>, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    fn mirror(&self, p1: Option<Vector2DInput>, p2: Option<Vector2DInput>) -> PyResult<Self> {
         let (a, b) = match (p1, p2) {
-            (Some(a), Some(b)) => (extract_vector2d(a)?, extract_vector2d(b)?),
+            (Some(a), Some(b)) => (a.into_vector()?, b.into_vector()?),
             _ => (Vector2D { x: 0.0, y: 0.0 }, Vector2D { x: 0.0, y: 1.0 }),
         };
         let direction = b.sub(a).normalized();
@@ -1405,13 +1450,13 @@ impl PolyLine2D {
             let perpendicular = ap.sub(projection);
             a.add(projection).sub(perpendicular)
         }).collect();
-        Py::new(py, Self { nodes }).map(|value| value.into_bound(py).into_any().unbind())
+        Ok(Self { nodes })
     }
 
     #[pyo3(signature = (angle, p1 = None))]
-    fn rotate(&self, angle: f64, p1: Option<&Bound<'_, PyAny>>, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    fn rotate(&self, angle: f64, p1: Option<Vector2DInput>) -> PyResult<Self> {
         let center = match p1 {
-            Some(point) => extract_vector2d(point)?,
+            Some(point) => point.into_vector()?,
             None => Vector2D::zero(),
         };
         let (sin_angle, cos_angle) = angle.sin_cos();
@@ -1422,7 +1467,7 @@ impl PolyLine2D {
                 y: point.x * sin_angle + point.y * cos_angle + center.y,
             }
         }).collect();
-        Py::new(py, Self { nodes }).map(|value| value.into_bound(py).into_any().unbind())
+        Ok(Self { nodes })
     }
 
     fn to_3d(&self) -> PolyLine3D {
@@ -1438,11 +1483,11 @@ impl PolyLine2D {
 impl PolyLine3D {
     #[new]
     #[pyo3(signature = (nodes = None))]
-    fn new(py: Python<'_>, nodes: Option<Vec<Py<PyAny>>>) -> PyResult<Self> {
+    fn new(nodes: Option<Vec<Vector3DInput>>) -> PyResult<Self> {
         let mut parsed = Vec::new();
         if let Some(nodes) = nodes {
             for node in nodes {
-                parsed.push(extract_vector3d(node.bind(py).as_any())?);
+                parsed.push(node.into_vector()?);
             }
         }
         Ok(Self { nodes: parsed })
@@ -1499,17 +1544,27 @@ impl PolyLine3D {
     }
     fn resample(&self, num_points: usize) -> Self { Self { nodes: polyline_resample(&self.nodes, num_points) } }
     fn reverse(&self) -> Self { let mut nodes = self.nodes.clone(); nodes.reverse(); Self { nodes } }
-    fn scale(&self, factor: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        if let Ok(scalar) = factor.extract::<f64>() {
-            return Py::new(py, Self { nodes: self.nodes.iter().map(|node| node.scale(scalar)).collect() }).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        let vector = extract_vector3d(factor)?;
-        Py::new(py, Self { nodes: self.nodes.iter().map(|node| node.mul(vector)).collect() }).map(|value| value.into_bound(py).into_any().unbind())
+    fn scale(&self, factor: Vector3DScaleInput) -> PyResult<Self> {
+        Ok(match factor.into_scale()? {
+            Vector3DScale::Scalar(scalar) => Self {
+                nodes: self.nodes.iter().map(|node| node.scale(scalar)).collect(),
+            },
+            Vector3DScale::Vector(vector) => Self {
+                nodes: self.nodes.iter().map(|node| node.mul(vector)).collect(),
+            },
+        })
     }
     #[pyo3(name = "move")]
-    fn r#move(&self, offset: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let offset = extract_vector3d(offset)?;
-        Py::new(py, Self { nodes: self.nodes.iter().copied().map(|node| node.add(offset)).collect() }).map(|value| value.into_bound(py).into_any().unbind())
+    fn r#move(&self, offset: Vector3DInput) -> PyResult<Self> {
+        let offset = offset.into_vector()?;
+        Ok(Self {
+            nodes: self
+                .nodes
+                .iter()
+                .copied()
+                .map(|node| node.add(offset))
+                .collect(),
+        })
     }
     fn add(&self, other: &Self) -> Self { let len = self.nodes.len().min(other.nodes.len()); Self { nodes: self.nodes[..len].iter().copied().zip(other.nodes[..len].iter().copied()).map(|(left, right)| left.add(right)).collect() } }
     fn sub(&self, other: &Self) -> Self { let len = self.nodes.len().min(other.nodes.len()); Self { nodes: self.nodes[..len].iter().copied().zip(other.nodes[..len].iter().copied()).map(|(left, right)| left.sub(right)).collect() } }
@@ -1521,7 +1576,7 @@ impl PolyLine3D {
     fn scale_nodes(&self, factors: Vec<f64>) -> Self { Self { nodes: polyline_scale_nodes(&self.nodes, &factors) } }
     fn __add__(&self, other: &Self) -> Self { self.add(other) }
     fn __sub__(&self, other: &Self) -> Self { self.sub(other) }
-    fn __mul__(&self, factor: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> { self.scale(factor, py) }
+    fn __mul__(&self, factor: Vector3DScaleInput) -> PyResult<Self> { self.scale(factor) }
     fn __getitem__(&self, index: usize) -> PyResult<Vector3D> { self.nodes.get(index).copied().ok_or_else(|| PyValueError::new_err("index out of range")) }
 }
 
@@ -1538,27 +1593,22 @@ pub struct Interpolation {
 impl Interpolation {
     #[new]
     #[pyo3(signature = (nodes, extrapolate = false))]
-    fn new(py: Python<'_>, nodes: &Bound<'_, PyAny>, extrapolate: bool) -> PyResult<Self> {
-        if let Ok(interpolation) = nodes.extract::<Interpolation>() {
-            return Ok(Self { curve: interpolation.curve, extrapolate });
+    fn new(nodes: InterpolationNodesInput, extrapolate: bool) -> PyResult<Self> {
+        match nodes {
+            InterpolationNodesInput::Interpolation(interpolation) => {
+                Ok(Self { curve: interpolation.curve, extrapolate })
+            }
+            InterpolationNodesInput::PolyLine(polyline) => {
+                Ok(Self { curve: polyline, extrapolate })
+            }
+            InterpolationNodesInput::Points(points) => {
+                let mut parsed = Vec::with_capacity(points.len());
+                for point in points {
+                    parsed.push(point.into_vector()?);
+                }
+                Ok(Self { curve: PolyLine2D { nodes: parsed }, extrapolate })
+            }
         }
-
-        if let Ok(polyline) = nodes.extract::<PolyLine2D>() {
-            return Ok(Self { curve: polyline, extrapolate });
-        }
-
-        let source = if let Ok(value) = nodes.getattr("nodes") {
-            value
-        } else {
-            nodes.clone()
-        };
-
-        let points = source.extract::<Vec<Py<PyAny>>>()?;
-        let mut parsed = Vec::with_capacity(points.len());
-        for point in points {
-            parsed.push(extract_vector2d(point.bind(py).as_any())?);
-        }
-        Ok(Self { curve: PolyLine2D { nodes: parsed }, extrapolate })
     }
 
     fn copy(&self) -> Self { self.clone() }
@@ -1595,28 +1645,38 @@ impl Interpolation {
         Self { curve: self.curve.resample(num_points), extrapolate: self.extrapolate }
     }
 
-    fn scale(&self, factor: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let scaled = self.curve.scale(factor, py)?;
-        let scaled = scaled.bind(py);
-        if let Ok(polyline) = scaled.extract::<PolyLine2D>() {
-            return Py::new(py, Self { curve: polyline, extrapolate: self.extrapolate }).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        Err(PyTypeError::new_err("failed to scale interpolation"))
+    fn scale(&self, factor: Vector2DScaleInput) -> PyResult<Self> {
+        let scaled = self.curve.scale(factor)?;
+        Ok(Self {
+            curve: scaled,
+            extrapolate: self.extrapolate,
+        })
     }
 
     #[pyo3(name = "move")]
-    fn r#move(&self, offset: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let moved = self.curve.r#move(offset, py)?;
-        let moved = moved.bind(py);
-        if let Ok(polyline) = moved.extract::<PolyLine2D>() {
-            return Py::new(py, Self { curve: polyline, extrapolate: self.extrapolate }).map(|value| value.into_bound(py).into_any().unbind());
-        }
-        Err(PyTypeError::new_err("failed to move interpolation"))
+    fn r#move(&self, offset: Vector2DInput) -> PyResult<Self> {
+        let moved = self.curve.r#move(offset)?;
+        Ok(Self {
+            curve: moved,
+            extrapolate: self.extrapolate,
+        })
     }
 
     fn add(&self, other: &Interpolation) -> Self {
+        // create new nodes
+        let mut nodes_new = Vec::new();
+
+        // iterate over self nodes and add the value of other at the same x position
+        for node in &self.curve.nodes {
+            let x = node.x;
+            nodes_new.push(Vector2D {
+                x,
+                y: node.y + other.get_value(x),
+            });
+        }
+
         Self {
-            curve: self.curve.add(&other.curve),
+            curve: PolyLine2D { nodes: nodes_new },
             extrapolate: self.extrapolate || other.extrapolate,
         }
     }
@@ -1688,14 +1748,6 @@ impl Interpolation {
 
     fn __add__(&self, other: &Interpolation) -> Self { self.add(other) }
     fn __sub__(&self, other: &Interpolation) -> Self { self.sub(other) }
-}
-
-macro_rules! register_polyline_classes {
-    ($m:expr) => {
-        $m.add_class::<PolyLine2D>()?;
-        $m.add_class::<PolyLine3D>()?;
-        $m.add_class::<Interpolation>()?;
-    };
 }
 
 #[pymodule(submodule, name = "vector")]

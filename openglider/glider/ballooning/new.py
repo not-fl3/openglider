@@ -49,8 +49,8 @@ class BallooningNew(BallooningBase):
         return BallooningNew(new_interpolation)
     
     def __mul__(self, factor: float) -> BallooningNew:
-        curve = self.interpolation * factor
-        interpolation = openglider.rs.vector.Interpolation(curve.nodes)
+        interpolation = self.interpolation.copy()
+        interpolation.scale(openglider.rs.vector.Vector2D([1, factor]))
         return BallooningNew(interpolation)
 
     def close_trailing_edge(self, start_x: float) -> None:

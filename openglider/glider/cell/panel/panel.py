@@ -161,7 +161,7 @@ class PanelCut(BaseModel):
             line = flattened.at_position(Percentage(x))
 
             try:
-                _ik, _ = line.cut(curve_exact, ik)
+                _ik, _ = line.cut(curve_exact, nearest_ik=ik)
                 if abs(_ik-ik) < 20:
                     ik = _ik
             except RuntimeError:

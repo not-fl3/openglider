@@ -5,16 +5,14 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
-
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_ROOT = PROJECT_ROOT / "openglider"
 MODULE_NAME = "rs"
 SUBMODULE_STUB_ROOT = PACKAGE_ROOT / MODULE_NAME
-ROOT_STUB_PATH = PACKAGE_ROOT / f"{MODULE_NAME}.pyi"
+ROOT_STUB_PATH = SUBMODULE_STUB_ROOT / "__init__.pyi"
 
 
 def _find_extension_binary() -> Path:
@@ -52,6 +50,7 @@ def _install_generated_files(output_dir: Path) -> None:
         raise FileNotFoundError(f"Expected generated root stub at {root_stub}")
 
     SUBMODULE_STUB_ROOT.mkdir(parents=True, exist_ok=True)
+
     for stub_file in SUBMODULE_STUB_ROOT.glob("*.pyi"):
         stub_file.unlink()
 

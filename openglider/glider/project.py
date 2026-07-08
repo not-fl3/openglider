@@ -161,7 +161,7 @@ class GliderProject:
     def copy(self) -> GliderProject:
         new_glider = self.glider.copy()
         new_glider_3d = self.glider_3d and self.glider_3d.copy()
-        new = GliderProject(new_glider, new_glider_3d, changelog=self.changelog[:])
+        new = GliderProject(glider=new_glider, glider_3d=new_glider_3d, changelog=self.changelog[:])
         new.name = self.name
 
         return new
@@ -187,14 +187,14 @@ class GliderProject:
 
         filename = os.path.split(path)[-1]
         name, ext = os.path.splitext(filename)
-        return cls(glider_2d, name=name, changelog=changelog)
+        return cls(glider=glider_2d, name=name, changelog=changelog)
     
     @classmethod
     def import_freecad(cls, path: str) -> GliderProject:
         glider_2d = import_freecad(path)
         filename = os.path.split(path)[-1]
         name, ext = os.path.splitext(filename)
-        return cls(glider_2d, name=name)
+        return cls(glider=glider_2d, name=name)
 
     def get_glider_3d(self, force: bool=False) -> Glider:
         if self.glider_3d is None or force:

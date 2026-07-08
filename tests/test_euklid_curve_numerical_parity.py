@@ -151,7 +151,7 @@ class TestEuklidCurveNumericalParity(unittest.TestCase):
             _assert_close(float(ecut[1]), float(rcut[1]), f"poly cut[{idx}].ik_2")
 
         e_poly_near = e_line.cut(e_other, nearest)
-        r_poly_near = r_line.cut(r_other, nearest)
+        r_poly_near = r_line.cut(r_other, nearest_ik=nearest)
         _assert_close(float(e_poly_near[0]), float(r_poly_near[0]), "polyline cut nearest ik_1")
         _assert_close(float(e_poly_near[1]), float(r_poly_near[1]), "polyline cut nearest ik_2")
 
