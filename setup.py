@@ -1,6 +1,18 @@
 # type: ignore
-from pybind11.setup_helpers import Pybind11Extension, build_ext
+"""Setup script with PyO3 stub generation."""
+
 from setuptools import setup
+from pathlib import Path
+
+
+def generate_stubs_after_build():
+    """Generate .pyi stub files after building the PyO3 extension."""
+    try:
+        from build import generate_pyi_stubs
+        generate_pyi_stubs()
+    except ImportError:
+        pass
+
 
 
 SRC_CPP = "src_cpp"
@@ -28,4 +40,6 @@ XFOIL_EXTENSION = Pybind11Extension(
 )
 
 if __name__ == "__main__":
-    setup(ext_modules=[XFOIL_EXTENSION], cmdclass={"build_ext": build_ext})
+    setup()
+    # Generate stubs after installation
+    generate_stubs_after_build()

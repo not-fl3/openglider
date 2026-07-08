@@ -1,9 +1,49 @@
 [build-system]
-requires = ["setuptools>=69", "setuptools-rust>=1.12", "pybind11>=2.11", "wheel"]
+requires = ["setuptools>=69", "setuptools-rust>=1.12", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools-rust]
 
+dependencies = [
+    "euklid",
+    "pyfoil",
+    "pydantic",
+    "svgwrite",
+    "numpy",
+    "scipy",
+    "ezdxf",
+    "ezodf",
+    "lxml",
+    "pyexcel-ods",
+    "packaging",
+    "meshpy",
+    "svglib",
+]
+
+[project.optional-dependencies]
+gui = [
+    "qtpy",
+    "pyside6",
+    "qtawesome",
+    "qasync",
+    "qtmodern",
+    "qtconsole",
+    "pyqtgraph",
+    "matplotlib",
+    "vtk",
+]
+
+[project.scripts]
+openglider = "openglider.gui:start_main_window"
+
+[project.urls]
+Homepage = "https://www.openglider.org"
+Repository = "https://github.com/booya-at/OpenGlider"
+
+[tool.setuptools]
+packages = ["openglider"]
+
+[tool.setuptools-rust]
 [[tool.setuptools-rust.ext-modules]]
 target = "openglider.rs"
 path = "Cargo.toml"
