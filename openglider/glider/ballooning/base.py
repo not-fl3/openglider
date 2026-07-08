@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC
 import math
 from collections.abc import Iterator
+from typing import Self
 
 import numpy as np
 import euklid
@@ -139,5 +140,8 @@ class BallooningBase(ABC):
     
     def apply_splines(self) -> None:
         pass
+
+    def copy(self) -> Self:
+        raise NotImplementedError()
 
 

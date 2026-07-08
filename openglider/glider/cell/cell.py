@@ -259,7 +259,7 @@ class Cell(BaseModel):
     def x_values(self) -> list[float]:
         for i, (x1, x2) in enumerate(zip(self.prof1.x_values, self.prof2.x_values)):
             if (x2 - x1) > 1e-5:
-                raise ValueError(f"Invalid x values at ({i}): {x1, x2}")
+                raise ValueError(f"Invalid x values at ({i}/{len(self.prof1.x_values)}): {x1, x2}")
             
         return self.prof1.x_values
 

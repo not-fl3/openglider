@@ -161,7 +161,7 @@ class ParametricGlider:
             second = self.balloonings[i + 1]
             result = first * (1 - k) + second * k
         else:
-            result = first
+            result = first.copy()
         
         if multiplier is not None:
             result *= multiplier

@@ -89,7 +89,7 @@ class AttachmentPoint(Node):
         positions = [self.rib_pos.value]
 
         if self.protoloops:
-            hull = rib.get_hull()
+            hull = rib.get_hull(normalize_x_values=True)
             ik_start = hull.get_ik(self.rib_pos.si)
 
             for i in range(self.protoloops):
@@ -111,7 +111,7 @@ class AttachmentPoint(Node):
         return rib.rotation_matrix.apply(euklid.vector.Vector3D([0, force, 0]))
 
     def get_position(self, rib: Rib) -> euklid.vector.Vector3D:
-        hull = rib.get_hull()
+        hull = rib.get_hull(normalize_x_values=True)
         profile_3d = rib.get_profile_3d()
 
         self.position = profile_3d.get(hull(self.rib_pos.si))

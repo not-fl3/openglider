@@ -17,10 +17,10 @@ porcher,skytex_32,32,lemon,#C4D79B
 porcher,skytex_32,32,gold,#FBBD3D
 porcher,skytex_32,32,dark_red,#8C1C40
 porcher,skytex_32,32,sunflower,#FDC529
-porcher,skytex_32,32,black,#000000
+porcher,skytex_32,32,black,#101010
 porcher,skytex_38_hf,38,white,#FFFFFF
 porcher,skytex_40_hf,38,white,#FFFFFF
-porcher,skytex_38,38,black,#000000
+porcher,skytex_38,38,black,#101010
 porcher,skytex_38,38,white,#FFFFFF
 porcher,skytex_38,38,dark_grey,#909C9C
 porcher,skytex_38,38,lime_green_500,#96C11E
@@ -38,7 +38,7 @@ porcher,skytex_38,38,petrol_blue,#01567D
 porcher,skytex_38,38,deep_blue,#243882
 porcher,skytex_38,38,electric_blue,#4F81BD
 porcher,skytex_38,38,diva_blue,#007bb2
-porcher,skytex_27,27,black,#000000
+porcher,skytex_27,27,black,#101010
 porcher,skytex_27,27,white,#FFFFFF
 porcher,skytex_27,27,lime_green,#96C11E
 porcher,skytex_27,27,green,#00945E

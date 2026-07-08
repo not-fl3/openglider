@@ -68,7 +68,7 @@ def get_cell_length_table(glider: Glider) -> Table:
                 table[current_row, 3] = rigidfoil.y
                 table[current_row, 6] = round(1000*rigidfoil.total_length, 1)
 
-            table[current_row, 2] = cell_no
+            table[current_row, 2] = cell_no + 1
 
             current_row += 1
 

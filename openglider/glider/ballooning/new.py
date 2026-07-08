@@ -88,6 +88,9 @@ class BallooningBezierNeu(BallooningNew):
             "spline": self.spline_curve.controlpoints,
             "name": self.name
             }
+    
+    def copy(self) -> BallooningBezierNeu:
+        return BallooningBezierNeu(self.spline_curve.controlpoints.nodes.copy(), name=self.name)
 
     @classmethod
     def __from_json__(cls, **kwargs: Any) -> BallooningNew:

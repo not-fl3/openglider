@@ -54,17 +54,19 @@ class RibBase(BaseModel):
         ik = self.profile_2d(x_value)
         return self.profile_3d[ik]
     
-    def get_hull(self) -> pyfoil.Airfoil:
+    def get_hull(self, normalize_x_values: bool = False) -> pyfoil.Airfoil:
         return self.profile_2d
     
     @cached_function("self")
     def get_profile_3d(self, x_values: list[float]=None) -> Profile3D:
-        hull = self.get_hull()
+        hull = self.get_hull(normalize_x_values=x_values is None)
 
         if x_values is not None:
             hull = hull.set_x_values(x_values)
-
-        return Profile3D(curve=self.align_all(hull.curve), x_values=x_values or hull.x_values)
+        else:
+            x_values = self.profile_2d.x_values
+        
+        return Profile3D(curve=self.align_all(hull.curve), x_values=x_values)
 
     @cached_property('profile_3d')
     def normvectors(self) -> list[euklid.vector.Vector3D]:
@@ -184,13 +186,17 @@ class Rib(RibBase):
     def is_closed(self) -> bool:
         return self.profile_2d.thickness < 0.01
 
-    def get_hull(self) -> pyfoil.Airfoil:
+    def get_hull(self, normalize_x_values: bool = False) -> pyfoil.Airfoil:
         """returns the outer contour of the normalized mesh in form
            of a Polyline"""
-        if self.sharknose is not None:
-            return self.sharknose.get_modified_airfoil(self)
+        result = self.profile_2d
 
-        return self.profile_2d
+        if self.sharknose is not None:
+            result = self.sharknose.get_modified_airfoil(self)
+            if normalize_x_values:
+                result = result.set_x_values(self.profile_2d.x_values)
+        
+        return result
     
     def get_weight(self):
         outline = self.get_hull().curve * self.chord

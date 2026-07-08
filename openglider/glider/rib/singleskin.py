@@ -55,8 +55,8 @@ class SingleSkinRib(Rib):
             self.apply_continued_min()
 
     def apply_continued_min(self) -> None:
-        self.profile_2d = self.profile_2d.move_nearest_point(self.single_skin_parameters.continued_min_end)
-        data = np.array(self.profile_2d.curve.tolist())
+        new_profile = self.profile_2d.move_nearest_point(self.single_skin_parameters.continued_min_end)
+        data = np.array(new_profile.curve.tolist())
         x, y = data.T
         min_index = y.argmin()
         y_min = y[min_index]
@@ -68,7 +68,9 @@ class SingleSkinRib(Rib):
                 new_y += [xy[1]]
 
         data_new = np.array([x, new_y]).T.tolist()
-        self.profile_2d = pyfoil.Airfoil(data_new)
+
+        new_profile = pyfoil.Airfoil(data_new)
+        self.profile_2d = new_profile.set_x_values(self.profile_2d.x_values)
 
     @classmethod
     def from_rib(cls, rib: Rib, single_skin_parameters: SingleSkinParameters, xrot: Angle | None) -> SingleSkinRib:
@@ -84,7 +86,7 @@ class SingleSkinRib(Rib):
         return json_dict
 
     @cached_function("self", exclude=["attachment_points"], generator=lambda rib: [p.rib_pos for p in rib.attachment_points])
-    def get_hull(self) -> pyfoil.Airfoil:
+    def get_hull(self, normalize_x_values: bool = False) -> pyfoil.Airfoil:
         if any([isinstance(p, SingleSkinAttachmentPoint) for p in self.attachment_points]):
             attachment_points = list(filter(lambda p: p.rib_pos < 0.9999, self.attachment_points))
             attachment_points.sort(key=lambda p: p.rib_pos)
@@ -144,6 +146,9 @@ class SingleSkinRib(Rib):
                         airfoil.curve.get(0)
                     ]
                 )
+            
+            if normalize_x_values:
+                airfoil = airfoil.set_x_values(self.profile_2d.x_values)
 
             return airfoil
         
@@ -227,6 +232,9 @@ class SingleSkinRib(Rib):
                 ]
 
                 profile = pyfoil.Airfoil(new_data)
+        
+        if normalize_x_values:
+            airfoil = airfoil.set_x_values(self.profile_2d.x_values)
 
         return profile
 
