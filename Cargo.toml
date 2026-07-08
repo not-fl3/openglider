@@ -8,6 +8,11 @@ name = "rs"
 path = "rust/lib.rs"
 crate-type = ["cdylib"]
 
+[bin]
+name = "pyo3_stub_gen"
+path = "rust/stub_gen.rs"
+
 [dependencies]
 pyo3 = { version = "0.29", features = ["experimental-inspect"] }
 nalgebra = { version = "0.34", default-features = false, features = ["std"] }
+pyo3-introspection = "0.29"

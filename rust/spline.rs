@@ -527,18 +527,24 @@ define_curve_type!(SymmetricCubicBSplineCurve, false, CurveBase::BSpline(3), tru
 define_curve_type!(SymmetricQuadBSplineCurve, false, CurveBase::BSpline(4), true);
 define_curve_type!(SymmetricBezierCurve, false, CurveBase::Bezier, true);
 
-pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    let py = m.py();
-    let submodule = PyModule::new(py, "spline")?;
-    m.add_submodule(&submodule)?;
-    submodule.add_class::<BezierCurve>()?;
-    submodule.add_class::<LinSplineCurve>()?;
-    submodule.add_class::<BSplineCurve>()?;
-    submodule.add_class::<CubicBSplineCurve>()?;
-    submodule.add_class::<QuadBSplineCurve>()?;
-    submodule.add_class::<SymmetricBSplineCurve>()?;
-    submodule.add_class::<SymmetricCubicBSplineCurve>()?;
-    submodule.add_class::<SymmetricQuadBSplineCurve>()?;
-    submodule.add_class::<SymmetricBezierCurve>()?;
-    Ok(())
+#[pymodule(submodule, name = "spline")]
+pub(crate) mod spline_mod {
+    #[pymodule_export]
+    use super::BSplineCurve;
+    #[pymodule_export]
+    use super::BezierCurve;
+    #[pymodule_export]
+    use super::CubicBSplineCurve;
+    #[pymodule_export]
+    use super::LinSplineCurve;
+    #[pymodule_export]
+    use super::QuadBSplineCurve;
+    #[pymodule_export]
+    use super::SymmetricBSplineCurve;
+    #[pymodule_export]
+    use super::SymmetricBezierCurve;
+    #[pymodule_export]
+    use super::SymmetricCubicBSplineCurve;
+    #[pymodule_export]
+    use super::SymmetricQuadBSplineCurve;
 }

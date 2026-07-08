@@ -1,6 +1,6 @@
 use nalgebra::{Matrix3, Vector3};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyModule};
+use pyo3::types::PyAny;
 
 use crate::vector::{PolyLine2D, PolyLine3D, Transformation, Vector2D, Vector3D};
 
@@ -87,10 +87,8 @@ impl Plane {
     }
 }
 
-pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    let py = m.py();
-    let submodule = PyModule::new(py, "plane")?;
-    m.add_submodule(&submodule)?;
-    submodule.add_class::<Plane>()?;
-    Ok(())
+#[pymodule(submodule, name = "plane")]
+pub(crate) mod plane_mod {
+    #[pymodule_export]
+    use super::Plane;
 }

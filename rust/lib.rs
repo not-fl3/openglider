@@ -27,15 +27,20 @@ fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-#[pymodule]
-fn rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(triangle_area, m)?)?;
-    m.add_function(wrap_pyfunction!(version, m)?)?;
-
-    vector::register(m)?;
-    spline::register(m)?;
-    plane::register(m)?;
-    mesh::register(m)?;
-
-    Ok(())
+#[pymodule(name = "rs")]
+mod rs {
+    #[pymodule_export]
+    use super::triangle_area;
+    #[pymodule_export]
+    use super::version;
+    #[pymodule_export]
+    use crate::mesh::find_duplicates;
+    #[pymodule_export]
+    use crate::mesh::mesh_mod as mesh;
+    #[pymodule_export]
+    use crate::plane::plane_mod as plane;
+    #[pymodule_export]
+    use crate::spline::spline_mod as spline;
+    #[pymodule_export]
+    use crate::vector::vector_mod as vector;
 }

@@ -1,17 +1,17 @@
 # type: ignore
 """Setup script with PyO3 stub generation."""
 
-from setuptools import setup
 from pathlib import Path
+import subprocess
+import sys
+
+from setuptools import setup
 
 
 def generate_stubs_after_build():
     """Generate .pyi stub files after building the PyO3 extension."""
-    try:
-        from build import generate_pyi_stubs
-        generate_pyi_stubs()
-    except ImportError:
-        pass
+    script_path = Path(__file__).parent / "scripts" / "generate_pyi_stubs.py"
+    subprocess.run([sys.executable, str(script_path)], check=True)
 
 
 

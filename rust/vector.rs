@@ -1698,17 +1698,26 @@ macro_rules! register_polyline_classes {
     };
 }
 
-pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    let py = m.py();
-    let submodule = PyModule::new(py, "vector")?;
-    m.add_submodule(&submodule)?;
-    submodule.add_class::<Vector2D>()?;
-    submodule.add_class::<Vector3D>()?;
-    submodule.add_class::<CutResult>()?;
-    submodule.add_class::<Rotation2D>()?;
-    submodule.add_class::<Transformation>()?;
-    register_polyline_classes!(&submodule);
-    submodule.add_function(wrap_pyfunction!(cut, &submodule)?)?;
-    submodule.add_function(wrap_pyfunction!(cut_2d, &submodule)?)?;
-    Ok(())
+#[pymodule(submodule, name = "vector")]
+pub(crate) mod vector_mod {
+    #[pymodule_export]
+    use super::CutResult;
+    #[pymodule_export]
+    use super::Interpolation;
+    #[pymodule_export]
+    use super::PolyLine2D;
+    #[pymodule_export]
+    use super::PolyLine3D;
+    #[pymodule_export]
+    use super::Rotation2D;
+    #[pymodule_export]
+    use super::Transformation;
+    #[pymodule_export]
+    use super::Vector2D;
+    #[pymodule_export]
+    use super::Vector3D;
+    #[pymodule_export]
+    use super::cut;
+    #[pymodule_export]
+    use super::cut_2d;
 }
