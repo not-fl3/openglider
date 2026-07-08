@@ -7,13 +7,13 @@ import svgwrite
 import svgwrite.shapes
 import svgwrite.container
 import svgwrite.path
-import euklid
+import openglider.rs
 import numpy as np
 
 if TYPE_CHECKING:
     pass
 
-LineList = list[euklid.vector.PolyLine2D]
+LineList = list[openglider.rs.vector.PolyLine2D]
 
 class Layer:
     stroke: str | None = "black"
@@ -26,7 +26,7 @@ class Layer:
         self.stroke_width = stroke_width
         self.visible = visible
 
-    def __add__(self, other: Layer | list[euklid.vector.PolyLine2D]) -> Layer:
+    def __add__(self, other: Layer | list[openglider.rs.vector.PolyLine2D]) -> Layer:
         if isinstance(other, Layer):
             self.polylines += other.polylines
         else:
@@ -34,7 +34,7 @@ class Layer:
 
         return self
 
-    def __iter__(self) -> Iterator[euklid.vector.PolyLine2D]:
+    def __iter__(self) -> Iterator[openglider.rs.vector.PolyLine2D]:
         return self.polylines.__iter__()
 
     def __len__(self) -> int:
@@ -47,7 +47,7 @@ class Layer:
             "stroke_width": self.stroke_width
         }
 
-    def append(self, x: euklid.vector.PolyLine2D) -> None:
+    def append(self, x: openglider.rs.vector.PolyLine2D) -> None:
         self.polylines.append(x)
 
     def copy(self) -> Layer:
@@ -68,7 +68,7 @@ class Layer:
             "color": color,
         }
 
-LayerType: TypeAlias = Layer | list[euklid.vector.PolyLine2D]
+LayerType: TypeAlias = Layer | list[openglider.rs.vector.PolyLine2D]
 
 class Layers:
     def __init__(self, **layers: Layer):
@@ -165,7 +165,7 @@ class PlotPart:
     def copy(self) -> PlotPart:
         return copy.deepcopy(self)
 
-    def mirror(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> PlotPart:
+    def mirror(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> PlotPart:
         layers = {}
 
         for layer_name, layer in self.layers.items():
@@ -240,22 +240,22 @@ class PlotPart:
     def rotate(self, angle: float, radians: bool=True) -> None:
         if not radians:
             angle = angle * np.pi / 180
-        center = euklid.vector.Vector2D([0,0])
+        center = openglider.rs.vector.Vector2D([0,0])
         for layer in self.layers.values():
             layer.polylines = [
                 polyline.rotate(angle, center) for polyline in layer
             ]
 
-    def move(self, diff: euklid.vector.Vector2D) -> None:
+    def move(self, diff: openglider.rs.vector.Vector2D) -> None:
         for layer_name, layer in self.layers.items():
             layer.polylines = [
                 line.move(diff) for line in layer.polylines
             ]
 
-    def move_to(self, vector: euklid.vector.Vector2D) -> None:
+    def move_to(self, vector: openglider.rs.vector.Vector2D) -> None:
         minx = self.min_x
         miny = self.min_y
-        self.move(euklid.vector.Vector2D([vector[0] - minx, vector[1] - miny]))
+        self.move(openglider.rs.vector.Vector2D([vector[0] - minx, vector[1] - miny]))
 
     def intersects(self, other: PlotPart) -> bool:
         """

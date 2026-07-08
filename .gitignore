@@ -11,6 +11,7 @@ local
 # C extensions
 *.so
 *.lyx
+target/
 
 local
 # Packages

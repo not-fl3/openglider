@@ -6,7 +6,7 @@ from collections.abc import Iterator, Sequence
 import copy
 import logging
 
-import euklid
+import openglider.rs
 import ezdxf
 import ezdxf.document
 
@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 class Vertex:
-    _position: euklid.vector.Vector3D
+    _position: openglider.rs.vector.Vector3D
 
     dmin = 10**-10
 
     def __init__(self, x: float, y: float, z: float, attributes: dict[str, Any]=None):
-        self._position = euklid.vector.Vector3D([x,y,z])
+        self._position = openglider.rs.vector.Vector3D([x,y,z])
         self.attributes = attributes or {}
         self.index = -1
 
@@ -31,7 +31,7 @@ class Vertex:
         return self.position.__iter__()
     
     @property
-    def position(self) -> euklid.vector.Vector3D:
+    def position(self) -> openglider.rs.vector.Vector3D:
         return self._position
     
     @property
@@ -52,7 +52,7 @@ class Vertex:
         return data
 
     def set_values(self, x: float, y: float, z: float) -> None:
-        self._position = euklid.vector.Vector3D([x,y,z])
+        self._position = openglider.rs.vector.Vector3D([x,y,z])
 
     def __len__(self) -> Literal[3]:
         return 3
@@ -68,7 +68,7 @@ class Vertex:
                 return False
         return True
 
-    def is_in_range(self, minimum: euklid.vector.Vector3D, maximum: euklid.vector.Vector3D) -> bool:
+    def is_in_range(self, minimum: openglider.rs.vector.Vector3D, maximum: openglider.rs.vector.Vector3D) -> bool:
         return (self.position[0] >= minimum[0] and self.position[1] >= minimum[1] and self.position[2] >= minimum[2] and
                 self.position[0] <= maximum[0] and self.position[1] <= maximum[1] and self.position[2] <= maximum[2])
 
@@ -120,13 +120,13 @@ class Polygon:
         self.nodes += other.nodes
 
     @property
-    def center(self) -> euklid.vector.Vector3D:
-        center = euklid.vector.Vector3D([0,0,0])
+    def center(self) -> openglider.rs.vector.Vector3D:
+        center = openglider.rs.vector.Vector3D([0,0,0])
         for vert in self.nodes:
             center += vert.position
         return center / len(self.nodes)
     
-    def _get_normal(self) -> euklid.vector.Vector3D:
+    def _get_normal(self) -> openglider.rs.vector.Vector3D:
         if len(self) == 2:
             n = self.nodes[1].position - self.nodes[0].position
 
@@ -144,7 +144,7 @@ class Polygon:
 
 
     @property
-    def normal(self) -> euklid.vector.Vector3D:
+    def normal(self) -> openglider.rs.vector.Vector3D:
         return self._get_normal().normalized()
     
     @property
@@ -192,12 +192,12 @@ class Mesh:
         return list(vertices)
 
     @property
-    def bounding_box(self) -> tuple[euklid.vector.Vector3D, euklid.vector.Vector3D]:
+    def bounding_box(self) -> tuple[openglider.rs.vector.Vector3D, openglider.rs.vector.Vector3D]:
         vertices_x = [p.x for p in self.vertices]
         vertices_y = [p.y for p in self.vertices]
         vertices_z = [p.z for p in self.vertices]
 
-        return euklid.vector.Vector3D([min(vertices_x), min(vertices_y), min(vertices_z)]), euklid.vector.Vector3D([max(vertices_x), max(vertices_y), max(vertices_z)])
+        return openglider.rs.vector.Vector3D([min(vertices_x), min(vertices_y), min(vertices_z)]), openglider.rs.vector.Vector3D([max(vertices_x), max(vertices_y), max(vertices_z)])
 
     def get_all_polygons(self) -> list[Polygon]:
         return sum(self.polygons.values(), [])
@@ -208,9 +208,9 @@ class Mesh:
 
     def mirror(self, axis: Literal["x"] | Literal["y"] | Literal["z"]="x") -> Mesh:
         multiplication = {
-            "x": euklid.vector.Vector3D([-1, 1, 1]),
-            "y": euklid.vector.Vector3D([1, -1, 1]),
-            "z": euklid.vector.Vector3D([1, 1, -1])
+            "x": openglider.rs.vector.Vector3D([-1, 1, 1]),
+            "y": openglider.rs.vector.Vector3D([1, -1, 1]),
+            "z": openglider.rs.vector.Vector3D([1, 1, -1])
         }[axis]
         for vertex in self.vertices:
             vertex._position = vertex._position * multiplication
@@ -254,7 +254,7 @@ class Mesh:
     @classmethod
     def from_indexed(
         cls,
-        vertices: list[euklid.vector.Vector3D],
+        vertices: list[openglider.rs.vector.Vector3D],
         polygons: dict[str, Sequence[tuple[PolygonType, dict[str, Any]]]],
         boundaries: dict[str, list[int]]=None,
         name: str="unnamed",
@@ -505,7 +505,7 @@ class Mesh:
     @staticmethod
     def _find_duplicates(nodes: list[Vertex]) -> dict[Vertex, Vertex]:
         node_lst = [p.position for p in nodes]
-        duplicates = euklid.mesh.find_duplicates(node_lst, Vertex.dmin)
+        duplicates = openglider.rs.mesh.find_duplicates(node_lst, Vertex.dmin)
         duplicates_dct = {}
 
         for node1_id, node2_id in duplicates:

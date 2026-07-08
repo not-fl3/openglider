@@ -4,7 +4,7 @@ import logging
 from openglider.gui.qt import QtWidgets, QtGui, QtCore
 from typing import Any
 from collections.abc import Iterator
-import euklid
+import openglider.rs
 
 from openglider.glider.parametric.shape import ParametricShape
 from openglider.glider.parametric.glider import ParametricGlider
@@ -141,13 +141,13 @@ class Shape2D(QtWidgets.QGraphicsObject):
                     return val
 
 
-                def get_cut_line(cut: PanelCut) -> list[euklid.vector.Vector2D]:
+                def get_cut_line(cut: PanelCut) -> list[openglider.rs.vector.Vector2D]:
                     left = shape.get_point(cell_no, normalize_x(cut.x_left))
                     right = shape.get_point(cell_no+1, normalize_x(cut.x_right))
 
                     if cut.x_center is not None:
                         center = shape.get_point(cell_no+0.5, normalize_x(cut.x_center))
-                        return euklid.spline.BSplineCurve([left, center, right]).get_sequence(8).nodes
+                        return openglider.rs.spline.BSplineCurve([left, center, right]).get_sequence(8).nodes
                     
                     return [left, right]
                 

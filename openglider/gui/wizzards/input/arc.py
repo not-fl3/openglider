@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from openglider.utils.colors import Color
 import pyqtgraph
-import euklid
+import openglider.rs
 
 from openglider.glider.project import GliderProject
 from openglider.gui.views_2d import Canvas, DraggableLine
@@ -80,21 +80,23 @@ class ArcInput(Canvas):
         else:
             y2.insert(0, y_values[1])
         
-        line = euklid.vector.PolyLine2D(list(zip(x_values, y2)))
-        line_normalized = line.scale(euklid.vector.Vector2D([1/x_values[-1], 1]))
+        line = openglider.rs.vector.PolyLine2D(list(zip(x_values, y2)))
+        line_normalized = line.scale(openglider.rs.vector.Vector2D([1/x_values[-1], 1]))
 
-        p0 = euklid.vector.Vector2D([0,0]) 
-        p1 = euklid.vector.Vector2D([0, 1])
+        p0 = openglider.rs.vector.Vector2D([0,0]) 
+        p1 = openglider.rs.vector.Vector2D([0, 1])
 
         if hasattr(project.glider.arc.curve, "get_curvature"):
             interpolation = project.glider.arc.curve.get_curvature(100)  # type: ignore
-            line_mirrored = euklid.vector.PolyLine2D(interpolation.nodes).mirror(p0, p1).reverse()
+            line_mirrored = openglider.rs.vector.PolyLine2D(interpolation.nodes).mirror(p0, p1).reverse()
         else:
             line_mirrored = line_normalized.mirror(p0, p1).reverse()
+
+        merged = openglider.rs.vector.PolyLine2D(line_mirrored.nodes + line_normalized.nodes)
         
         data = {
-            "x": [p[0] for p in line_mirrored + line_normalized],
-            "y": [p[1] for p in line_mirrored + line_normalized]
+            "x": [p[0] for p in merged.nodes],
+            "y": [p[1] for p in merged.nodes]
         }
 
         return data
@@ -108,7 +110,7 @@ class ArcInput(Canvas):
         node_index = curve.drag_node_index
         curve.data["pos"][node_index][0] = max(0, curve.data["pos"][node_index][0])
 
-        self.project.glider.arc.curve.controlpoints = euklid.vector.PolyLine2D(curve.controlpoints)
+        self.project.glider.arc.curve.controlpoints = openglider.rs.vector.PolyLine2D(curve.controlpoints)
         self.arc_2d.update_arc()
 
         self.update()

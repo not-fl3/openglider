@@ -6,7 +6,7 @@ import numbers
 from typing import TYPE_CHECKING
 from packaging.version import Version
 
-import euklid
+import openglider.rs
 import pyfoil
 
 from openglider.glider.parametric.arc import ArcCurve
@@ -165,13 +165,13 @@ def get_geometry_explicit(sheet: Table, config: ParametricGliderConfig) -> Geome
         span_last = span
 
     def symmetric_fit(data: list[list[float]], bspline: bool=True) -> SymmetricCurveType:
-        line = euklid.vector.PolyLine2D(data)
+        line = openglider.rs.vector.PolyLine2D(data)
         #not_from_center = int(data[0][0] == 0)
         #mirrored = [[-p[0], p[1]] for p in data[not_from_center:]][::-1] + data
         if bspline:
-            return euklid.spline.SymmetricBSplineCurve.fit(line, 3)  # type: ignore
+            return openglider.rs.spline.SymmetricBSplineCurve.fit(line, 3)  # type: ignore
         else:
-            return euklid.spline.SymmetricBezierCurve.fit(line, 3)  # type: ignore
+            return openglider.rs.spline.SymmetricBezierCurve.fit(line, 3)  # type: ignore
 
     has_center_cell = not front[0][0] == 0
     cell_no = (len(front) - 1) * 2 + has_center_cell
@@ -180,10 +180,10 @@ def get_geometry_explicit(sheet: Table, config: ParametricGliderConfig) -> Geome
 
     const_arr = [0.] + linspace(start, 1, len(front) - (not has_center_cell))
     rib_pos = [0.] + [p[0] for p in front[not has_center_cell:]]
-    rib_pos_int = euklid.vector.Interpolation(list(zip(rib_pos, const_arr)))
-    rib_distribution = euklid.vector.PolyLine2D([[i, rib_pos_int.get_value(i)] for i in linspace(0, rib_pos[-1], 30)])
+    rib_pos_int = openglider.rs.vector.Interpolation(list(zip(rib_pos, const_arr)))
+    rib_distribution = openglider.rs.vector.PolyLine2D([[i, rib_pos_int.get_value(i)] for i in linspace(0, rib_pos[-1], 30)])
 
-    rib_distribution_curve: euklid.spline.BSplineCurve = euklid.spline.BSplineCurve.fit(rib_distribution, 3)  # type: ignore
+    rib_distribution_curve: openglider.rs.spline.BSplineCurve = openglider.rs.spline.BSplineCurve.fit(rib_distribution, 3)  # type: ignore
 
     parametric_shape = ParametricShape(
         symmetric_fit(front),
@@ -206,13 +206,13 @@ def get_geometry_explicit(sheet: Table, config: ParametricGliderConfig) -> Geome
 def get_geometry_parametric(table: Table, cell_num: int, config: ParametricGliderConfig) -> Geometry:
     data = {}
     curve_types = {
-        "front": euklid.spline.SymmetricBSplineCurve,
-        "back": euklid.spline.SymmetricBSplineCurve,
-        "rib_distribution": euklid.spline.BezierCurve,
-        "arc": euklid.spline.SymmetricBSplineCurve,
-        "aoa": euklid.spline.SymmetricBSplineCurve,
-        "profile_merge_curve": euklid.spline.SymmetricBSplineCurve,
-        "ballooning_merge_curve": euklid.spline.SymmetricBSplineCurve
+        "front": openglider.rs.spline.SymmetricBSplineCurve,
+        "back": openglider.rs.spline.SymmetricBSplineCurve,
+        "rib_distribution": openglider.rs.spline.BezierCurve,
+        "arc": openglider.rs.spline.SymmetricBSplineCurve,
+        "aoa": openglider.rs.spline.SymmetricBSplineCurve,
+        "profile_merge_curve": openglider.rs.spline.SymmetricBSplineCurve,
+        "ballooning_merge_curve": openglider.rs.spline.SymmetricBSplineCurve
     }
 
     for column in range(0, table.num_columns, 2):
@@ -224,7 +224,7 @@ def get_geometry_parametric(table: Table, cell_num: int, config: ParametricGlide
         points = []
         
         if table[0, column+1] is not None:
-            curve_type = getattr(euklid.spline, table[0, column+1])
+            curve_type = getattr(openglider.rs.spline, table[0, column+1])
         else:
             logger.warning(f"default curve for {key}")
             curve_type = curve_types[key]

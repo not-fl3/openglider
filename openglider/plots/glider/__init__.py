@@ -2,7 +2,7 @@ from __future__ import annotations
 import collections
 import logging
 from typing import Any, TypeAlias
-import euklid
+import openglider.rs
 
 from openglider.glider.cell.cell import Cell
 from openglider.glider.cell.panel.panel import Panel
@@ -83,7 +83,7 @@ class PlotMaker:
 
         return self._cellplotmakers[cell]
 
-    def get_panels(self, extra_marks: list[dict[Panel, list[euklid.vector.PolyLine2D]]] | None = None) -> Layout:
+    def get_panels(self, extra_marks: list[dict[Panel, list[openglider.rs.vector.PolyLine2D]]] | None = None) -> Layout:
         self.panels.clear()
         panels_upper: list[Layout | PlotPart] = []
         panels_lower: list[Layout | PlotPart] = []
@@ -197,9 +197,9 @@ class PlotMaker:
 
         return self.straps
 
-    def get_rigidfoils(self) -> tuple[list[PlotPart], list[dict[Panel, list[euklid.vector.PolyLine2D]]]]:
+    def get_rigidfoils(self) -> tuple[list[PlotPart], list[dict[Panel, list[openglider.rs.vector.PolyLine2D]]]]:
         self.rigidfoils.clear()
-        extra_marks: list[dict[Panel, list[euklid.vector.PolyLine2D]]] = []
+        extra_marks: list[dict[Panel, list[openglider.rs.vector.PolyLine2D]]] = []
 
         for cell in self.glider_3d.cells:
             logger.info(f"plotting rigidfoils for cell: {cell.name}")

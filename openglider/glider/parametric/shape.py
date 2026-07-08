@@ -4,7 +4,7 @@ import logging
 import math
 from typing import Literal
 
-import euklid
+import openglider.rs
 
 from openglider.glider.parametric.config import ParametricGliderConfig
 from openglider.glider.shape import Shape
@@ -53,10 +53,10 @@ class ParametricShape:
         )
 
     @property
-    def baseline(self) -> euklid.vector.PolyLine2D:
+    def baseline(self) -> openglider.rs.vector.PolyLine2D:
         return self.get_baseline(self.config.baseline_pct)
 
-    def get_baseline(self, pct: Percentage) -> euklid.vector.PolyLine2D:
+    def get_baseline(self, pct: Percentage) -> openglider.rs.vector.PolyLine2D:
         shape = self.get_half_shape()
         return shape.get_baseline(pct)
 
@@ -77,12 +77,12 @@ class ParametricShape:
 
         dist_scale = 1 / self.rib_distribution.controlpoints.nodes[-1][0]
         self.rib_distribution.controlpoints = self.rib_distribution.controlpoints.scale(
-            euklid.vector.Vector2D([dist_scale, 1])
+            openglider.rs.vector.Vector2D([dist_scale, 1])
         )
 
         back_scale = span / self.back_curve.controlpoints.nodes[-1][0]
         self.back_curve.controlpoints = self.back_curve.controlpoints.scale(
-            euklid.vector.Vector2D([back_scale, 1])
+            openglider.rs.vector.Vector2D([back_scale, 1])
         )
 
     @property
@@ -91,20 +91,20 @@ class ParametricShape:
         Interpolate Cell-distribution
         """
         data = self.rib_distribution.get_sequence(self.num_distribution_interpolation)
-        interpolation = euklid.vector.Interpolation([[p[1], p[0]] for p in data])
+        interpolation = openglider.rs.vector.Interpolation([[p[1], p[0]] for p in data])
         start = self.has_center_cell / self.cell_num
         num = self.cell_num // 2 + 1
         return [(interpolation.get_value(i), i) for i in linspace(start, 1, num)]
 
     # besser mit spezieller bezier?
     @property
-    def rib_dist_controlpoints(self) -> euklid.vector.PolyLine2D:
-        return euklid.vector.PolyLine2D(self.rib_distribution.controlpoints.nodes[1:-1])
+    def rib_dist_controlpoints(self) -> openglider.rs.vector.PolyLine2D:
+        return openglider.rs.vector.PolyLine2D(self.rib_distribution.controlpoints.nodes[1:-1])
 
     @rib_dist_controlpoints.setter
-    def rib_dist_controlpoints(self, arr: list[list[float]] | list[euklid.vector.Vector2D]) -> None:
+    def rib_dist_controlpoints(self, arr: list[list[float]] | list[openglider.rs.vector.Vector2D]) -> None:
 
-        self.rib_distribution.controlpoints = euklid.vector.PolyLine2D([[0., 0.]] + arr + [[1., 1.]])
+        self.rib_distribution.controlpoints = openglider.rs.vector.PolyLine2D([[0., 0.]] + arr + [[1., 1.]])
 
     @property
     def rib_x_values(self) -> list[float]:
@@ -138,8 +138,8 @@ class ParametricShape:
         """
         self.rescale_curves()
         num = self.num_shape_interpolation
-        front_int = euklid.vector.Interpolation(self.front_curve.get_sequence(num).nodes)
-        back_int = euklid.vector.Interpolation(self.back_curve.get_sequence(num).nodes)
+        front_int = openglider.rs.vector.Interpolation(self.front_curve.get_sequence(num).nodes)
+        back_int = openglider.rs.vector.Interpolation(self.back_curve.get_sequence(num).nodes)
         
         distribution = self.rib_x_values
         if self.has_center_cell:
@@ -165,21 +165,21 @@ class ParametricShape:
             p2[0] = - p2[0]
             back.insert(0, p2)
 
-        base_shape = Shape(euklid.vector.PolyLine2D(front), euklid.vector.PolyLine2D(back))
+        base_shape = Shape(openglider.rs.vector.PolyLine2D(front), openglider.rs.vector.PolyLine2D(back))
 
         if zrot is None:
             return base_shape
         
         baseline = base_shape.get_baseline(self.config.baseline_pct).nodes
-        front_new: list[euklid.vector.Vector2D] = []
-        back_new: list[euklid.vector.Vector2D] = []
+        front_new: list[openglider.rs.vector.Vector2D] = []
+        back_new: list[openglider.rs.vector.Vector2D] = []
 
         for rib_no, angle in enumerate(zrot):
             if angle is None:
-                front_new.append(euklid.vector.Vector2D(front[rib_no]))
-                back_new.append(euklid.vector.Vector2D(back[rib_no]))
+                front_new.append(openglider.rs.vector.Vector2D(front[rib_no]))
+                back_new.append(openglider.rs.vector.Vector2D(back[rib_no]))
             else:
-                rotation = euklid.vector.Rotation2D(angle.si)
+                rotation = openglider.rs.vector.Rotation2D(angle.si)
                 front_new.append(
                     baseline[rib_no] + rotation.apply(base_shape.front.nodes[rib_no]-baseline[rib_no])
                 )
@@ -188,8 +188,8 @@ class ParametricShape:
                 )
         
         return Shape(
-            euklid.vector.PolyLine2D(front_new),
-            euklid.vector.PolyLine2D(back_new)
+            openglider.rs.vector.PolyLine2D(front_new),
+            openglider.rs.vector.PolyLine2D(back_new)
         )
 
 
@@ -200,7 +200,7 @@ class ParametricShape:
         """
         return self.get_half_shape().copy_complete()
 
-    def __getitem__(self, pos: tuple[int, float]) -> euklid.vector.Vector2D:
+    def __getitem__(self, pos: tuple[int, float]) -> openglider.rs.vector.Vector2D:
         """if first argument is negative the point is returned mirrored"""
         rib_nr, rib_pos = pos
         ribs = self.ribs
@@ -213,17 +213,17 @@ class ParametricShape:
         chord = ba[1] - fr[1]
         x = fr[0]
         y = fr[1] + rib_pos * chord
-        return euklid.vector.Vector2D([sign * x, y])
+        return openglider.rs.vector.Vector2D([sign * x, y])
 
     @property
-    def ribs(self) -> list[tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]]:
+    def ribs(self) -> list[tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]]:
         return self.get_half_shape().ribs
     
     @property
     def chords(self) -> list[float]:
         return [(p1-p2).length() for p1, p2 in self.ribs]
 
-    def get_rib_point(self, rib_no: int, x: float) -> euklid.vector.Vector2D:
+    def get_rib_point(self, rib_no: int, x: float) -> openglider.rs.vector.Vector2D:
         ribs = list(self.ribs)
         rib = ribs[rib_no]
 
@@ -232,7 +232,7 @@ class ParametricShape:
         except TypeError:
             return rib[0]
 
-    def get_shape_point(self, x: float, y: float) -> euklid.vector.Vector2D:
+    def get_shape_point(self, x: float, y: float) -> openglider.rs.vector.Vector2D:
         k = x%1
         rib1 = int(x)
         p1 = self.get_rib_point(rib1, y)
@@ -250,8 +250,8 @@ class ParametricShape:
         """
         num = self.num_depth_integral
         x_values = linspace(0, self.span, num)
-        front_int = euklid.vector.Interpolation(self.front_curve.get_sequence(num).nodes)
-        back_int = euklid.vector.Interpolation(self.back_curve.get_sequence(num).nodes)
+        front_int = openglider.rs.vector.Interpolation(self.front_curve.get_sequence(num).nodes)
+        back_int = openglider.rs.vector.Interpolation(self.back_curve.get_sequence(num).nodes)
         integrated_depth = [0.]
         for x in x_values[1:]:
             depth = front_int.get_value(x) - back_int.get_value(x)
@@ -262,7 +262,7 @@ class ParametricShape:
         return list(zip(x_values_normalized, y_values))
 
     def set_const_cell_dist(self) -> None:
-        const_dist = euklid.vector.PolyLine2D(list(self.depth_integrated))
+        const_dist = openglider.rs.vector.PolyLine2D(list(self.depth_integrated))
         num_pts = len(self.rib_distribution.controlpoints)
         self.rib_distribution = self.rib_distribution.fit(const_dist, numpoints=num_pts)  # type: ignore
 
@@ -273,11 +273,11 @@ class ParametricShape:
             y = x
 
         print("scale factor: ", x, y)
-        self.front_curve.controlpoints = self.front_curve.controlpoints.scale(euklid.vector.Vector2D([x, y]))
+        self.front_curve.controlpoints = self.front_curve.controlpoints.scale(openglider.rs.vector.Vector2D([x, y]))
 
         # scale back to fit with front
         factor = self.front_curve.controlpoints.nodes[-1][0] / self.back_curve.controlpoints.nodes[-1][0]
-        self.back_curve.controlpoints = self.back_curve.controlpoints.scale(euklid.vector.Vector2D([factor, y]))
+        self.back_curve.controlpoints = self.back_curve.controlpoints.scale(openglider.rs.vector.Vector2D([factor, y]))
 
         # scale rib_dist
         #factor = 1 / self.rib_distribution.controlpoints.nodes[-1][0]
@@ -324,7 +324,7 @@ class ParametricShape:
         return dy / (center_f + center_b)[1]
     
     def _clean(self) -> None:
-        p0 = self.front_curve.get(0) * euklid.vector.Vector2D([0, -1])
+        p0 = self.front_curve.get(0) * openglider.rs.vector.Vector2D([0, -1])
         self.front_curve.controlpoints = self.front_curve.controlpoints.move(p0)
         self.back_curve.controlpoints = self.back_curve.controlpoints.move(p0)
     
@@ -342,16 +342,16 @@ class ParametricShape:
         x0 = ribs[0][0][0]
         span = ribs[-1][0][0] - x0
 
-        front = euklid.vector.PolyLine2D([p + euklid.vector.Vector2D([0, (p[0]-x0)*diff/span]) for p, _ in ribs])
-        back = euklid.vector.PolyLine2D([p + euklid.vector.Vector2D([0, (p[0]-x0)*diff/span]) for _, p in ribs])
+        front = openglider.rs.vector.PolyLine2D([p + openglider.rs.vector.Vector2D([0, (p[0]-x0)*diff/span]) for p, _ in ribs])
+        back = openglider.rs.vector.PolyLine2D([p + openglider.rs.vector.Vector2D([0, (p[0]-x0)*diff/span]) for _, p in ribs])
 
         self.front_curve = self.front_curve.fit(front, self.front_curve.numpoints)  # type: ignore
         self.back_curve = self.back_curve.fit(back, self.back_curve.numpoints)  # type: ignore
 
         y0 = self.ribs[0][0][1]
 
-        self.front_curve.controlpoints = self.front_curve.controlpoints.move(euklid.vector.Vector2D([0, -y0]))
-        self.back_curve.controlpoints = self.back_curve.controlpoints.move(euklid.vector.Vector2D([0, -y0]))
+        self.front_curve.controlpoints = self.front_curve.controlpoints.move(openglider.rs.vector.Vector2D([0, -y0]))
+        self.back_curve.controlpoints = self.back_curve.controlpoints.move(openglider.rs.vector.Vector2D([0, -y0]))
         
         return self.get_sweep()
 

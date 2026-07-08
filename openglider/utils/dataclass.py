@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypeVar
 from collections.abc import Callable
-import euklid
+import openglider.rs
 
 import pydantic
 from pydantic import model_validator
@@ -93,8 +93,8 @@ def get_validator(cls: type) -> Callable[[Any], Any]:
     return validator
 
 #pydantic.validators._VALIDATORS += [
-#    (euklid.vector.Vector3D, [get_validator(euklid.vector.Vector3D)]),
-#    (euklid.vector.Vector2D, [get_validator(euklid.vector.Vector2D)])
+#    (openglider.rs.vector.Vector3D, [get_validator(openglider.rs.vector.Vector3D)]),
+#    (openglider.rs.vector.Vector2D, [get_validator(openglider.rs.vector.Vector2D)])
 #]
 
 class BaseModel(pydantic.BaseModel):
@@ -118,8 +118,8 @@ class BaseModel(pydantic.BaseModel):
     def validate_basemodel(cls, data: dict[str, Any]) -> dict[str, Any]:
         # TODO: this is an ugly hack
         evaluated_types = (
-            euklid.vector.Vector3D,
-            euklid.vector.Vector2D,
+            openglider.rs.vector.Vector3D,
+            openglider.rs.vector.Vector2D,
         )
 
         for field_name, field in cls.model_fields.items():

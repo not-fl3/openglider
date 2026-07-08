@@ -2,16 +2,16 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-import euklid
+import openglider.rs
 
 from openglider.glider.ballooning.base import BallooningBase
 
 
 class Ballooning(BallooningBase):
 
-    def __init__(self, f_upper: euklid.vector.Interpolation, f_lower: euklid.vector.Interpolation):
-        self.upper: euklid.vector.Interpolation = f_upper
-        self.lower: euklid.vector.Interpolation = f_lower
+    def __init__(self, f_upper: openglider.rs.vector.Interpolation, f_lower: openglider.rs.vector.Interpolation):
+        self.upper: openglider.rs.vector.Interpolation = f_upper
+        self.lower: openglider.rs.vector.Interpolation = f_lower
 
     def __json__(self) -> dict[str, Any]:
         return {'f_upper': self.upper,
@@ -41,8 +41,8 @@ class Ballooning(BallooningBase):
             lower.append([point[0], point[1]+other.lower.get_value(point[0])])
 
         return Ballooning(
-            euklid.vector.Interpolation(upper, extrapolate=True), 
-            euklid.vector.Interpolation(lower, extrapolate=True)
+            openglider.rs.vector.Interpolation(upper, extrapolate=True), 
+            openglider.rs.vector.Interpolation(lower, extrapolate=True)
             )
 
     def __imul__(self, val: float) -> Ballooning:
@@ -88,11 +88,11 @@ class Ballooning(BallooningBase):
         return amount / 2
 
     def scale(self, factor: float) -> None:
-        self.upper.scale(euklid.vector.Vector2D([1, factor]))
-        self.lower.scale(euklid.vector.Vector2D([1, factor]))
+        self.upper.scale(openglider.rs.vector.Vector2D([1, factor]))
+        self.lower.scale(openglider.rs.vector.Vector2D([1, factor]))
 
     def close_trailing_edge(self, start_x: float) -> None:
-        def close(curve: euklid.vector.Interpolation) -> euklid.vector.Interpolation:
+        def close(curve: openglider.rs.vector.Interpolation) -> openglider.rs.vector.Interpolation:
             new_nodes = []
             for p in curve.nodes:
                 x = p[0]
@@ -108,7 +108,7 @@ class Ballooning(BallooningBase):
                 
                 new_nodes.append([x, y])
             
-            return euklid.vector.Interpolation(new_nodes)
+            return openglider.rs.vector.Interpolation(new_nodes)
         
         self.upper = close(self.upper)
         self.lower = close(self.lower)
@@ -136,13 +136,13 @@ class Ballooning(BallooningBase):
 
 class BallooningBezier(Ballooning):
     num_points = 100
-    def __init__(self, upper: list[euklid.vector.Vector2D]=None, lower: list[euklid.vector.Vector2D]=None, name: str="ballooning") -> None:
+    def __init__(self, upper: list[openglider.rs.vector.Vector2D]=None, lower: list[openglider.rs.vector.Vector2D]=None, name: str="ballooning") -> None:
         super().__init__(None, None)  # type: ignore
-        upper = upper or euklid.vector.PolyLine2D([[0, 0], [0.1, 0], [0.2, 0.14], [0.8, 0.14], [0.9, 0], [1, 0]]).nodes
-        lower = lower or euklid.vector.PolyLine2D([[0, 0], [0.1, 0], [0.2, 0.14], [0.8, 0.14], [0.9, 0], [1, 0]]).nodes
+        upper = upper or openglider.rs.vector.PolyLine2D([[0, 0], [0.1, 0], [0.2, 0.14], [0.8, 0.14], [0.9, 0], [1, 0]]).nodes
+        lower = lower or openglider.rs.vector.PolyLine2D([[0, 0], [0.1, 0], [0.2, 0.14], [0.8, 0.14], [0.9, 0], [1, 0]]).nodes
 
-        self.upper_spline = euklid.spline.BSplineCurve(upper)
-        self.lower_spline = euklid.spline.BSplineCurve(lower)
+        self.upper_spline = openglider.rs.spline.BSplineCurve(upper)
+        self.lower_spline = openglider.rs.spline.BSplineCurve(lower)
 
         self.upper_spline.controlpoints.nodes[0][0] = 0
         self.upper_spline.controlpoints.nodes[-1][0] = 1
@@ -157,22 +157,22 @@ class BallooningBezier(Ballooning):
                 "lower": [list(p) for p in self.lower_spline.controlpoints]}
 
     @property
-    def points(self) -> euklid.vector.PolyLine2D:
+    def points(self) -> openglider.rs.vector.PolyLine2D:
         upper = self.upper_spline.get_sequence(self.num_points).nodes
-        lower = self.lower_spline.get_sequence(self.num_points).reverse() * euklid.vector.Vector2D([1., -1.])
+        lower = self.lower_spline.get_sequence(self.num_points).reverse() * openglider.rs.vector.Vector2D([1., -1.])
 
-        return euklid.vector.PolyLine2D(upper + lower.nodes)
+        return openglider.rs.vector.PolyLine2D(upper + lower.nodes)
 
-    def get_points(self, n: int=150) -> list[euklid.vector.Vector2D]:
+    def get_points(self, n: int=150) -> list[openglider.rs.vector.Vector2D]:
         n_2 = int(n / 2)
 
-        upper = self.upper_spline.get_sequence(n_2).reverse() * euklid.vector.Vector2D([-1., 1.])
+        upper = self.upper_spline.get_sequence(n_2).reverse() * openglider.rs.vector.Vector2D([-1., 1.])
         lower = self.lower_spline.get_sequence(self.num_points)
         return upper.nodes + lower.nodes
 
     def apply_splines(self) -> None:
-        self.upper = euklid.vector.Interpolation(self.upper_spline.get_sequence(self.num_points).nodes, extrapolate=True)
-        self.lower = euklid.vector.Interpolation(self.lower_spline.get_sequence(self.num_points).nodes, extrapolate=True)
+        self.upper = openglider.rs.vector.Interpolation(self.upper_spline.get_sequence(self.num_points).nodes, extrapolate=True)
+        self.lower = openglider.rs.vector.Interpolation(self.lower_spline.get_sequence(self.num_points).nodes, extrapolate=True)
 
     def __imul__(self, factor: float) -> BallooningBezier:  # TODO: Check consistency
         """Multiplication of BezierBallooning"""
@@ -180,7 +180,7 @@ class BallooningBezier(Ballooning):
         #Ballooning.__imul__(self, factor)
         #self.upper_spline.fit(self.upper.data)
         #self.lower_spline.fit(self.lower.data)
-        scale = euklid.vector.Vector2D([1, factor])
+        scale = openglider.rs.vector.Vector2D([1, factor])
         self.controlpoints = (
             self.controlpoints[0] * scale,
             self.controlpoints[1] * scale
@@ -196,14 +196,14 @@ class BallooningBezier(Ballooning):
     def numpoints(self, numpoints: int) -> None:
         upper = self.upper_spline.get_sequence(numpoints)
         lower = self.lower_spline.get_sequence(numpoints)
-        Ballooning.__init__(self, euklid.vector.Interpolation(upper.nodes), euklid.vector.Interpolation(lower.nodes))
+        Ballooning.__init__(self, openglider.rs.vector.Interpolation(upper.nodes), openglider.rs.vector.Interpolation(lower.nodes))
 
     @property
-    def controlpoints(self) -> tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]:
+    def controlpoints(self) -> tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]:
         return self.upper_spline.controlpoints, self.lower_spline.controlpoints
 
     @controlpoints.setter
-    def controlpoints(self, controlpoints: tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]) -> None:
+    def controlpoints(self, controlpoints: tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]) -> None:
         upper, lower = controlpoints
         if upper is not None:
             self.upper_spline.controlpoints = upper
@@ -213,5 +213,5 @@ class BallooningBezier(Ballooning):
 
     def scale(self, factor: float) -> None:
         super().scale(factor)
-        self.upper_spline.controlpoints = self.upper_spline.controlpoints.scale(euklid.vector.Vector2D([1, factor]))
-        self.lower_spline.controlpoints = self.lower_spline.controlpoints.scale(euklid.vector.Vector2D([1, factor]))
+        self.upper_spline.controlpoints = self.upper_spline.controlpoints.scale(openglider.rs.vector.Vector2D([1, factor]))
+        self.lower_spline.controlpoints = self.lower_spline.controlpoints.scale(openglider.rs.vector.Vector2D([1, factor]))

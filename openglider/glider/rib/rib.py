@@ -4,7 +4,7 @@ from typing import Any, TYPE_CHECKING, ClassVar
 import numpy as np
 import logging
 
-import euklid
+import openglider.rs
 import pyfoil
 
 from openglider.airfoil import Profile3D
@@ -33,24 +33,24 @@ class RibBase(BaseModel):
     """
     material: Material | None = None
     profile_2d: pyfoil.Airfoil
-    pos: euklid.vector.Vector3D
+    pos: openglider.rs.vector.Vector3D
 
     name: str = "unnamed rib"
 
-    def align_all(self, data: euklid.vector.PolyLine2D, scale: bool=True) -> euklid.vector.PolyLine3D:
+    def align_all(self, data: openglider.rs.vector.PolyLine2D, scale: bool=True) -> openglider.rs.vector.PolyLine3D:
         """align 2d coordinates to the 3d pos of the rib"""
         if scale:
             return self.transformation.apply(data)
         else:
             return self.rotation_matrix.apply(data).move(self.pos)
 
-    def align(self, point: euklid.vector.Vector2D, scale: bool=True) -> euklid.vector.Vector3D:
+    def align(self, point: openglider.rs.vector.Vector2D, scale: bool=True) -> openglider.rs.vector.Vector3D:
         if scale:
             return self.transformation.apply(point)
         else:
             return self.rotation_matrix.apply(point) + self.pos
 
-    def align_x(self, x_value: float) -> euklid.vector.Vector3D:
+    def align_x(self, x_value: float) -> openglider.rs.vector.Vector3D:
         ik = self.profile_2d(x_value)
         return self.profile_3d[ik]
     
@@ -69,7 +69,7 @@ class RibBase(BaseModel):
         return Profile3D(curve=self.align_all(hull.curve), x_values=x_values)
 
     @cached_property('profile_3d')
-    def normvectors(self) -> list[euklid.vector.Vector3D]:
+    def normvectors(self) -> list[openglider.rs.vector.Vector3D]:
         return [self.rotation_matrix.apply(p) for p in self.profile_2d.normvectors.nodes]
     
     @cached_property('profile_2d', 'transformation')
@@ -77,14 +77,14 @@ class RibBase(BaseModel):
         return self.get_profile_3d()
     
     @property
-    def rotation_matrix(self) -> euklid.vector.Transformation:
+    def rotation_matrix(self) -> openglider.rs.vector.Transformation:
         raise NotImplementedError()
     
     @property
-    def transformation(self) -> euklid.vector.Transformation:
+    def transformation(self) -> openglider.rs.vector.Transformation:
         raise NotImplementedError()
     
-    def point(self, x_value: float | Percentage) -> euklid.vector.Vector3D:
+    def point(self, x_value: float | Percentage) -> openglider.rs.vector.Vector3D:
         return self.align(self.profile_2d.profilepoint(float(x_value)))
     
 
@@ -96,9 +96,9 @@ class RibBase(BaseModel):
             new.name = str(new.name) + "_copy"
         return new
     
-    def get_projection(self, point: euklid.vector.Vector3D) -> float:
-        p1 = self.align(euklid.vector.Vector2D([0,0]))
-        p2 = self.align(euklid.vector.Vector2D([1,0]))
+    def get_projection(self, point: openglider.rs.vector.Vector3D) -> float:
+        p1 = self.align(openglider.rs.vector.Vector2D([0,0]))
+        p2 = self.align(openglider.rs.vector.Vector2D([1,0]))
 
         d1 = point - p1
         d2 = p2 - p1
@@ -151,16 +151,16 @@ class Rib(RibBase):
         self.aoa_absolute = aoa - self._aoa_diff(self.arcang, self.glide)
 
     @cached_property('arcang', 'glide', 'zrot', 'xrot', 'aoa_absolute')
-    def rotation_matrix(self) -> euklid.vector.Transformation:  # type: ignore
+    def rotation_matrix(self) -> openglider.rs.vector.Transformation:  # type: ignore
         return rib_rotation(self.aoa_absolute, self.arcang, self.zrot, self.xrot)
 
     @cached_property('arcang', 'glide', 'zrot', 'xrot', 'aoa_absolute', 'chord', 'pos', 'offset')
-    def transformation(self) -> euklid.vector.Transformation:  # type: ignore
+    def transformation(self) -> openglider.rs.vector.Transformation:  # type: ignore
         xoffset = self.convert_to_chordlength(self.offset[0]).si
         yoffset = self.convert_to_chordlength(self.offset[1]).si
         zoffset = self.convert_to_chordlength(self.offset[2]).si
 
-        offset = euklid.vector.Vector3D([xoffset, yoffset, zoffset])
+        offset = openglider.rs.vector.Vector3D([xoffset, yoffset, zoffset])
         return rib_transformation(self.aoa_absolute, self.arcang, self.zrot, self.xrot, self.chord, self.pos, offset)
     
     def rename_parts(self) -> None:
@@ -181,7 +181,7 @@ class Rib(RibBase):
             self.xrot *= -1.
         if self.zrot is not None:
             self.zrot = - self.zrot
-        self.pos = self.pos * euklid.vector.Vector3D([1, -1, 1])
+        self.pos = self.pos * openglider.rs.vector.Vector3D([1, -1, 1])
 
     def is_closed(self) -> bool:
         return self.profile_2d.thickness < 0.01
@@ -209,7 +209,7 @@ class Rib(RibBase):
         return area * self.material.weight
 
     @property
-    def normalized_normale(self) -> euklid.vector.Vector3D:
+    def normalized_normale(self) -> openglider.rs.vector.Vector3D:
         return self.rotation_matrix.apply([0., 0., 1.])
 
     def get_mesh(self, hole_num: int=10, filled: bool=False, max_area: float=None) -> Mesh:
@@ -241,7 +241,7 @@ class Rib(RibBase):
             for lst in boundary:
                 segments += triangulate.Triangulation.get_segments(lst)
             return Mesh.from_indexed(
-                self.align_all(euklid.vector.PolyLine2D(vertices)).nodes,
+                self.align_all(openglider.rs.vector.PolyLine2D(vertices)).nodes,
                 {'rib': [(segment, {}) for segment in segments]},
                 {}
                 )
@@ -253,7 +253,7 @@ class Rib(RibBase):
             tri.name = self.name
             mesh = tri.triangulate()
 
-            points = self.align_all(euklid.vector.PolyLine2D(mesh.points))
+            points = self.align_all(openglider.rs.vector.PolyLine2D(mesh.points))
             boundaries = {self.name: list(range(len(mesh.points)))}
 
             rib_mesh = Mesh.from_indexed(points.nodes, polygons={f"ribs_{self.material}": [(tri, {}) for tri in mesh.elements]} , boundaries=boundaries)
@@ -294,34 +294,34 @@ class Rib(RibBase):
         return self.rigidfoils
 
 
-def rib_rotation(aoa: float, arc: float, zrot: Angle | None, xrot: Angle | None) -> euklid.vector.Transformation:
+def rib_rotation(aoa: float, arc: float, zrot: Angle | None, xrot: Angle | None) -> openglider.rs.vector.Transformation:
     # align upright -> profile is in x/z layer
     xrot_float = 0.
     if xrot is not None:
         xrot_float = xrot.si
-    rot0 = euklid.vector.Transformation.rotation(np.pi / 2 - xrot_float, [1, 0, 0])  # type: ignore
+    rot0 = openglider.rs.vector.Transformation.rotation(np.pi / 2 - xrot_float, [1, 0, 0])  # type: ignore
 
     # rotate aoa -> y (rot0.apply([0,0,1]))
-    rot1 = euklid.vector.Transformation.rotation(aoa, [0, 1, 0])  # type: ignore
+    rot1 = openglider.rs.vector.Transformation.rotation(aoa, [0, 1, 0])  # type: ignore
 
     # rotate arc
-    rot2 = euklid.vector.Transformation.rotation(-arc, [1,0,0])  # type: ignore
+    rot2 = openglider.rs.vector.Transformation.rotation(-arc, [1,0,0])  # type: ignore
 
     # reverse order
     result = rot2 * rot1 * rot0
 
     if zrot is not None:
-        axis = (rot1 * rot2).apply(euklid.vector.Vector3D([0,0,1]))
-        rot3 = euklid.vector.Transformation.rotation(zrot.si, axis)  # type: ignore
+        axis = (rot1 * rot2).apply(openglider.rs.vector.Vector3D([0,0,1]))
+        rot3 = openglider.rs.vector.Transformation.rotation(zrot.si, axis)  # type: ignore
         return rot3 * result
     
     return result
 
 
-def rib_transformation(aoa: float, arc: float, zrot: Angle | None, xrot: Angle | None, scale: float, pos: euklid.vector.Vector3D, offset: euklid.vector.Vector3D) -> euklid.vector.Transformation:
-    scale_transform = euklid.vector.Transformation.scale(scale)  # type: ignore
+def rib_transformation(aoa: float, arc: float, zrot: Angle | None, xrot: Angle | None, scale: float, pos: openglider.rs.vector.Vector3D, offset: openglider.rs.vector.Vector3D) -> openglider.rs.vector.Transformation:
+    scale_transform = openglider.rs.vector.Transformation.scale(scale)  # type: ignore
     #scale = Scale(scale)
     #move = Translation(pos)
     rot = rib_rotation(aoa, arc, zrot, xrot)  # type: ignore
-    move = euklid.vector.Transformation.translation(pos + rot.apply(offset))  # type: ignore
+    move = openglider.rs.vector.Transformation.translation(pos + rot.apply(offset))  # type: ignore
     return scale_transform * rot * move 

@@ -2,13 +2,13 @@ from typing import Any
 from openglider.glider.parametric.arc import ArcCurve
 from openglider.gui.qt import QtWidgets, QtGui, QtCore
 from openglider.utils.colors import Color
-import euklid
+import openglider.rs
 
 from openglider.glider.project import GliderProject
 
 
 class Arc2D(QtWidgets.QGraphicsObject):
-    positions: euklid.vector.PolyLine2D
+    positions: openglider.rs.vector.PolyLine2D
     bbox: tuple[float, float, float, float]
 
     def __init__(self, project: GliderProject, color: Color | None=None, alpha: int=160) -> None:
@@ -42,14 +42,15 @@ class Arc2D(QtWidgets.QGraphicsObject):
         height = max(y) - min_y
         self.bbox = min_x, min_y, width, height
 
-    def get_arc_positions(self) -> euklid.vector.PolyLine2D:
+    def get_arc_positions(self) -> openglider.rs.vector.PolyLine2D:
         arc, x_values = self.get_normalized_arc()
         points = arc.get_arc_positions(x_values)
 
-        points_left = points * euklid.vector.Vector2D([-1, 1])
-        #points_left = [[-p[0], p[1]] for p in points]
-
-        return points_left.reverse() + points
+        points_left = points * openglider.rs.vector.Vector2D([-1, 1])
+        # PolyLine2D.__add__ is pointwise add, not concatenation.
+        # Build the full arc by explicitly concatenating node sequences.
+        nodes = points_left.reverse().nodes + points.nodes
+        return openglider.rs.vector.PolyLine2D(nodes)
 
     def paint(self, p: QtGui.QPainter, *args: Any) -> None:
         color = QtGui.QColor(*self.color.rgb(), self.alpha)

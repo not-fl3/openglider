@@ -3,7 +3,7 @@ import math
 
 from typing import Any, Literal
 import numpy as np
-import euklid
+import openglider.rs
 
 from openglider.airfoil import Profile2D
 from openglider.utils.distribution import Distribution
@@ -13,7 +13,7 @@ from openglider.utils.types import CurveType
 class BezierProfile2D(Profile2D):
     # TODO make new fit bezier method to set the second x value of the
     # controllpoints to zero.
-    def __init__(self, data: euklid.vector.PolyLine2D=None, name: str="unnamed",
+    def __init__(self, data: openglider.rs.vector.PolyLine2D=None, name: str="unnamed",
                  upper_spline: CurveType=None, lower_spline: CurveType=None):
         
         new_data = []
@@ -47,7 +47,7 @@ class BezierProfile2D(Profile2D):
         if self.upper_spline is not None:
             return self.upper_spline.fit(upper_smooth, control_num)  # type: ignore
         else:
-            return euklid.spline.BSplineCurve.fit(upper_smooth, control_num)
+            return openglider.rs.spline.BSplineCurve.fit(upper_smooth, control_num)
 
     def fit_lower(self, num: int=100, dist: Literal["const"] | Literal["sin"] | None=None, control_num: int=8) -> CurveType:
         lower = self.curve.nodes[self.noseindex:]
@@ -56,13 +56,13 @@ class BezierProfile2D(Profile2D):
         if self.lower_spline:
             return self.lower_spline.fit(lower_smooth, control_num)  # type: ignore
         else:
-            return euklid.spline.BSplineCurve.fit(lower_smooth, control_num)  # type: ignore
+            return openglider.rs.spline.BSplineCurve.fit(lower_smooth, control_num)  # type: ignore
 
-    def fit_region(self, start: float, stop: float, num_points: int, control_points: list[euklid.vector.Vector2D]) -> CurveType:
-        smoothened = euklid.vector.PolyLine2D([self.get(x) for x in np.linspace(start, stop, num=num_points)])
-        return euklid.spline.BezierCurve.fit(smoothened, numpoints=num_points)  # type: ignore
+    def fit_region(self, start: float, stop: float, num_points: int, control_points: list[openglider.rs.vector.Vector2D]) -> CurveType:
+        smoothened = openglider.rs.vector.PolyLine2D([self.get(x) for x in np.linspace(start, stop, num=num_points)])
+        return openglider.rs.spline.BezierCurve.fit(smoothened, numpoints=num_points)  # type: ignore
 
-    def fit_profile(self, num_points: int, control_points: list[euklid.vector.Vector2D]) -> None:
+    def fit_profile(self, num_points: int, control_points: list[openglider.rs.vector.Vector2D]) -> None:
         # todo: classmethod
         self.upper_spline = self.fit_region(-1., 0., num_points, control_points)
         self.lower_spline = self.fit_region(0., 1., num_points, control_points)
@@ -71,21 +71,21 @@ class BezierProfile2D(Profile2D):
         upper = self.upper_spline.get_sequence(num)
         lower = self.lower_spline.get_sequence(num)
 
-        self.data = euklid.vector.PolyLine2D(upper.tolist() + lower.tolist()[1:])
+        self.data = openglider.rs.vector.PolyLine2D(upper.tolist() + lower.tolist()[1:])
 
-    def make_smooth_dist(self, points: list[euklid.vector.Vector2D], num: int=70, dist: Literal["const"] | Literal["sin"] | None=None, upper: bool=True) -> euklid.vector.PolyLine2D:
+    def make_smooth_dist(self, points: list[openglider.rs.vector.Vector2D], num: int=70, dist: Literal["const"] | Literal["sin"] | None=None, upper: bool=True) -> openglider.rs.vector.PolyLine2D:
         # make array [[length, x, y], ...]
         if not dist:
-            return euklid.vector.PolyLine2D(points)
+            return openglider.rs.vector.PolyLine2D(points)
         length = [0.]
         for i, point in enumerate(points[1:]):
             length.append(length[-1] + (point - points[i]).length())
-        interpolation_x = euklid.vector.Interpolation(list(zip(length, [p[0] for p in points])))
-        interpolation_y = euklid.vector.Interpolation(points)
+        interpolation_x = openglider.rs.vector.Interpolation(list(zip(length, [p[0] for p in points])))
+        interpolation_y = openglider.rs.vector.Interpolation(points)
 
-        def get_point(dist: float) -> euklid.vector.Vector2D:
+        def get_point(dist: float) -> openglider.rs.vector.Vector2D:
             x = interpolation_x.get_value(dist)
-            return euklid.vector.Vector2D([x, interpolation_y.get_value(x)])
+            return openglider.rs.vector.Vector2D([x, interpolation_y.get_value(x)])
 
         if dist == "const":
             distribution = Distribution.from_linear(num, 0, length[-1]).data
@@ -97,7 +97,7 @@ class BezierProfile2D(Profile2D):
         else:
             return points
 
-        return euklid.vector.PolyLine2D([get_point(d) for d in distribution])
+        return openglider.rs.vector.PolyLine2D([get_point(d) for d in distribution])
 
     @classmethod
     def from_profile_2d(cls, profile_2d: Profile2D) -> BezierProfile2D:

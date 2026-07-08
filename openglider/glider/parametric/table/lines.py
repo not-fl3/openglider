@@ -4,7 +4,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, ClassVar, Self
 
-import euklid
+import openglider.rs
 import pydantic
 
 from openglider.glider.cell.attachment_point import CellAttachmentPoint
@@ -25,7 +25,7 @@ class LineSetTable(BaseModel):
     table: Table = pydantic.Field(default_factory=Table)
     lower_attachment_points: dict[str, Node] = pydantic.Field(default_factory=dict)
 
-    def get_lineset(self, glider: Glider, v_inf: euklid.vector.Vector3D) -> LineSet:
+    def get_lineset(self, glider: Glider, v_inf: openglider.rs.vector.Vector3D) -> LineSet:
         # upper -> dct {name: node}
         num_rows = self.table.num_rows
         num_cols = self.table.num_columns

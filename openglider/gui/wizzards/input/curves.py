@@ -4,7 +4,7 @@ import logging
 from typing import Any
 from collections.abc import Callable
 
-import euklid
+import openglider.rs
 from openglider.glider.curve import CurveEnum, GliderCurveType, ShapeBSplineCurve
 from openglider.glider.project import GliderProject
 from openglider.glider.shape import Shape
@@ -253,9 +253,9 @@ class CurveWizard(Wizard):
         pass
     
     def add_curve(self) -> None:
-        p1 = euklid.vector.Vector2D([1., 0.5])
-        p2 = euklid.vector.Vector2D([2., 0.5])
-        p3 = euklid.vector.Vector2D([self.shape.rib_no-1, 0.5])
+        p1 = openglider.rs.vector.Vector2D([1., 0.5])
+        p2 = openglider.rs.vector.Vector2D([2., 0.5])
+        p3 = openglider.rs.vector.Vector2D([self.shape.rib_no-1, 0.5])
         self.curve_list.add(
             "unnamed",
             ShapeBSplineCurve([p1, p2, p3], shape=self.shape)  # type: ignore

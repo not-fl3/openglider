@@ -3,7 +3,7 @@ import re
 from typing import TYPE_CHECKING, Any, ClassVar
 import logging
 
-import euklid
+import openglider.rs
 from openglider.glider.shape import Shape
 from openglider.lines.node import NODE_TYPE_ENUM, Node
 from openglider.utils.dataclass import BaseModel
@@ -26,17 +26,17 @@ class RoundReinforcement(BaseModel):
     size: Length | Percentage = Length("4cm")
     material_code: str = ""
 
-    def get_3d(self, rib: Rib, num_points: int=10) -> list[euklid.vector.PolyLine3D]:
+    def get_3d(self, rib: Rib, num_points: int=10) -> list[openglider.rs.vector.PolyLine3D]:
         # create circle with center on the point
         polygons = self.get_flattened(rib, num_points=num_points)
-        aligned_polygons: list[euklid.vector.PolyLine3D] = []
+        aligned_polygons: list[openglider.rs.vector.PolyLine3D] = []
         for polygon in polygons:
 
             aligned_polygons.append(rib.align_all(polygon, scale=False))
         
         return aligned_polygons
 
-    def get_flattened(self, rib: Rib, num_points: int=10) -> list[euklid.vector.PolyLine2D]:
+    def get_flattened(self, rib: Rib, num_points: int=10) -> list[openglider.rs.vector.PolyLine2D]:
         # get center point
         profile = rib.profile_2d
         start = profile(self.position)
@@ -79,7 +79,7 @@ class AttachmentPoint(Node):
     
     @classmethod
     def __from_json__(cls, **data: Any) -> AttachmentPoint:
-        data["force"] = euklid.vector.Vector3D(data["force"])
+        data["force"] = openglider.rs.vector.Vector3D(data["force"])
         return AttachmentPoint(**data)
     
     def cache_hash(self) -> int:
@@ -107,10 +107,10 @@ class AttachmentPoint(Node):
         return positions
     
     @staticmethod
-    def calculate_force_rib_aligned(rib: Rib, force: float) -> euklid.vector.Vector3D:
-        return rib.rotation_matrix.apply(euklid.vector.Vector3D([0, force, 0]))
+    def calculate_force_rib_aligned(rib: Rib, force: float) -> openglider.rs.vector.Vector3D:
+        return rib.rotation_matrix.apply(openglider.rs.vector.Vector3D([0, force, 0]))
 
-    def get_position(self, rib: Rib) -> euklid.vector.Vector3D:
+    def get_position(self, rib: Rib) -> openglider.rs.vector.Vector3D:
         hull = rib.get_hull(normalize_x_values=True)
         profile_3d = rib.get_profile_3d()
 
@@ -118,7 +118,7 @@ class AttachmentPoint(Node):
 
         return self.position
     
-    def get_position_2d(self, shape: Shape, glider: Glider) -> euklid.vector.Vector2D:
+    def get_position_2d(self, shape: Shape, glider: Glider) -> openglider.rs.vector.Vector2D:
 
         rib_no = None
         for i, rib in enumerate(glider.ribs):

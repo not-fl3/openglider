@@ -4,7 +4,7 @@ from collections.abc import Callable
 import logging
 import math
 
-import euklid
+import openglider.rs
 from openglider.airfoil import get_x_value
 from openglider.glider.cell.cell import FlattenedCell
 from openglider.glider.cell.panel import Panel
@@ -52,7 +52,7 @@ class PanelPlot:
         cut_types = self.config.get_cut_types()
         self.flattened_panel = self.panel.get_flattened(self.cell, self.config.midribs, cut_types=cut_types)
 
-    def flatten(self, extra_marks: list[euklid.vector.PolyLine2D] | None=None) -> PlotPart:
+    def flatten(self, extra_marks: list[openglider.rs.vector.PolyLine2D] | None=None) -> PlotPart:
         assert self.flattened_panel is not None, "Call prepare() before flatten()"
         self.plotpart = PlotPart(material_code=str(self.panel.material), name=self.panel.name)
 
@@ -73,10 +73,10 @@ class PanelPlot:
             ]
 
         # folding line
-        self.front_curve = euklid.vector.PolyLine2D([
+        self.front_curve = openglider.rs.vector.PolyLine2D([
                 line.get(x) for line, x in zip(self.inner, self.flattened_panel.cut_front.inner_indices)
             ])
-        self.back_curve = euklid.vector.PolyLine2D([
+        self.back_curve = openglider.rs.vector.PolyLine2D([
                 line.get(x) for line, x in zip(self.inner, self.flattened_panel.cut_back.inner_indices)
             ])
 
@@ -104,12 +104,12 @@ class PanelPlot:
 
         return self.plotpart
 
-    def get_endcurves(self) -> tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]:
+    def get_endcurves(self) -> tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]:
         ik_values = self.panel.get_ik_values(self.cell, self.config.midribs, exact=True)
-        front = euklid.vector.PolyLine2D([
+        front = openglider.rs.vector.PolyLine2D([
             line.get(ik[0]) for line, ik in zip(self.inner, ik_values)
         ])
-        back = euklid.vector.PolyLine2D([
+        back = openglider.rs.vector.PolyLine2D([
             line.get(ik[1]) for line, ik in zip(self.inner, ik_values)
         ])
 
@@ -124,7 +124,7 @@ class PanelPlot:
         return MaterialUsage().consume(self.panel.material, area)
 
 
-    def get_point(self, x: float | Percentage) -> tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]:
+    def get_point(self, x: float | Percentage) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:
         ik = get_x_value(self.x_values, x)
 
         return (
@@ -132,7 +132,7 @@ class PanelPlot:
             self.ballooned[1].get(ik)
         )
 
-    def get_p1_p2(self, x: float, is_right: bool) -> tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]:
+    def get_p1_p2(self, x: float, is_right: bool) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:
         if is_right:
             front, back = self.panel.cut_front.x_right, self.panel.cut_back.x_right
         else:
@@ -150,7 +150,7 @@ class PanelPlot:
 
     def insert_mark(
         self,
-        mark: Callable[[euklid.vector.Vector2D, euklid.vector.Vector2D], dict[str, list[euklid.vector.PolyLine2D]]],
+        mark: Callable[[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D], dict[str, list[openglider.rs.vector.PolyLine2D]]],
         x: float | Percentage,
         plotpart: PlotPart,
         is_right: bool
@@ -379,7 +379,7 @@ class PanelPlot:
             y: float,
             start: float,
             end: float,
-            ) -> euklid.vector.PolyLine2D | None:
+            ) -> openglider.rs.vector.PolyLine2D | None:
         assert self.flattened_panel is not None, "Call prepare() before draw_straight_line()"
 
         if start > max(self.panel.cut_back.x_left, self.panel.cut_back.x_right):
@@ -423,18 +423,18 @@ class PanelPlot:
                     plotpart.layers["marks"].append(line)
 
                     # laser dots
-                    plotpart.layers["L0"].append(euklid.vector.PolyLine2D([line.get(0)]))
-                    plotpart.layers["L0"].append(euklid.vector.PolyLine2D([line.get(len(line)-1)]))
+                    plotpart.layers["L0"].append(openglider.rs.vector.PolyLine2D([line.get(0)]))
+                    plotpart.layers["L0"].append(openglider.rs.vector.PolyLine2D([line.get(len(line)-1)]))
 
         return result
 
 
 class FlattenedCellWithAllowance(FlattenedCell):
-    outer: tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]
-    outer_orig: tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]
+    outer: tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]
+    outer_orig: tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]
 
     def copy(self, **kwargs: Any) -> FlattenedCellWithAllowance:
-        def copy_tuple(t: tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]) -> tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]:
+        def copy_tuple(t: tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]) -> tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]:
             return (
                 t[0].copy(),
                 t[1].copy()
@@ -503,7 +503,7 @@ class CellPlotMaker:
             outer_orig=outer_orig
         )
 
-    def get_panels(self, panels: list[Panel] | None=None, extra_marks: dict[Panel, list[euklid.vector.PolyLine2D]] | None = None) -> list[PlotPart]:
+    def get_panels(self, panels: list[Panel] | None=None, extra_marks: dict[Panel, list[openglider.rs.vector.PolyLine2D]] | None = None) -> list[PlotPart]:
         cell_panels: list[PlotPart] = []
 
         if panels is None:
@@ -521,11 +521,11 @@ class CellPlotMaker:
         
         return cell_panels
 
-    def get_panels_lower(self, extra_marks: dict[Panel, list[euklid.vector.PolyLine2D]] | None = None) -> list[PlotPart]:
+    def get_panels_lower(self, extra_marks: dict[Panel, list[openglider.rs.vector.PolyLine2D]] | None = None) -> list[PlotPart]:
         panels = [p for p in self.cell.panels if p.is_lower()]
         return self.get_panels(panels, extra_marks=extra_marks)
 
-    def get_panels_upper(self, extra_marks: dict[Panel, list[euklid.vector.PolyLine2D]] | None = None) -> list[PlotPart]:
+    def get_panels_upper(self, extra_marks: dict[Panel, list[openglider.rs.vector.PolyLine2D]] | None = None) -> list[PlotPart]:
         panels = [p for p in self.cell.panels if not p.is_lower()]
         return self.get_panels(panels, extra_marks=extra_marks)
 
@@ -556,9 +556,9 @@ class CellPlotMaker:
 
         return upper, lower
     
-    def get_rigidfoils(self) -> tuple[list[PlotPart], dict[Panel, list[euklid.vector.PolyLine2D]]]:
+    def get_rigidfoils(self) -> tuple[list[PlotPart], dict[Panel, list[openglider.rs.vector.PolyLine2D]]]:
         rigidfoils: list[PlotPart] = []
-        panel_marks: dict[Panel, list[euklid.vector.PolyLine2D]] = {}
+        panel_marks: dict[Panel, list[openglider.rs.vector.PolyLine2D]] = {}
         for rigidfoil in self.cell.rigidfoils:
             if not isinstance(rigidfoil, EntryStrap):
                 drawing, marks = rigidfoil.get_flattened(self.cell, self.config.midribs, cut_types=self.config.get_cut_types())

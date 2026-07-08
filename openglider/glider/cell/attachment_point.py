@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-import euklid
+import openglider.rs
 from pydantic import Field
 from openglider.glider.shape import Shape
 from openglider.lines.node import Node, NODE_TYPE_ENUM
@@ -37,14 +37,14 @@ class CellAttachmentPoint(Node):
     
     @classmethod
     def __from_json__(cls, **kwargs: Any) -> CellAttachmentPoint:
-        force = euklid.vector.Vector3D(kwargs.pop("force"))
+        force = openglider.rs.vector.Vector3D(kwargs.pop("force"))
         return cls(**kwargs, force=force)
 
     @classmethod
-    def calculate_force_cell_aligned(cls, cell: Cell, force: float) -> euklid.vector.Vector3D:
+    def calculate_force_cell_aligned(cls, cell: Cell, force: float) -> openglider.rs.vector.Vector3D:
         return cell.get_normvector() * force
 
-    def get_position(self, cell: Cell) -> euklid.vector.Vector3D:
+    def get_position(self, cell: Cell) -> openglider.rs.vector.Vector3D:
         ik = cell.rib1.profile_2d(self.rib_pos)
 
         if self.rib_pos in (-1, 1):
@@ -54,12 +54,12 @@ class CellAttachmentPoint(Node):
         else:
             self.position = cell.midrib(self.cell_pos, ballooning=self.ballooned)[ik]
         
-        if not isinstance(self.force, euklid.vector.Vector3D):
+        if not isinstance(self.force, openglider.rs.vector.Vector3D):
             self.force = cell.get_normvector().normalized() * self.force
             
         return self.position
     
-    def get_position_2d(self, shape: Shape, glider: Glider) -> euklid.vector.Vector2D:
+    def get_position_2d(self, shape: Shape, glider: Glider) -> openglider.rs.vector.Vector2D:
         cell_no = None
         for i, cell in enumerate(glider.cells):
             if self in cell.attachment_points:

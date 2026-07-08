@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import copy
 import math
 import re
-import euklid
+import openglider.rs
 
 import openglider
 from openglider.glider.cell.attachment_point import CellAttachmentPoint
@@ -193,7 +193,7 @@ class Glider:
         
         return mesh
 
-    def return_ribs(self, num_midribs: int=0, ballooning: bool=True) -> list[list[euklid.vector.Vector3D]]:
+    def return_ribs(self, num_midribs: int=0, ballooning: bool=True) -> list[list[openglider.rs.vector.Vector3D]]:
         """
         Get a list of rib-curves
         :param num: number of midribs per cell
@@ -234,7 +234,7 @@ class Glider:
             k = 1
         return self.cells[i].midrib(k)
 
-    def get_point(self, y: float=0, x: float=-1) -> euklid.vector.Vector3D:
+    def get_point(self, y: float=0, x: float=-1) -> openglider.rs.vector.Vector3D:
         """
         Get a point on the glider
         :param y: span-wise argument (0, cell_no)
@@ -286,7 +286,7 @@ class Glider:
         
         for node in [node for node in other2.lineset.nodes]:
             if node.node_type != node.NODE_TYPE.UPPER:
-                mirror = euklid.vector.Vector3D([1,-1,1])
+                mirror = openglider.rs.vector.Vector3D([1,-1,1])
                 node.position *= mirror
             if all(node.force):
                 node.force *= mirror
@@ -308,26 +308,26 @@ class Glider:
         """
         Simple (rectangular) shape representation for spline inputs
         """
-        last_pos = euklid.vector.Vector2D([0,0])  # y,z
+        last_pos = openglider.rs.vector.Vector2D([0,0])  # y,z
         front = []
         back = []
         x = 0.
         for rib in self.ribs:
-            p1 = euklid.vector.Vector2D([rib.pos[1], rib.pos[2]])
+            p1 = openglider.rs.vector.Vector2D([rib.pos[1], rib.pos[2]])
 
             width = (p1-last_pos).length()
             last_pos = p1
 
             x += width * (rib.pos[1] > 0)  # x-value
             if x == 0:
-                last_pos = euklid.vector.Vector2D([0,0])
+                last_pos = openglider.rs.vector.Vector2D([0,0])
 
             y_front = -rib.pos[0] + rib.chord * rib.startpos
             y_back = -rib.pos[0] + rib.chord * (rib.startpos - 1)
-            front.append(euklid.vector.Vector2D([x, y_front]))
-            back.append(euklid.vector.Vector2D([x, y_back]))
+            front.append(openglider.rs.vector.Vector2D([x, y_front]))
+            back.append(openglider.rs.vector.Vector2D([x, y_back]))
 
-        return Shape(euklid.vector.PolyLine2D(front), euklid.vector.PolyLine2D(back))
+        return Shape(openglider.rs.vector.PolyLine2D(front), openglider.rs.vector.PolyLine2D(back))
 
     @property
     def shape_flattened(self) -> Shape:
@@ -335,7 +335,7 @@ class Glider:
         Projected Shape of the glider (as it would lie on the ground - flattened)
         """
         front, back = flatten_list(self.get_spanwise(0), self.get_spanwise(1))
-        zero = euklid.vector.Vector2D([0,0])
+        zero = openglider.rs.vector.Vector2D([0,0])
 
         return Shape(front.rotate(-math.pi/2, zero), back.rotate(-math.pi/2, zero))
 
@@ -437,13 +437,13 @@ class Glider:
             rib.chord *= factor
         self.area = area_backup
 
-    def get_spanwise(self, x: float=0.) -> euklid.vector.PolyLine3D:
+    def get_spanwise(self, x: float=0.) -> openglider.rs.vector.PolyLine3D:
         """
         Return a list of points for a x_value
         """
-        return euklid.vector.PolyLine3D([rib.align_x(x) for rib in self.ribs])
+        return openglider.rs.vector.PolyLine3D([rib.align_x(x) for rib in self.ribs])
 
-    def get_attachment_point_layers(self) -> dict[str, euklid.vector.Interpolation]:
+    def get_attachment_point_layers(self) -> dict[str, openglider.rs.vector.Interpolation]:
         regex = re.compile(r"([a-zA-Z]+)([0-9]+)")
         attachment_point_per_group: dict[str, list[tuple[int, Percentage]]] = {}
 
@@ -458,7 +458,7 @@ class Glider:
         for name, group in attachment_point_per_group.items():
             group.sort(key=lambda p: p[0])
             group.insert(0, (0, group[0][1]))
-            curves[name] = euklid.vector.Interpolation(group)
+            curves[name] = openglider.rs.vector.Interpolation(group)
 
 
         return curves
@@ -514,4 +514,4 @@ class Glider:
 
         angle = math.atan(1/glide)
         speed = self.lineset.v_inf.length()
-        self.lineset.v_inf = euklid.vector.Vector3D([math.cos(angle), 0, math.sin(angle)]) * speed
+        self.lineset.v_inf = openglider.rs.vector.Vector3D([math.cos(angle), 0, math.sin(angle)]) * speed

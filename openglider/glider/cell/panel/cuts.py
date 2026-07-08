@@ -1,7 +1,7 @@
 from abc import ABC
 import math
 import logging
-import euklid
+import openglider.rs
 
 from openglider.utils.dataclass import BaseModel
 from openglider.vector.unit import Length
@@ -11,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class CutResult(BaseModel):
-    outline: euklid.vector.PolyLine2D
+    outline: openglider.rs.vector.PolyLine2D
     index_left: float
     index_right: float
     inner_indices: list[float]
 
-    def __init__(self, curve: euklid.vector.PolyLine2D, index_left: float, index_right: float, inner_indices: list[float]):
+    def __init__(self, curve: openglider.rs.vector.PolyLine2D, index_left: float, index_right: float, inner_indices: list[float]):
         # WHY????
         super().__init__(  # type: ignore
             outline=curve,
@@ -39,7 +39,7 @@ class CutResult(BaseModel):
         
         return x1 + (y-y1) / (y2-y1) * (x2-x1)
 
-InnerLists = list[tuple[euklid.vector.PolyLine2D, float]]
+InnerLists = list[tuple[openglider.rs.vector.PolyLine2D, float]]
 
 class Cut(ABC, BaseModel):
     amount: Length
@@ -47,8 +47,8 @@ class Cut(ABC, BaseModel):
     def apply(
         self,
         inner_lists: InnerLists,
-        outer_left: euklid.vector.PolyLine2D,
-        outer_right: euklid.vector.PolyLine2D,
+        outer_left: openglider.rs.vector.PolyLine2D,
+        outer_right: openglider.rs.vector.PolyLine2D,
         amount_3d: list[float] | None=None
         ) -> CutResult:
 
@@ -66,7 +66,7 @@ class DesignCut(Cut):
     def total_amount(self) -> float:
         return self.num_folds * float(self.amount)
 
-    def get_p1_p2(self, inner_lists: InnerLists, amount_3d: list[float] | None) -> tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]:
+    def get_p1_p2(self, inner_lists: InnerLists, amount_3d: list[float] | None) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:
         l1, ik1 = inner_lists[0]
         l2, ik2 = inner_lists[-1]
 
@@ -93,17 +93,17 @@ class DesignCut(Cut):
     def apply(
         self,
         inner_lists: InnerLists,
-        outer_left: euklid.vector.PolyLine2D,
-        outer_right: euklid.vector.PolyLine2D,
+        outer_left: openglider.rs.vector.PolyLine2D,
+        outer_right: openglider.rs.vector.PolyLine2D,
         amount_3d: list[float] | None=None
         ) -> CutResult:
 
         p1, p2 = self.get_p1_p2(inner_lists, amount_3d)
         indices = self._get_indices(inner_lists, amount_3d)
         
-        normvector = euklid.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
+        normvector = openglider.rs.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
 
-        newlist: list[euklid.vector.Vector2D] = []
+        newlist: list[openglider.rs.vector.Vector2D] = []
         # todo: sort by distance
         cuts_left = outer_left.cut(p1, p2)
         cuts_left.sort(key=lambda cut: -abs(cut[1]))
@@ -124,7 +124,7 @@ class DesignCut(Cut):
         newlist.append(rightcut+normvector*self.total_amount)
         newlist.append(rightcut)
 
-        curve = euklid.vector.PolyLine2D(newlist)
+        curve = openglider.rs.vector.PolyLine2D(newlist)
 
         return CutResult(curve, leftcut_index, rightcut_index, indices)
 
@@ -133,8 +133,8 @@ class SimpleCut(DesignCut):
     def apply(
         self,
         inner_lists: InnerLists,
-        outer_left: euklid.vector.PolyLine2D,
-        outer_right: euklid.vector.PolyLine2D,
+        outer_left: openglider.rs.vector.PolyLine2D,
+        outer_right: openglider.rs.vector.PolyLine2D,
         amount_3d: list[float] | None=None
 
         
@@ -143,9 +143,9 @@ class SimpleCut(DesignCut):
         p1, p2 = self.get_p1_p2(inner_lists, amount_3d)
         indices = self._get_indices(inner_lists, amount_3d)
 
-        normvector = euklid.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
+        normvector = openglider.rs.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
 
-        # TODO: fix in euklid!
+        # TODO: fix in openglider.rs!
         try:
             leftcut_index = outer_left.cut(p1, p2, inner_lists[0][1])
             index_left = leftcut_index[0]
@@ -171,7 +171,7 @@ class SimpleCut(DesignCut):
         rightcut_2 = outer_right.get(rightcut_index_2[0])
         diff_l, diff_r = leftcut-leftcut_2, rightcut - rightcut_2
 
-        curve = euklid.vector.PolyLine2D([leftcut, leftcut+diff_l, rightcut+diff_r, rightcut])
+        curve = openglider.rs.vector.PolyLine2D([leftcut, leftcut+diff_l, rightcut+diff_r, rightcut])
 
         return CutResult(curve, index_left, index_right, indices)
 
@@ -180,8 +180,8 @@ class Cut3D(DesignCut):
     def apply(
         self,
         inner_lists: InnerLists,
-        outer_left: euklid.vector.PolyLine2D,
-        outer_right: euklid.vector.PolyLine2D,
+        outer_left: openglider.rs.vector.PolyLine2D,
+        outer_right: openglider.rs.vector.PolyLine2D,
         amount_3d: list[float] | None=None
         ) -> CutResult:
         
@@ -194,7 +194,7 @@ class Cut3D(DesignCut):
         """
 
         inner_ik: list[float] = []
-        inner_points: list[euklid.vector.Vector2D] = []
+        inner_points: list[openglider.rs.vector.Vector2D] = []
 
         if amount_3d is None:
             amount_3d = [0.] * len(inner_lists)
@@ -205,7 +205,7 @@ class Cut3D(DesignCut):
             inner_ik.append(ik_new)
             inner_points.append(curve.get(ik_new))
         
-        inner_curve = euklid.vector.PolyLine2D(inner_points)
+        inner_curve = openglider.rs.vector.PolyLine2D(inner_points)
         normvectors = inner_curve.normvectors()
 
         curve = inner_curve.add(normvectors * -self.total_amount)
@@ -235,7 +235,7 @@ class Cut3D(DesignCut):
 
         
 
-        #curve = euklid.vector.PolyLine2D(point_list)
+        #curve = openglider.rs.vector.PolyLine2D(point_list)
 
         return CutResult(curve, leftcut_index, rightcut_index, inner_ik)
 
@@ -243,8 +243,8 @@ class Cut3D_2(DesignCut):
     def apply(
         self,
         inner_lists: InnerLists,
-        outer_left: euklid.vector.PolyLine2D,
-        outer_right: euklid.vector.PolyLine2D,
+        outer_left: openglider.rs.vector.PolyLine2D,
+        outer_right: openglider.rs.vector.PolyLine2D,
         amount_3d: list[float] | None=None
         ) -> CutResult:
         
@@ -256,8 +256,8 @@ class Cut3D_2(DesignCut):
         :param amount_3d: list of 3d-shaping amounts
         :return:
         """
-        inner_new: list[tuple[euklid.vector.PolyLine2D, float]] = []
-        point_list: list[euklid.vector.Vector2D] = []
+        inner_new: list[tuple[openglider.rs.vector.PolyLine2D, float]] = []
+        point_list: list[openglider.rs.vector.Vector2D] = []
         
         if amount_3d is None:
             amount_3d = [0.] * len(inner_lists)
@@ -268,7 +268,7 @@ class Cut3D_2(DesignCut):
             inner_new.append((curve, ik_new))
 
         p1, p2 = self.get_p1_p2(inner_lists, amount_3d)
-        normvector = euklid.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
+        normvector = openglider.rs.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
 
         leftcut_index = outer_left.cut(p1, p2, inner_lists[0][1])
         rightcut_index = outer_right.cut(p1, p2, inner_lists[-1][1])
@@ -288,7 +288,7 @@ class Cut3D_2(DesignCut):
         point_list.append(rightcut+normvector*self.total_amount)
         point_list.append(rightcut)
 
-        curve = euklid.vector.PolyLine2D(point_list)
+        curve = openglider.rs.vector.PolyLine2D(point_list)
 
         return CutResult(curve, index_left, index_right, [x[1] for x in inner_new])
 
@@ -300,15 +300,15 @@ class FoldedCut(DesignCut):
     def apply(
         self,
         inner_lists: InnerLists,
-        outer_left: euklid.vector.PolyLine2D,
-        outer_right: euklid.vector.PolyLine2D,
+        outer_left: openglider.rs.vector.PolyLine2D,
+        outer_right: openglider.rs.vector.PolyLine2D,
         amount_3d: list[float] | None=None
         ) -> CutResult:
         
         p1, p2 = self.get_p1_p2(inner_lists, amount_3d)
         indices = self._get_indices(inner_lists, amount_3d)
 
-        normvector = euklid.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
+        normvector = openglider.rs.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
 
         left_start_index = outer_left.cut(p1, p2, inner_lists[0][1])[0]
         right_start_index = outer_right.cut(p1, p2, inner_lists[-1][1])[0]
@@ -328,17 +328,21 @@ class FoldedCut(DesignCut):
 
         # mirror to (p1-p2) -> p'=p-2*(p.normvector)
         last_left, last_right = left_start, right_start
-        new_left, new_right = euklid.vector.PolyLine2D([]), euklid.vector.PolyLine2D([])
+        new_left, new_right = openglider.rs.vector.PolyLine2D([]), openglider.rs.vector.PolyLine2D([])
 
         for i in range(self.num_folds):
             left_this = left_piece if i % 2 else left_piece_mirrored
             right_this = right_piece if i % 2 else right_piece_mirrored
-            new_left = new_left + left_this.move(last_left-left_this.get(0))
-            new_right = new_right + right_this.move(last_right-right_this.get(0))
+            new_left = openglider.rs.vector.PolyLine2D(
+                new_left.nodes + left_this.move(last_left-left_this.get(0)).nodes
+            )
+            new_right = openglider.rs.vector.PolyLine2D(
+                new_right.nodes + right_this.move(last_right-right_this.get(0)).nodes
+            )
             last_left = new_left.get(len(new_left)-1)
             last_right = new_right.get(len(new_right)-1)
 
-        curve = new_left+new_right.reverse()
+        curve = openglider.rs.vector.PolyLine2D(new_left.nodes + new_right.reverse().nodes)
 
         return CutResult(curve, left_start_index, right_start_index, indices)
 
@@ -351,15 +355,15 @@ class ParallelCut(DesignCut):
     def apply(
         self,
         inner_lists: InnerLists,
-        outer_left: euklid.vector.PolyLine2D,
-        outer_right: euklid.vector.PolyLine2D,
+        outer_left: openglider.rs.vector.PolyLine2D,
+        outer_right: openglider.rs.vector.PolyLine2D,
         amount_3d: list[float] | None=None
         ) -> CutResult:
         
         p1, p2 = self.get_p1_p2(inner_lists, amount_3d)
         indices = self._get_indices(inner_lists, amount_3d)
 
-        normvector = euklid.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
+        normvector = openglider.rs.vector.Rotation2D(-math.pi/2).apply(p1-p2).normalized()
 
         leftcut_index = outer_left.cut(p1, p2, inner_lists[0][1])
         rightcut_index = outer_right.cut(p1, p2, inner_lists[-1][1])
@@ -377,7 +381,7 @@ class ParallelCut(DesignCut):
         rightcut_2 = outer_right.get(rightcut_index_2[0])
         diff = (leftcut-leftcut_2 + rightcut - rightcut_2) * 0.5
 
-        curve = euklid.vector.PolyLine2D([leftcut, leftcut+diff, rightcut+diff, rightcut])
+        curve = openglider.rs.vector.PolyLine2D([leftcut, leftcut+diff, rightcut+diff, rightcut])
 
         #iks = [x[1] for x in inner_lists]
 

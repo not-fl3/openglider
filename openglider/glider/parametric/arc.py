@@ -4,7 +4,7 @@ import copy
 import math
 from typing import Any
 
-import euklid
+import openglider.rs
 import numpy as np
 
 from openglider.utils.types import SymmetricCurveType
@@ -16,6 +16,7 @@ class ArcCurve:
     _
     """
     num_interpolation_points = 100
+    _x_tolerance = 1e-8
 
     def __init__(self, curve: SymmetricCurveType) -> None:
         self.curve = curve
@@ -28,9 +29,9 @@ class ArcCurve:
 
     @staticmethod
     def has_center_cell(x_values: list[float]) -> bool:
-        return x_values[0] != 0
+        return abs(x_values[0]) > ArcCurve._x_tolerance
 
-    def get_arc_positions(self, x_values: list[float]) -> euklid.vector.PolyLine2D:
+    def get_arc_positions(self, x_values: list[float]) -> openglider.rs.vector.PolyLine2D:
         """
         calculate y/z positions vor the arc-curve, given a shape's rib-x-values
 
@@ -40,7 +41,7 @@ class ArcCurve:
         # Symmetric-Bezier-> start from 0.5
         positions = []
 
-        x_values = [abs(x) for x in x_values]
+        x_values = [0.0 if abs(x) <= self._x_tolerance else abs(x) for x in x_values]
 
         arc_curve = self.curve.get_sequence(self.num_interpolation_points)
         arc_curve_length = arc_curve.get_length()
@@ -49,13 +50,13 @@ class ArcCurve:
         positions = [arc_curve.get(p) for p in _positions]
 
         if not self.has_center_cell(x_values):
-            scale_center = euklid.vector.Vector2D([0, 1])
+            scale_center = openglider.rs.vector.Vector2D([0, 1])
         else:
-            scale_center = euklid.vector.Vector2D([-1, 1])
+            scale_center = openglider.rs.vector.Vector2D([-1, 1])
         
         positions[0] = positions[0] * scale_center
         
-        return euklid.vector.PolyLine2D(positions)
+        return openglider.rs.vector.PolyLine2D(positions)
 
     def get_cell_angles(self, x_values: list[float], rad: bool=True) -> list[float]:
         """
@@ -84,24 +85,24 @@ class ArcCurve:
 
     @classmethod
     def from_cell_angles(cls, angles: list[float], x_values: list[float], rad: bool=True) -> ArcCurve:
-        last_pos = euklid.vector.Vector2D([0,0])
+        last_pos = openglider.rs.vector.Vector2D([0,0])
         last_x = 0.
         nodes = []
         for i, x in enumerate(x_values):
             angle = angles[i]
             l = x - last_x
-            d = euklid.vector.Vector2D([math.cos(angle), -math.sin(angle)])
+            d = openglider.rs.vector.Vector2D([math.cos(angle), -math.sin(angle)])
             last_pos = last_pos + d * l
             last_x = x
 
             nodes.append(last_pos)
         
-        right_curve = euklid.vector.PolyLine2D(nodes)
+        right_curve = openglider.rs.vector.PolyLine2D(nodes)
         left_curve = right_curve.mirror()
 
-        curve = euklid.vector.PolyLine2D(left_curve.nodes[:-1] + right_curve.nodes)
+        curve = openglider.rs.vector.PolyLine2D(left_curve.nodes[:-1] + right_curve.nodes)
         
-        spline = euklid.spline.SymmetricBSplineCurve.fit(curve, 8) # type: ignore
+        spline = openglider.rs.spline.SymmetricBSplineCurve.fit(curve, 8) # type: ignore
         
         return cls(spline)
 
@@ -134,19 +135,19 @@ class ArcCurve:
         span_projected = arc_curve.nodes[-1][0]
         return span_projected / arc_curve.get_length()
 
-    def get_circle(self, n: int=50) -> euklid.vector.PolyLine2D:
+    def get_circle(self, n: int=50) -> openglider.rs.vector.PolyLine2D:
         p1, p2 = self.curve.get_sequence(1)
-        p3 = p1 * euklid.vector.Vector2D([-1, 1])
+        p3 = p1 * openglider.rs.vector.Vector2D([-1, 1])
         return CirclePart(p1, p2, p3).get_sequence(n)
 
 
     def rescale(self, x_values: list[float]) -> None:
         positions = self.get_arc_positions(x_values)
-        diff = euklid.vector.Vector2D([0, -positions.nodes[0][1]])
-        self.curve.controlpoints = euklid.vector.PolyLine2D([p + diff for p in self.curve.controlpoints.nodes])
+        diff = openglider.rs.vector.Vector2D([0, -positions.nodes[0][1]])
+        self.curve.controlpoints = openglider.rs.vector.PolyLine2D([p + diff for p in self.curve.controlpoints.nodes])
 
-        arc_curve: euklid.vector.PolyLine2D = self.curve.get_sequence(self.num_interpolation_points)
+        arc_curve: openglider.rs.vector.PolyLine2D = self.curve.get_sequence(self.num_interpolation_points)
         arc_curve_length = arc_curve.get_length()
         scale_factor = x_values[-1] / arc_curve_length
 
-        self.curve.controlpoints = euklid.vector.PolyLine2D([p * scale_factor for p in self.curve.controlpoints.nodes])
+        self.curve.controlpoints = openglider.rs.vector.PolyLine2D([p * scale_factor for p in self.curve.controlpoints.nodes])

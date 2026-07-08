@@ -3,7 +3,7 @@ import logging
 import math
 from typing import TYPE_CHECKING
 
-import euklid
+import openglider.rs
 from openglider.glider.cell import cell
 from openglider.glider.cell.panel import cuts
 from openglider.mesh.mesh import Mesh
@@ -57,14 +57,14 @@ class EntryStrap:
 
         return panel_1_index, ik1, ik2, length
     
-    def get_marks(self, cell: Cell, midribs: int, cut_types: dict[PANELCUT_TYPES, type[cuts.Cut]] | None) -> dict[Panel, list[euklid.vector.PolyLine2D]]:
+    def get_marks(self, cell: Cell, midribs: int, cut_types: dict[PANELCUT_TYPES, type[cuts.Cut]] | None) -> dict[Panel, list[openglider.rs.vector.PolyLine2D]]:
         data = self.get_data(cell, midribs)
         panel_1_index = data[0]
 
         panel_front = cell.panels[panel_1_index]
         panel_back = cell.panels[panel_1_index+1]
 
-        def get_mark(panel: Panel, is_first: bool) -> list[euklid.vector.PolyLine2D]:
+        def get_mark(panel: Panel, is_first: bool) -> list[openglider.rs.vector.PolyLine2D]:
             flattended = panel.get_flattened(cell, midribs=midribs, cut_types=cut_types)
 
             if is_first:
@@ -82,7 +82,7 @@ class EntryStrap:
             p1 = curve.get(curve.walk(index, offset * 0.25))
             p2 = curve.get(curve.walk(index, offset * 0.75))
 
-            return [euklid.vector.PolyLine2D([p1]), euklid.vector.PolyLine2D([p2])]      
+            return [openglider.rs.vector.PolyLine2D([p1]), openglider.rs.vector.PolyLine2D([p2])]      
 
         return {
             panel_front: get_mark(panel_front, True),
@@ -120,7 +120,7 @@ class PanelRigidFoil:
 
         return Mesh.from_indexed(nodes, {"PanelRigidFoil": [([i, i+1], {}) for i in range(len(nodes)-1)]}, name="PanelRigidFoil")
 
-    def get_flattened(self, cell: Cell, midribs: int, cut_types: dict[PANELCUT_TYPES, type[cuts.Cut]] | None) -> tuple[openglider.vector.drawing.PlotPart, dict[Panel, list[euklid.vector.PolyLine2D]]]:
+    def get_flattened(self, cell: Cell, midribs: int, cut_types: dict[PANELCUT_TYPES, type[cuts.Cut]] | None) -> tuple[openglider.vector.drawing.PlotPart, dict[Panel, list[openglider.rs.vector.PolyLine2D]]]:
         dwg = openglider.vector.drawing.PlotPart(material_code="rigidfoil")
         panels = list(sorted(cell.panels, key=lambda p: p.mean_x()))
         
@@ -128,10 +128,10 @@ class PanelRigidFoil:
         # generate sections of connected panels with some off-panel section in between
         # for each section generate 
         flat_panels: dict[Panel, FlattenedPanel] = {}
-        lines: dict[Panel, euklid.vector.PolyLine2D] = {} # panel -> line
+        lines: dict[Panel, openglider.rs.vector.PolyLine2D] = {} # panel -> line
         profile_3d = cell.midrib(self.y.si)
 
-        panel_marks: dict[Panel, list[euklid.vector.PolyLine2D]] = {}
+        panel_marks: dict[Panel, list[openglider.rs.vector.PolyLine2D]] = {}
 
         for panel in panels:
             panel_flat = panel.get_flattened(cell, midribs=midribs, cut_types=cut_types)
@@ -163,9 +163,9 @@ class PanelRigidFoil:
             for i in range(len(current_section)+1):
                 x = current_section_offset + sum(lengths[:i])
                 dwg.layers["marks"].append(
-                    euklid.vector.PolyLine2D([
-                        euklid.vector.Vector2D([x, -self.channel_width/2]),
-                        euklid.vector.Vector2D([x, self.channel_width/2]),
+                    openglider.rs.vector.PolyLine2D([
+                        openglider.rs.vector.Vector2D([x, -self.channel_width/2]),
+                        openglider.rs.vector.Vector2D([x, self.channel_width/2]),
                     ])
                 )
             
@@ -177,10 +177,10 @@ class PanelRigidFoil:
 
             for mark_position in mark_positions:
                 dwg.layers["L0"].append(
-                    euklid.vector.PolyLine2D([euklid.vector.Vector2D([current_section_offset + mark_position, -mark_distance])])
+                    openglider.rs.vector.PolyLine2D([openglider.rs.vector.Vector2D([current_section_offset + mark_position, -mark_distance])])
                 )
                 dwg.layers["L0"].append(
-                    euklid.vector.PolyLine2D([euklid.vector.Vector2D([current_section_offset + mark_position, mark_distance/2])])
+                    openglider.rs.vector.PolyLine2D([openglider.rs.vector.Vector2D([current_section_offset + mark_position, mark_distance/2])])
                 )
 
             # add to panels
@@ -198,8 +198,8 @@ class PanelRigidFoil:
                         p1 = line.get(line.walk(0, mark_position - panel_start))
                         p2 = line.offset(mark_distance/2).get(line.walk(0, mark_position - panel_start))
                         panel_marks[panel] += [
-                            euklid.vector.PolyLine2D([p2]),
-                            euklid.vector.PolyLine2D([p1 + (p1 - p2)])
+                            openglider.rs.vector.PolyLine2D([p2]),
+                            openglider.rs.vector.PolyLine2D([p1 + (p1 - p2)])
                         ]
 
 
@@ -229,11 +229,11 @@ class PanelRigidFoil:
             add_section(None)
 
         # draw outline
-        outline = euklid.vector.PolyLine2D([
-            euklid.vector.Vector2D([-self.pocket_length.si, -self.channel_width/2]),
-            euklid.vector.Vector2D([current_section_offset + self.pocket_length.si, -self.channel_width/2]),
-            euklid.vector.Vector2D([current_section_offset + self.pocket_length.si, self.channel_width/2]),
-            euklid.vector.Vector2D([-self.pocket_length.si, self.channel_width/2]),
+        outline = openglider.rs.vector.PolyLine2D([
+            openglider.rs.vector.Vector2D([-self.pocket_length.si, -self.channel_width/2]),
+            openglider.rs.vector.Vector2D([current_section_offset + self.pocket_length.si, -self.channel_width/2]),
+            openglider.rs.vector.Vector2D([current_section_offset + self.pocket_length.si, self.channel_width/2]),
+            openglider.rs.vector.Vector2D([-self.pocket_length.si, self.channel_width/2]),
         ]).close()
 
         dwg.layers["cuts"].append(outline)

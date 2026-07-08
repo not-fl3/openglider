@@ -1,24 +1,24 @@
 from typing import overload
 
-import euklid
+import openglider.rs
 import pyfoil
 
 from openglider.utils.cache import cached_property
 from openglider.utils.dataclass import BaseModel
 
 class Profile3D(BaseModel):
-    curve: euklid.vector.PolyLine3D
+    curve: openglider.rs.vector.PolyLine3D
     x_values: list[float]
 
     name: str = "unnamed"
 
     @overload
-    def __getitem__(self, ik: float) -> euklid.vector.Vector3D: ...
+    def __getitem__(self, ik: float) -> openglider.rs.vector.Vector3D: ...
 
     @overload
-    def __getitem__(self, ik: slice) -> euklid.vector.PolyLine3D: ...
+    def __getitem__(self, ik: slice) -> openglider.rs.vector.PolyLine3D: ...
 
-    def __getitem__(self, ik: float | slice) -> euklid.vector.PolyLine3D | euklid.vector.Vector3D:
+    def __getitem__(self, ik: float | slice) -> openglider.rs.vector.PolyLine3D | openglider.rs.vector.Vector3D:
         if isinstance(ik, slice):
             start = ik.start
             stop = ik.stop
@@ -38,13 +38,13 @@ class Profile3D(BaseModel):
         return self.curve.get_positions(start, stop)
 
     @overload
-    def get(self, start: float) -> euklid.vector.Vector3D: ...
+    def get(self, start: float) -> openglider.rs.vector.Vector3D: ...
 
     @overload
-    def get(self, start: float, stop: float) -> euklid.vector.PolyLine3D: ...
+    def get(self, start: float, stop: float) -> openglider.rs.vector.PolyLine3D: ...
 
 
-    def get(self, start: float, stop: float | None=None) -> euklid.vector.PolyLine3D | euklid.vector.Vector3D:
+    def get(self, start: float, stop: float | None=None) -> openglider.rs.vector.PolyLine3D | openglider.rs.vector.Vector3D:
         if stop is None:
             return self.curve.get(start)
             
@@ -63,7 +63,7 @@ class Profile3D(BaseModel):
         return noseindex
 
     @cached_property('self')
-    def projection_layer(self) -> euklid.plane.Plane:
+    def projection_layer(self) -> openglider.rs.plane.Plane:
         """
         Projection Layer of profile_3d
         """
@@ -71,7 +71,7 @@ class Profile3D(BaseModel):
         diff = [p - p1 for p in self.curve.nodes]
 
         xvect = diff[self.noseindex].normalized() * -1
-        yvect = euklid.vector.Vector3D([0, 0, 0])
+        yvect = openglider.rs.vector.Vector3D([0, 0, 0])
 
         for i in range(len(diff)):
             sign = 1 - 2 * (i > self.noseindex)
@@ -79,7 +79,7 @@ class Profile3D(BaseModel):
 
         yvect = yvect.normalized()
 
-        return euklid.plane.Plane(self.curve.nodes[self.noseindex], xvect, yvect)
+        return openglider.rs.plane.Plane(self.curve.nodes[self.noseindex], xvect, yvect)
 
     def flatten(self) -> pyfoil.Airfoil:
         """Flatten the airfoil and return a 2d-Representative"""
@@ -90,11 +90,11 @@ class Profile3D(BaseModel):
         )
 
     @cached_property('self')
-    def normvectors(self) -> list[euklid.vector.Vector3D]:
+    def normvectors(self) -> list[openglider.rs.vector.Vector3D]:
         layer = self.projection_layer
         profnorm = layer.normvector
 
-        def get_normvector(x: euklid.vector.Vector3D) -> euklid.vector.Vector3D:
+        def get_normvector(x: openglider.rs.vector.Vector3D) -> openglider.rs.vector.Vector3D:
             return x.cross(profnorm).normalized()
 
         vectors = [get_normvector(self.curve.nodes[1] - self.curve.nodes[0])]
@@ -108,5 +108,5 @@ class Profile3D(BaseModel):
         return vectors
 
     @property
-    def tangents(self) -> list[euklid.vector.Vector3D]:
+    def tangents(self) -> list[openglider.rs.vector.Vector3D]:
         return self.curve.get_tangents()

@@ -1,0 +1,13 @@
+[package]
+name = "openglider-rs"
+version = "0.1.3"
+edition = "2021"
+
+[lib]
+name = "rs"
+path = "rust/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.29", features = ["experimental-inspect"] }
+nalgebra = { version = "0.34", default-features = false, features = ["std"] }

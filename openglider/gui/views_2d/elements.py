@@ -12,7 +12,7 @@ import pyqtgraph.GraphicsScene.mouseEvents
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
 import logging
 
-import euklid
+import openglider.rs
 
 from openglider.utils.colors import Color
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class Line2D(QtWidgets.QGraphicsObject):
     color: Color
 
-    def __init__(self, data: list[euklid.vector.Vector2D], color: tuple[int, int, int] | Color | None=None, dashed: bool=False) -> None:
+    def __init__(self, data: list[openglider.rs.vector.Vector2D], color: tuple[int, int, int] | Color | None=None, dashed: bool=False) -> None:
         self.curve_data = data or []
         if isinstance(color, Color):
             self.color = color
@@ -183,7 +183,7 @@ class DraggableLine(pyqtgraph.GraphItem):
     data: dict[str, Any]
     drag_node_index: int | None
 
-    def __init__(self, data: list[euklid.vector.Vector2D]) -> None:
+    def __init__(self, data: list[openglider.rs.vector.Vector2D]) -> None:
         self.drag_node_index = None
         self.drag_start_position = None
         self.on_node_move = []
@@ -197,11 +197,11 @@ class DraggableLine(pyqtgraph.GraphItem):
         self.set_controlpoints(data)
 
     @property
-    def controlpoints(self) -> euklid.vector.PolyLine2D:
-        return euklid.vector.PolyLine2D(self.data["pos"].tolist())
+    def controlpoints(self) -> openglider.rs.vector.PolyLine2D:
+        return openglider.rs.vector.PolyLine2D(self.data["pos"].tolist())
 
-    def set_controlpoints(self, controlpoints: list[euklid.vector.Vector2D]) -> None:
-        if isinstance(controlpoints, euklid.vector.PolyLine2D):
+    def set_controlpoints(self, controlpoints: list[openglider.rs.vector.Vector2D]) -> None:
+        if isinstance(controlpoints, openglider.rs.vector.PolyLine2D):
             controlpoints = controlpoints.nodes
 
         num = len(controlpoints)
@@ -210,7 +210,9 @@ class DraggableLine(pyqtgraph.GraphItem):
 
         self.data["data"] = data
         self.data["adj"] = np.column_stack((np.arange(0, num-1), np.arange(1, num)))
-        self.data["pos"] = np.array(controlpoints)
+        # pyqtgraph GraphItem expects a numeric Nx2 array; a plain np.array(list[Vector2D])
+        # becomes a 1D object array and later fails at pos[:, 0].
+        self.data["pos"] = np.array([[float(p[0]), float(p[1])] for p in controlpoints], dtype=float)
 
         self.updateGraph()
 
@@ -225,7 +227,7 @@ class DraggableLine(pyqtgraph.GraphItem):
 
         if is_ctrl_key or is_shift_key:
             node_index = points[0].data()[0]
-            controlpoints = euklid.vector.PolyLine2D(self.data["pos"].tolist())
+            controlpoints = openglider.rs.vector.PolyLine2D(self.data["pos"].tolist())
 
             if is_ctrl_key:
                 if node_index in (0, len(controlpoints)-1):

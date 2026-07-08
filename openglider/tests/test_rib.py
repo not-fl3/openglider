@@ -1,7 +1,7 @@
 import unittest
 import random
 
-import euklid
+import openglider.rs
 
 import openglider
 from openglider.glider.rib.rib import Rib
@@ -16,7 +16,7 @@ class TestRib(unittest.TestCase):
         numpoints = random.randint(10,11)
         self.prof = openglider.airfoil.Profile2D.compute_naca(naca, numpoints)
         self.rib = Rib(profile_2d=self.prof,
-                       pos=euklid.vector.Vector3D([random.random(), random.random(), random.random()]),
+                       pos=openglider.rs.vector.Vector3D([random.random(), random.random(), random.random()]),
                        chord=random.random(),
                        arcang=random.random(),
                        aoa_absolute=random.random(),
@@ -30,7 +30,7 @@ class TestRib(unittest.TestCase):
 
     def test_align(self) -> None:
         first = self.rib.pos
-        second = self.rib.align(euklid.vector.Vector2D([0, 0]))
+        second = self.rib.align(openglider.rs.vector.Vector2D([0, 0]))
         for i in range(3):
             self.assertAlmostEqual(first[i], second[i])
 

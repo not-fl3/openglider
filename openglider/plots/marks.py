@@ -5,7 +5,7 @@ import math
 from typing import Any
 from collections.abc import Sequence
 
-import euklid
+import openglider.rs
 
 import openglider.vector.polygon as polygons
 
@@ -19,7 +19,7 @@ class Mark(ABC):
     def __repr__(self) -> str:
         return self.__class__.__name__
     
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) ->  dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) ->  dict[str, list[openglider.rs.vector.PolyLine2D]]:
         raise NotImplementedError()
     
     def __json__(self) -> dict[str, Any]:
@@ -29,7 +29,7 @@ class Mark(ABC):
         }
 
 class Empty(Mark):
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         return {}
 
 class Combine(Mark):
@@ -52,8 +52,8 @@ class Combine(Mark):
         repr_children = ", ".join([str(x) for x in self.marks])
         return f"{repr_self} ({repr_children})"
 
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
-        result: dict[str, list[euklid.vector.PolyLine2D]] = {}
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
+        result: dict[str, list[openglider.rs.vector.PolyLine2D]] = {}
         for mark in self.marks:
             for layer_name, marks in mark(p1, p2).items():
                 result.setdefault(layer_name, [])
@@ -75,7 +75,7 @@ class Polygon(Mark):
             **super().__json__()
         )
 
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         circle = polygons.Circle.from_p1_p2(p1, p2)
 
         return {
@@ -107,14 +107,14 @@ class Arrow(Mark):
             **super().__json__()
         )
 
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         d = (p2 - p1)*self.scale
-        dr = euklid.vector.Vector2D([-d[1], d[0]])*(1/math.sqrt(2))
+        dr = openglider.rs.vector.Vector2D([-d[1], d[0]])*(1/math.sqrt(2))
         if not self.left:
             dr *= -1.
 
         return {
-            self.layer: [euklid.vector.PolyLine2D([
+            self.layer: [openglider.rs.vector.PolyLine2D([
             p1,
             p1+d,
             p1+d*0.5+dr,
@@ -136,16 +136,16 @@ class Line(Mark):
             **super().__json__()
         )
 
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         if self.rotation:
             center = (p1+p2)*0.5
-            rotation = euklid.vector.Rotation2D(self.rotation)
-            result = [euklid.vector.PolyLine2D([
+            rotation = openglider.rs.vector.Rotation2D(self.rotation)
+            result = [openglider.rs.vector.PolyLine2D([
                 center + rotation.apply(p1-center),
                 center + rotation.apply(p2-center)
                 ])]
         else:
-            result = [euklid.vector.PolyLine2D([p1, p2])]
+            result = [openglider.rs.vector.PolyLine2D([p1, p2])]
 
         return {
             self.layer: result
@@ -153,7 +153,7 @@ class Line(Mark):
 
 
 class Cross(Line):
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         l1 = list(Line(rotation=self.rotation)(p1, p2).values())[0]
         l2 = list(Line(rotation=self.rotation+math.pi*0.5)(p1, p2).values())[0]
         return {
@@ -174,13 +174,13 @@ class Dot(Mark):
     def __from_json__(cls, positions: list[float]) -> Dot:
         return cls(*positions)
 
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         dots = []
         for x in self.positions:
             p = p1 + (p2 - p1) * x
             dots.append(p)
         return {
-            self.layer: [euklid.vector.PolyLine2D([p]) for p in dots]
+            self.layer: [openglider.rs.vector.PolyLine2D([p]) for p in dots]
         }
 
 
@@ -197,14 +197,14 @@ class _Modify(Mark):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}->{repr(self.child)}"
 
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         return self.child(p1, p2)
 
 
 class Rotate(_Modify):
     def __init__(self, func: Mark, rotation: float, center: bool=True):
         self.angle = rotation
-        self.rotation = euklid.vector.Rotation2D(rotation)
+        self.rotation = openglider.rs.vector.Rotation2D(rotation)
         super().__init__(func)
     
     def __deepcopy__(self, memo: Any) -> Rotate:
@@ -217,7 +217,7 @@ class Rotate(_Modify):
     def __repr__(self) -> str:
         return f"Rotate({self.angle})->{self.child}"
 
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         diff = (p2 - p1) * 0.5
         center = (p1 + p2) * 0.5
         diff_new = self.rotation.apply(diff)
@@ -234,7 +234,7 @@ class OnLine(_Modify):
     | x  <- new
     | |
     """
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         p1_2 = (p1+p2) * 0.5
         p2_2 = p1 * 1.5 - p2 * 0.5
         return super().__call__(p1_2, p2_2)
@@ -249,7 +249,7 @@ class Inside(_Modify):
     l1|
       | l2
     """
-    def __call__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D) -> dict[str, list[euklid.vector.PolyLine2D]]:
+    def __call__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D) -> dict[str, list[openglider.rs.vector.PolyLine2D]]:
         p1_2 = p1*2-p2
         p2_2 = p1
         return super().__call__(p1_2, p2_2)

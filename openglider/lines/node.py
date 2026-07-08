@@ -4,7 +4,7 @@ import logging
 import enum
 from typing import Any
 
-import euklid
+import openglider.rs
 from typing import ClassVar
 
 from openglider.lines.functions import proj_force
@@ -22,9 +22,9 @@ class Node(BaseModel):
     NODE_TYPE: ClassVar[type[NODE_TYPE_ENUM]] = NODE_TYPE_ENUM
 
     node_type: NODE_TYPE_ENUM
-    force: euklid.vector.Vector3D = Field(default_factory=lambda: euklid.vector.Vector3D())
-    position: euklid.vector.Vector3D = Field(default_factory=lambda: euklid.vector.Vector3D())
-    vec_proj: euklid.vector.Vector3D = Field(default_factory=lambda: euklid.vector.Vector3D())
+    force: openglider.rs.vector.Vector3D = Field(default_factory=lambda: openglider.rs.vector.Vector3D())
+    position: openglider.rs.vector.Vector3D = Field(default_factory=lambda: openglider.rs.vector.Vector3D())
+    vec_proj: openglider.rs.vector.Vector3D = Field(default_factory=lambda: openglider.rs.vector.Vector3D())
     name: str = "unnamed_node"
     
     def __json__(self) -> dict[str, Any]:
@@ -45,8 +45,8 @@ class Node(BaseModel):
             **kwargs
         )
 
-    def calc_force_infl(self, vec: euklid.vector.Vector3D) -> euklid.vector.Vector3D:
-        v = euklid.vector.Vector3D(vec)
+    def calc_force_infl(self, vec: openglider.rs.vector.Vector3D) -> openglider.rs.vector.Vector3D:
+        v = openglider.rs.vector.Vector3D(vec)
 
         direction = self.position - v
         if self.node_type == self.NODE_TYPE.UPPER:
@@ -60,10 +60,10 @@ class Node(BaseModel):
 
         return direction.normalized() * force
 
-    def calc_proj_vec(self, v_inf: euklid.vector.Vector3D) -> None:
+    def calc_proj_vec(self, v_inf: openglider.rs.vector.Vector3D) -> None:
         self.vec_proj = self.position - v_inf * (v_inf.dot(self.position) / v_inf.dot(v_inf))
 
-    def get_diff(self) -> euklid.vector.Vector3D:
+    def get_diff(self) -> openglider.rs.vector.Vector3D:
         return self.position - self.vec_proj
 
     def is_upper(self) -> bool:

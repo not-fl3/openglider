@@ -1,6 +1,6 @@
 from __future__ import annotations
 import math
-import euklid
+import openglider.rs
 
 from openglider.airfoil import Profile3D
 from openglider.utils.cache import cached_property
@@ -16,7 +16,7 @@ class BasicCell(BaseModel):
     ballooning_phi: list[float]
     name: str = "unnamed_cell"
 
-    def point_basic_cell(self, y: int=0, ik: float=0) -> euklid.vector.Vector3D:
+    def point_basic_cell(self, y: int=0, ik: float=0) -> openglider.rs.vector.Vector3D:
         ##round ballooning
         return self.midrib(y).get(ik)
 
@@ -74,7 +74,7 @@ class BasicCell(BaseModel):
             return Profile3D(curve=midrib, x_values=x_values)
 
     @cached_property('prof1', 'prof2')
-    def normvectors(self) -> euklid.vector.PolyLine3D:
+    def normvectors(self) -> openglider.rs.vector.PolyLine3D:
         prof1 = self.prof1.curve
         prof2 = self.prof2.curve
         
@@ -82,13 +82,13 @@ class BasicCell(BaseModel):
         t_2 = self.prof2.tangents
         # cross (differenzvektor, tangentialvektor)
 
-        normals: list[euklid.vector.Vector3D] = []
+        normals: list[openglider.rs.vector.Vector3D] = []
 
         for p1, p2, t1, t2 in zip(prof1, prof2, t_1, t_2):
             normal = (t1 + t2).cross(p1 - p2).normalized()
             normals.append(normal)
         
-        return euklid.vector.PolyLine3D(normals)
+        return openglider.rs.vector.PolyLine3D(normals)
 
     @cached_property('ballooning_phi', 'prof1', 'prof2')
     def ballooning_radius(self) -> list[float | None]:

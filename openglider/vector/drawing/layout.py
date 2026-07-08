@@ -8,7 +8,7 @@ from collections.abc import Iterator, Sequence
 
 import ezdxf
 import ezdxf.document
-import euklid
+import openglider.rs
 import svgwrite
 import svgwrite.container
 import svgwrite.shapes
@@ -123,7 +123,7 @@ class Layout:
                 drawing = cls([part])
 
             x = (max_width - width)/2
-            drawing.move_to(euklid.vector.Vector2D([x,y]))
+            drawing.move_to(openglider.rs.vector.Vector2D([x,y]))
 
             y += direction * drawing.height
             y += distance
@@ -150,7 +150,7 @@ class Layout:
 
             if drawing.width > 0 or drawing.height > 0:
                 y = (max_height - height)/2
-                drawing.move_to(euklid.vector.Vector2D([x,y]))
+                drawing.move_to(openglider.rs.vector.Vector2D([x,y]))
 
                 x += direction * drawing.width
                 x += distance
@@ -181,7 +181,7 @@ class Layout:
                     drawing = part
                 else:
                     drawing = cls([part])
-                drawing.move_to(euklid.vector.Vector2D([x, y]))
+                drawing.move_to(openglider.rs.vector.Vector2D([x, y]))
                 all_parts += drawing
                 x += widths[column_no]
                 x += distance_x
@@ -198,14 +198,14 @@ class Layout:
             for col_width in widths[:-1]:
                 x += col_width
                 x += distance_x/2
-                line = euklid.vector.PolyLine2D([[x, 0], [x, height]])
+                line = openglider.rs.vector.PolyLine2D([[x, 0], [x, height]])
                 grid.layers["grid"].append(line)
                 x += distance_x/2
 
             for row_height in heights[:-1]:
                 y += row_height
                 y += distance_y/2
-                line = euklid.vector.PolyLine2D([[0, y], [width, y]])
+                line = openglider.rs.vector.PolyLine2D([[0, y], [width, y]])
                 grid.layers["grid"].append(line)
                 y += distance_y/2
 
@@ -252,7 +252,7 @@ class Layout:
 
         bbox.append(bbox[0])
 
-        data = [euklid.vector.PolyLine2D(bbox)]
+        data = [openglider.rs.vector.PolyLine2D(bbox)]
 
         border_part = PlotPart(drawing_boundary=data)
         if append:
@@ -294,7 +294,7 @@ class Layout:
         next_x = [0.]
         for col in column_lst:
             for part in col:
-                part.move(euklid.vector.Vector2D([last_x - part.min_x, last_y - part.min_y]))
+                part.move(openglider.rs.vector.Vector2D([last_x - part.min_x, last_y - part.min_y]))
                 #area.parts.append(part)
                 last_y = part.max_y + distance_y
                 next_x.append(part.max_x)
@@ -328,9 +328,9 @@ class Layout:
         return max([part.max_y for part in self.parts])
 
     @property
-    def bbox(self) -> list[euklid.vector.Vector2D]:
-        return [euklid.vector.Vector2D([self.min_x, self.min_y]), euklid.vector.Vector2D([self.max_x, self.min_y]),
-                euklid.vector.Vector2D([self.max_x, self.max_y]), euklid.vector.Vector2D([self.min_x, self.max_y])]
+    def bbox(self) -> list[openglider.rs.vector.Vector2D]:
+        return [openglider.rs.vector.Vector2D([self.min_x, self.min_y]), openglider.rs.vector.Vector2D([self.max_x, self.min_y]),
+                openglider.rs.vector.Vector2D([self.max_x, self.max_y]), openglider.rs.vector.Vector2D([self.min_x, self.max_y])]
 
     @property
     def width(self) -> float:
@@ -346,12 +346,12 @@ class Layout:
         except ValueError:
             return 0.
 
-    def move(self, vector: euklid.vector.Vector2D) -> None:
+    def move(self, vector: openglider.rs.vector.Vector2D) -> None:
         for part in self.parts:
             part.move(vector)
 
-    def move_to(self, vector: euklid.vector.Vector2D) -> None:
-        diff = (euklid.vector.Vector2D(self.bbox[0]) - vector) * -1
+    def move_to(self, vector: openglider.rs.vector.Vector2D) -> None:
+        diff = (openglider.rs.vector.Vector2D(self.bbox[0]) - vector) * -1
         self.move(diff)
 
     def append_top(self, other: Layout, distance: float=0.) -> Layout:
@@ -360,7 +360,7 @@ class Layout:
         else:
             y0 = 0.
 
-        other.move_to(euklid.vector.Vector2D([0., y0]))
+        other.move_to(openglider.rs.vector.Vector2D([0., y0]))
         self.parts += other.parts
 
         return self
@@ -368,7 +368,7 @@ class Layout:
     def append_left(self, other: Layout, distance: float=0) -> Layout:
         if other.parts:
             x0 = other.width + distance
-            other.move_to(euklid.vector.Vector2D([-x0, 0.]))
+            other.move_to(openglider.rs.vector.Vector2D([-x0, 0.]))
 
         self.parts += other.parts
 
@@ -397,7 +397,7 @@ class Layout:
 
             for entity in panel:  # type: ignore
                 layer = entity.dxf.layer
-                new_panel.layers[layer].append(euklid.vector.PolyLine2D([p[:2] for p in entity]))  # type: ignore
+                new_panel.layers[layer].append(openglider.rs.vector.PolyLine2D([p[:2] for p in entity]))  # type: ignore
 
         #blocks = list(dxf.blocks)
         blockrefs = dxf.modelspace().query("INSERT")
@@ -415,7 +415,7 @@ class Layout:
                     line = [v.dxf.location[:2] for v in entity]  # type: ignore
                     if entity.dxf.flags % 2:
                         line.append(line[0])
-                    new_panel.layers[layer].append(euklid.vector.PolyLine2D(line))
+                    new_panel.layers[layer].append(openglider.rs.vector.PolyLine2D(line))
                 except:
                     pass
 
@@ -598,7 +598,7 @@ class Layout:
     def export_ntv(self, path: str | os.PathLike) -> None:
         filename = os.path.split(path)[-1]
 
-        def format_line(line: euklid.vector.PolyLine2D) -> str:
+        def format_line(line: openglider.rs.vector.PolyLine2D) -> str:
             a = f"\nA {len(line)} "
             b = " ".join([f"({p[0]:.5f},{p[1]:.5f})" for p in line])
             return a+b

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from openglider.utils.dataclass import dataclass
-import euklid
+import openglider.rs
 
 @dataclass
 class Color:
@@ -68,21 +68,21 @@ def colorwheel(num: int) -> list[Color]:
     return colors  # type: ignore
 
 class HeatMap():
-    _interpolation_red = euklid.vector.Interpolation([
+    _interpolation_red = openglider.rs.vector.Interpolation([
         [0, 0],
         [0.35, 0],
         [0.66, 1],
         [1, 1]
     ])
 
-    _interpolation_blue = euklid.vector.Interpolation([
+    _interpolation_blue = openglider.rs.vector.Interpolation([
         [0, 1],
         [0.34, 1],
         [0.65, 0],
         [1, 0]
     ])
 
-    _interpolation_green = euklid.vector.Interpolation([
+    _interpolation_green = openglider.rs.vector.Interpolation([
         [0, 0],
         [0.125, 0],
         [0.375, 1],

@@ -6,7 +6,7 @@ import re
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Union
 
-import euklid
+import openglider.rs
 
 from openglider.glider.cell.attachment_point import CellAttachmentPoint
 from openglider.glider.cell.cell import Cell
@@ -27,13 +27,13 @@ logger = logging.getLogger(__name__)
 class ATP(dto.DTO[AttachmentPoint]):
     name: str
     rib_pos: Percentage
-    force: float | euklid.vector.Vector3D
+    force: float | openglider.rs.vector.Vector3D
 
     #@validator("force", pre=True)
     #def validate_force(self, force: Any):
     #    pass
 
-    def get(self, force: euklid.vector.Vector3D) -> AttachmentPoint:
+    def get(self, force: openglider.rs.vector.Vector3D) -> AttachmentPoint:
         data = self.__json__()
         data.pop("force")
         return AttachmentPoint(
@@ -44,7 +44,7 @@ class ATP(dto.DTO[AttachmentPoint]):
 class ATP4(ATP):
     type_name: str
 
-    def get(self, force: euklid.vector.Vector3D) -> AttachmentPoint:
+    def get(self, force: openglider.rs.vector.Vector3D) -> AttachmentPoint:
         atp = super().get(force)
         atp.type_name = self.type_name
 
@@ -54,7 +54,7 @@ class ATP4(ATP):
 class ATPPROTO(ATP):
     protoloop_distance: Percentage | Length
     
-    def get(self, force: euklid.vector.Vector3D) -> AttachmentPoint:
+    def get(self, force: openglider.rs.vector.Vector3D) -> AttachmentPoint:
         p = super().get(force)
         p.protoloops = 1
         return p
@@ -69,7 +69,7 @@ class ATPSingleSkin(ATP):
     width: Length
     height: Length
 
-    def get(self, force: euklid.vector.Vector3D) -> SingleSkinAttachmentPoint | AttachmentPoint:
+    def get(self, force: openglider.rs.vector.Vector3D) -> SingleSkinAttachmentPoint | AttachmentPoint:
         if self.width > 0:
             data = self.__json__()
             data.pop("force")
@@ -106,7 +106,7 @@ class AttachmentPointTable(RibTable):
         force = data[2]
 
         if isinstance(force, str):
-            force = euklid.vector.Vector3D(ast.literal_eval(force))
+            force = openglider.rs.vector.Vector3D(ast.literal_eval(force))
         elif rib is not None:
             force = AttachmentPoint.calculate_force_rib_aligned(rib, force)
 
@@ -121,7 +121,7 @@ class AttachmentPointTable(RibTable):
         
         return super().get_element(row, keyword, data)
     
-    def apply_forces(self, forces: Mapping[str, euklid.vector.Vector3D | float]) -> None:
+    def apply_forces(self, forces: Mapping[str, openglider.rs.vector.Vector3D | float]) -> None:
         new_table = Table()
 
         def update_columns(keyword: str, data_length: int, force_position: int) -> None:
@@ -171,7 +171,7 @@ class CellAttachmentPointTable(CellTable):
         force = data[3]
 
         if isinstance(force, str):
-            force = euklid.vector.Vector3D(ast.literal_eval(force))
+            force = openglider.rs.vector.Vector3D(ast.literal_eval(force))
         elif cell is not None:
             force = CellAttachmentPoint.calculate_force_cell_aligned(cell, force)
 

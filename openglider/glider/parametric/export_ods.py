@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
-import euklid
+import openglider.rs
 import ezodf
 
 from openglider.glider.parametric.table.ballooning import BallooningTable
@@ -147,8 +147,8 @@ def get_geom_sheet(glider_2d: ParametricGlider) -> Table:
     table[0, 8] = "profile-merge"
     table[0, 9] = "ballooning-merge"
 
-    def interpolation(curve: CurveType) -> euklid.vector.Interpolation:
-        return euklid.vector.Interpolation(curve.get_sequence(100).nodes)
+    def interpolation(curve: CurveType) -> openglider.rs.vector.Interpolation:
+        return openglider.rs.vector.Interpolation(curve.get_sequence(100).nodes)
 
     aoa_int = interpolation(glider_2d.aoa)
     profile_int = interpolation(glider_2d.profile_merge_curve)

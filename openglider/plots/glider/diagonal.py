@@ -1,7 +1,7 @@
 import logging
 import math
 
-import euklid
+import openglider.rs
 from openglider.glider.cell import DiagonalRib
 from openglider.glider.cell.cell import Cell
 from openglider.plots.config import PatternConfig
@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 class DribPlot:
     DefaultConf = PatternConfig
-    front: euklid.vector.PolyLine2D | None = None
-    back: euklid.vector.PolyLine2D | None = None
+    front: openglider.rs.vector.PolyLine2D | None = None
+    back: openglider.rs.vector.PolyLine2D | None = None
 
     def __init__(self, drib: DiagonalRib, cell: Cell, config: Config):
         # We are unwrapping the left side of the wing (flying direction).
@@ -44,7 +44,7 @@ class DribPlot:
 
         if not self.drib.is_lower:
             self.angle += math.pi
-        rotation_center = euklid.vector.Vector2D([0,0])
+        rotation_center = openglider.rs.vector.Vector2D([0,0])
         self.inner_1 = inner.rotate(-self.angle, rotation_center)
         self.inner_2 = outer.rotate(-self.angle, rotation_center)
 
@@ -53,15 +53,15 @@ class DribPlot:
         
         self.front = self.back = None
         if front is not None:
-            self.front = euklid.vector.PolyLine2D(front).rotate(-self.angle, rotation_center)
+            self.front = openglider.rs.vector.PolyLine2D(front).rotate(-self.angle, rotation_center)
         if back is not None:
-            self.back = euklid.vector.PolyLine2D(back).rotate(-self.angle, rotation_center)
+            self.back = openglider.rs.vector.PolyLine2D(back).rotate(-self.angle, rotation_center)
 
 
-    def get_left(self, x: float) -> tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]:
+    def get_left(self, x: float) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:
         return self.get_p1_p2(x, outer=False)
 
-    def get_right(self, x: float) -> tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]:
+    def get_right(self, x: float) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:
         return self.get_p1_p2(x, outer=True)
 
     def validate(self, x: float, right_side: bool=False) -> bool:
@@ -83,7 +83,7 @@ class DribPlot:
 
         return True
 
-    def get_p1_p2(self, x: float, outer: bool=False) -> tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]:
+    def get_p1_p2(self, x: float, outer: bool=False) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:
         self.validate(x, right_side=outer)
 
         if not outer:
@@ -123,7 +123,7 @@ class DribPlot:
         return inner_line.get(ik_new), outer_line.get(ik_new)
     
     def _insert_center_marks(self, plotpart: PlotPart) -> None:
-        def insert_center_mark(inner: euklid.vector.PolyLine2D, outer: euklid.vector.PolyLine2D) -> None:
+        def insert_center_mark(inner: openglider.rs.vector.PolyLine2D, outer: openglider.rs.vector.PolyLine2D) -> None:
             ik = inner.walk(0, inner.get_length()/2)
             p1 = inner.get(ik)
             p2 = outer.get(ik)
@@ -155,7 +155,7 @@ class DribPlot:
                     continue
 
     def _insert_attachment_points(self, plotpart: PlotPart) -> None:
-        def _add_mark(name: str, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D, mirror: bool) -> None:
+        def _add_mark(name: str, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D, mirror: bool) -> None:
             for layer_name, marks in self.config.marks_attachment_point(p1, p2).items():
                 plotpart.layers[layer_name] += marks
             left = p1 + (p1-p2)
@@ -180,9 +180,9 @@ class DribPlot:
 
     def _insert_text(self, plotpart: PlotPart) -> None:
         if self.drib.is_lower:
-            front = self.front or euklid.vector.PolyLine2D([self.inner_1.nodes[0], self.inner_2.nodes[0]])
+            front = self.front or openglider.rs.vector.PolyLine2D([self.inner_1.nodes[0], self.inner_2.nodes[0]])
         else:
-            front = self.back or euklid.vector.PolyLine2D([self.inner_1.nodes[-1], self.inner_2.nodes[-1]])
+            front = self.back or openglider.rs.vector.PolyLine2D([self.inner_1.nodes[-1], self.inner_2.nodes[-1]])
             front = front.reverse()
         
         font_size = Length("6mm")
@@ -225,11 +225,11 @@ class DribPlot:
                                         cut_front_result.outline.reverse()
             ]
 
-            plotpart.layers["marks"].append(euklid.vector.PolyLine2D([self.inner_1.get(0), self.inner_2.get(0)]))
-            plotpart.layers["marks"].append(euklid.vector.PolyLine2D([self.inner_1.get(len(self.inner_1) - 1), self.inner_2.get(len(self.inner_2) - 1)]))
+            plotpart.layers["marks"].append(openglider.rs.vector.PolyLine2D([self.inner_1.get(0), self.inner_2.get(0)]))
+            plotpart.layers["marks"].append(openglider.rs.vector.PolyLine2D([self.inner_1.get(len(self.inner_1) - 1), self.inner_2.get(len(self.inner_2) - 1)]))
 
         else:
-            outer: list[euklid.vector.Vector2D] = self.outer_1.copy().nodes
+            outer: list[openglider.rs.vector.Vector2D] = self.outer_1.copy().nodes
             outer.append(self.inner_1.nodes[-1])
 
             if self.back:
@@ -246,11 +246,11 @@ class DribPlot:
                 self.inner_1.nodes[0],
                 self.outer_1.nodes[0]
             ]
-            #outer += euklid.vector.PolyLine2D([self.left_out.get(p1)])
-            plotpart.layers["cuts"].append(euklid.vector.PolyLine2D(outer))
+            #outer += openglider.rs.vector.PolyLine2D([self.left_out.get(p1)])
+            plotpart.layers["cuts"].append(openglider.rs.vector.PolyLine2D(outer))
 
         for curve in self.drib.get_holes(self.cell)[0]:
-            curve = curve.rotate(-self.angle, euklid.vector.Vector2D([0,0]))
+            curve = curve.rotate(-self.angle, openglider.rs.vector.Vector2D([0,0]))
             plotpart.layers["cuts"].append(curve)
 
         plotpart.layers["stitches"] += [self.inner_1, self.inner_2]
@@ -260,8 +260,8 @@ class DribPlot:
         self._insert_controlpoints(plotpart)
 
         # mirror -> watch from above
-        #p1 = euklid.vector.Vector2D([0, 0])
-        #p2 = euklid.vector.Vector2D([1, 0])
+        #p1 = openglider.rs.vector.Vector2D([0, 0])
+        #p2 = openglider.rs.vector.Vector2D([1, 0])
         #plotpart = plotpart.mirror(p1, p2)
         self._insert_text(plotpart)
         

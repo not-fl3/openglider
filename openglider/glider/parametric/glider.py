@@ -7,7 +7,7 @@ import random
 from typing import TYPE_CHECKING, Self
 from collections.abc import Callable
 
-import euklid
+import openglider.rs
 from openglider.glider.parametric.config import ParametricGliderConfig, SewingAllowanceConfig
 from openglider.glider.parametric.table.base.parser import Parser
 from openglider.glider.parametric.table.cell.ballooning import BallooningData
@@ -109,10 +109,10 @@ class ParametricGlider:
             foil.set_thickness(foil.thickness * get_factor(0.1))
 
         def randomize_nodes(
-                curve: euklid.vector.PolyLine2D, 
+                curve: openglider.rs.vector.PolyLine2D, 
                 factor: float,
                 change_first: tuple[bool, bool]=(False, True),
-                change_last: tuple[bool, bool]=(False, True)) -> euklid.vector.PolyLine2D:
+                change_last: tuple[bool, bool]=(False, True)) -> openglider.rs.vector.PolyLine2D:
             assert len(curve) > 0
             new_curve = curve.nodes[:]
 
@@ -130,7 +130,7 @@ class ParametricGlider:
             if change_last[1]:
                 new_curve[-1][1] *= get_factor(factor) # change x[0] for 2%
 
-            return euklid.vector.PolyLine2D(new_curve)
+            return openglider.rs.vector.PolyLine2D(new_curve)
             
 
         # change arc
@@ -280,7 +280,7 @@ class ParametricGlider:
                 strap.name = "c{}{}{}".format(cell_no+1, "s", strap_no)
 
     def get_aoa(self, interpolation_num: int | None=None) -> list[float]:
-        aoa_interpolation = euklid.vector.Interpolation(self.aoa.get_sequence(interpolation_num or self.num_interpolate).nodes)
+        aoa_interpolation = openglider.rs.vector.Interpolation(self.aoa.get_sequence(interpolation_num or self.num_interpolate).nodes)
 
         return [aoa_interpolation.get_value(abs(x)) for x in self.shape.rib_x_values]
 
@@ -294,11 +294,11 @@ class ParametricGlider:
                 rib.set_aoa_relative(aoa)
 
     def get_profile_merge_values(self) -> list[float]:
-        profile_merge_curve = euklid.vector.Interpolation(self.profile_merge_curve.get_sequence(self.num_interpolate).nodes)
+        profile_merge_curve = openglider.rs.vector.Interpolation(self.profile_merge_curve.get_sequence(self.num_interpolate).nodes)
         return [profile_merge_curve.get_value(abs(x)) for x in self.shape.rib_x_values]
 
     def get_ballooning_data(self) -> list[BallooningData]:
-        ballooning_merge_curve = euklid.vector.Interpolation(self.ballooning_merge_curve.get_sequence(self.num_interpolate).nodes)
+        ballooning_merge_curve = openglider.rs.vector.Interpolation(self.ballooning_merge_curve.get_sequence(self.num_interpolate).nodes)
         merge_factors = [ballooning_merge_curve.get_value(abs(x)) for x in self.shape.cell_x_values]
 
         result = []
@@ -323,7 +323,7 @@ class ParametricGlider:
         for rib_no, x in enumerate(x_values):
             front, back = shape_ribs[rib_no]
             arc = arc_pos[rib_no]
-            startpoint = euklid.vector.Vector3D([-front[1] + offset_x, arc[0], arc[1]])
+            startpoint = openglider.rs.vector.Vector3D([-front[1] + offset_x, arc[0], arc[1]])
             rib = glider.ribs[rib_no]
 
             rib.pos = startpoint
@@ -374,7 +374,7 @@ class ParametricGlider:
             x_values = x_values[1:]
             rib_chords = rib_chords[1:]
 
-        profile_merge_curve = euklid.vector.Interpolation(self.profile_merge_curve.get_sequence(self.num_interpolate).nodes)
+        profile_merge_curve = openglider.rs.vector.Interpolation(self.profile_merge_curve.get_sequence(self.num_interpolate).nodes)
         
         result: list[pyfoil.Airfoil] = []
 
@@ -457,7 +457,7 @@ class ParametricGlider:
             arc = arc_pos[rib_no]
             profile = profiles[rib_no]
 
-            startpoint = euklid.vector.Vector3D([-front[1] + offset_x, arc[0], arc[1]])
+            startpoint = openglider.rs.vector.Vector3D([-front[1] + offset_x, arc[0], arc[1]])
 
             try:
                 material = self.tables.material_ribs.get(rib_no)[0]
@@ -594,10 +594,10 @@ class ParametricGlider:
         return balloonings
 
     @property
-    def v_inf(self) -> euklid.vector.Vector3D:
+    def v_inf(self) -> openglider.rs.vector.Vector3D:
         angle = math.atan(1/self.glide)
 
-        return euklid.vector.Vector3D([math.cos(angle), 0, math.sin(angle)]) * self.speed
+        return openglider.rs.vector.Vector3D([math.cos(angle), 0, math.sin(angle)]) * self.speed
 
     def set_area(self, area: float) -> None:
         factor = math.sqrt(area/self.shape.area)
@@ -625,7 +625,7 @@ class ParametricGlider:
         def rescale(curve: CurveType) -> None:
             span_orig = curve.controlpoints.nodes[-1][0]
             factor = span/span_orig
-            curve.controlpoints = curve.controlpoints.scale(euklid.vector.Vector2D([factor, 1.]))
+            curve.controlpoints = curve.controlpoints.scale(openglider.rs.vector.Vector2D([factor, 1.]))
 
         rescale(self.ballooning_merge_curve)
         rescale(self.profile_merge_curve)

@@ -1,6 +1,6 @@
 from typing import Any, ClassVar
 
-import euklid
+import openglider.rs
 import enum
 
 from openglider.glider.shape import Shape
@@ -10,7 +10,7 @@ from openglider.vector.unit import Angle, Length, Percentage, Quantity
 
 class CurveBase(BaseModel):
     unit: str | None = None
-    interpolation: euklid.vector.Interpolation
+    interpolation: openglider.rs.vector.Interpolation
     shape: Shape
 
     def to_unit(self, value: float) -> Quantity | float:
@@ -27,43 +27,43 @@ class CurveBase(BaseModel):
         raise ValueError()
 
 class FreeCurve(CurveBase):
-    def __init__(self, points: list[euklid.vector.Vector2D], shape: Shape):
+    def __init__(self, points: list[openglider.rs.vector.Vector2D], shape: Shape):
         super().__init__(
             shape = shape,
-            interpolation = euklid.vector.Interpolation(points)
+            interpolation = openglider.rs.vector.Interpolation(points)
         )
     
     @property
-    def controlpoints(self) -> list[euklid.vector.Vector2D]:
+    def controlpoints(self) -> list[openglider.rs.vector.Vector2D]:
         return self.interpolation.nodes
     
     @controlpoints.setter
-    def controlpoints(self, points: list[euklid.vector.Vector2D]) -> None:
-        self.interpolation = euklid.vector.Interpolation(points)
+    def controlpoints(self, points: list[openglider.rs.vector.Vector2D]) -> None:
+        self.interpolation = openglider.rs.vector.Interpolation(points)
 
     @property
-    def controlpoints_2d(self) -> list[euklid.vector.Vector2D]:
+    def controlpoints_2d(self) -> list[openglider.rs.vector.Vector2D]:
         return self.to_2d(self.controlpoints)
     
-    def set_controlpoints_2d(self, points: list[euklid.vector.Vector2D]) -> None:
+    def set_controlpoints_2d(self, points: list[openglider.rs.vector.Vector2D]) -> None:
         controlpoints = self.to_controlpoints(points)
         self.controlpoints = controlpoints
     
-    def to_2d(self, points: list[euklid.vector.Vector2D]) -> list[euklid.vector.Vector2D]:
-        nodes: list[euklid.vector.Vector2D] = []
+    def to_2d(self, points: list[openglider.rs.vector.Vector2D]) -> list[openglider.rs.vector.Vector2D]:
+        nodes: list[openglider.rs.vector.Vector2D] = []
         for p in points:
             x_shape = p[0]
             y = p[1]
 
             x = self.shape.get_point(x_shape, 0)[0]
 
-            nodes.append(euklid.vector.Vector2D([x,y]))
+            nodes.append(openglider.rs.vector.Vector2D([x,y]))
         
         return nodes
 
     
-    def to_controlpoints(self, points: list[euklid.vector.Vector2D]) -> list[euklid.vector.Vector2D]:
-        controlpoints: list[euklid.vector.Vector2D] = []
+    def to_controlpoints(self, points: list[openglider.rs.vector.Vector2D]) -> list[openglider.rs.vector.Vector2D]:
+        controlpoints: list[openglider.rs.vector.Vector2D] = []
 
         x_values = [p[0] for p in self.shape.front]
 
@@ -81,12 +81,12 @@ class FreeCurve(CurveBase):
             if index == 0 and self.shape.has_center_cell:
                 index = 1
             
-            controlpoints.append(euklid.vector.Vector2D([index, point[1]]))
+            controlpoints.append(openglider.rs.vector.Vector2D([index, point[1]]))
         
         return controlpoints
     
     @property
-    def points_2d(self) -> list[euklid.vector.Vector2D]:
+    def points_2d(self) -> list[openglider.rs.vector.Vector2D]:
         return self.to_2d(self.interpolation.nodes)
     
     def get(self, rib_no: int) -> float | Quantity:
@@ -96,7 +96,7 @@ class FreeCurve(CurveBase):
         value = self.interpolation.get_value(rib_no)
         return self.to_unit(value)
 
-    def draw(self) -> euklid.vector.PolyLine2D:
+    def draw(self) -> openglider.rs.vector.PolyLine2D:
         x_values = [p[0] for p in self.controlpoints]
 
         start = min(x_values)
@@ -112,35 +112,35 @@ class FreeCurve(CurveBase):
         if end % 1:
             x_values_lst.append(end)
         
-        return euklid.vector.PolyLine2D(self.to_2d([euklid.vector.Vector2D([x, self.interpolation.get_value(x)]) for x in x_values_lst]))
+        return openglider.rs.vector.PolyLine2D(self.to_2d([openglider.rs.vector.Vector2D([x, self.interpolation.get_value(x)]) for x in x_values_lst]))
 
 
 class Curve(CurveBase):
-    def __init__(self, points: list[euklid.vector.Vector2D], shape: Shape):
+    def __init__(self, points: list[openglider.rs.vector.Vector2D], shape: Shape):
         super().__init__(
-            interpolation = euklid.vector.Interpolation(points),
+            interpolation = openglider.rs.vector.Interpolation(points),
             shape=shape
         )
 
     @property
-    def controlpoints(self) -> list[euklid.vector.Vector2D]:
+    def controlpoints(self) -> list[openglider.rs.vector.Vector2D]:
         return self.interpolation.nodes
     
     @controlpoints.setter
-    def controlpoints(self, points: list[euklid.vector.Vector2D]) -> None:
-        self.interpolation = euklid.vector.Interpolation(points)
+    def controlpoints(self, points: list[openglider.rs.vector.Vector2D]) -> None:
+        self.interpolation = openglider.rs.vector.Interpolation(points)
 
     @property
-    def controlpoints_2d(self) -> list[euklid.vector.Vector2D]:
+    def controlpoints_2d(self) -> list[openglider.rs.vector.Vector2D]:
         return [
-            euklid.vector.Vector2D(self.shape.get_point(*p)) for p in self.controlpoints
+            openglider.rs.vector.Vector2D(self.shape.get_point(*p)) for p in self.controlpoints
         ]
     
-    def set_controlpoints_2d(self, points: list[euklid.vector.Vector2D]) -> None:
+    def set_controlpoints_2d(self, points: list[openglider.rs.vector.Vector2D]) -> None:
         controlpoints = self.to_controlpoints(points)
         self.controlpoints = controlpoints
     
-    def to_controlpoints(self, points: list[euklid.vector.Vector2D]) -> list[euklid.vector.Vector2D]:
+    def to_controlpoints(self, points: list[openglider.rs.vector.Vector2D]) -> list[openglider.rs.vector.Vector2D]:
         controlpoints = []
 
         x_values = [p[0] for p in self.shape.front]
@@ -168,13 +168,13 @@ class Curve(CurveBase):
             y = max(0, y)
             y = min(1, y)
             
-            controlpoints.append(euklid.vector.Vector2D([index, y]))
+            controlpoints.append(openglider.rs.vector.Vector2D([index, y]))
         
         return controlpoints
     
     @cached_property('shape', 'interpolation')
-    def points_2d(self) -> euklid.vector.PolyLine2D:
-        return euklid.vector.PolyLine2D([
+    def points_2d(self) -> openglider.rs.vector.PolyLine2D:
+        return openglider.rs.vector.PolyLine2D([
             self.shape.get_point(*p) for p in self.interpolation.nodes
         ])
     
@@ -186,7 +186,7 @@ class Curve(CurveBase):
 
         return self.to_unit(y)
         
-    def draw(self) -> euklid.vector.PolyLine2D:
+    def draw(self) -> openglider.rs.vector.PolyLine2D:
         x_values = [p[0] for p in self.controlpoints]
 
         start = int(min(x_values))
@@ -217,9 +217,9 @@ class Curve(CurveBase):
         points = [self.shape.get_point(x, y) for x, y in zip(x_values_lst, percentage_lst)]
 
         if start == 1 and self.shape.has_center_cell:
-            points.insert(0, points[0] * euklid.vector.Vector2D([-1,1]))
+            points.insert(0, points[0] * openglider.rs.vector.Vector2D([-1,1]))
         
-        return euklid.vector.PolyLine2D(points)
+        return openglider.rs.vector.PolyLine2D(points)
 
 
 
@@ -239,12 +239,12 @@ class ShapeCurve(Curve):
 
 
 class ShapeBSplineCurve(ShapeCurve):
-    curve_cls: ClassVar[type] = euklid.spline.BSplineCurve
+    curve_cls: ClassVar[type] = openglider.rs.spline.BSplineCurve
     
     @cached_property('shape', 'interpolation')
-    def points_2d(self) -> euklid.vector.PolyLine2D:
-        return euklid.spline.BSplineCurve([
-            euklid.vector.Vector2D(self.shape.get_point(*p)) for p in self.controlpoints
+    def points_2d(self) -> openglider.rs.vector.PolyLine2D:
+        return openglider.rs.spline.BSplineCurve([
+            openglider.rs.vector.Vector2D(self.shape.get_point(*p)) for p in self.controlpoints
         ]).get_sequence(100)
 
 

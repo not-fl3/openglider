@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-import euklid
+import openglider.rs
 import logging
 import pyfoil
 
@@ -27,7 +27,7 @@ class MiniRib:
     seam_allowance: Length = Length("6mm")
     trailing_edge_cut: Length = Length("20mm")
     mrib_num: int = 0
-    function: euklid.vector.Interpolation = Field(default_factory=lambda: euklid.vector.Interpolation([]))
+    function: openglider.rs.vector.Interpolation = Field(default_factory=lambda: openglider.rs.vector.Interpolation([]))
     hole_num: int = 0
     hole_border_side : Length | Percentage = Length("2cm")
     hole_border_panel: Length | Percentage = Length("2cm")
@@ -56,8 +56,8 @@ class MiniRib:
             else:
                 points = points + [[1., 0.]]
 
-            curve = euklid.spline.BSplineCurve(points).get_sequence(100)
-            self.function = euklid.vector.Interpolation(curve.nodes)
+            curve = openglider.rs.spline.BSplineCurve(points).get_sequence(100)
+            self.function = openglider.rs.vector.Interpolation(curve.nodes)
 
     def get_multiplier(self, x: float) -> float:
         within_back_cut = self.back_cut is None or abs(x) <= self.back_cut
@@ -88,7 +88,7 @@ class MiniRib:
             
             return pyfoil.Airfoil(envelope)
         
-    def get_flattened(self, cell:Cell) -> euklid.vector.PolyLine2D:
+    def get_flattened(self, cell:Cell) -> openglider.rs.vector.PolyLine2D:
         profile_3d = self.get_profile_3d(cell)
         return profile_3d.flatten().curve
    
@@ -122,7 +122,7 @@ class MiniRib:
 
         return line.get(ik_front_top, ik_back_top).get_length(), line.get(ik_front_bot, ik_back_bot).get_length()
 
-    def get_nodes(self, cell: Cell) -> tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]:
+    def get_nodes(self, cell: Cell) -> tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]:
         profile_3d = self.get_profile_3d(cell)
         profile_2d = profile_3d.flatten()
         contour = profile_2d.curve
@@ -144,26 +144,26 @@ class MiniRib:
             hole.name = self.hole_naming_scheme.format(hole_no, rib=self)
 
 
-    def get_hull(self, cell: Cell) -> euklid.vector.PolyLine2D:
+    def get_hull(self, cell: Cell) -> openglider.rs.vector.PolyLine2D:
         """returns the outer contour of the normalized mesh in form
            of a Polyline"""
         
         nodes_top, nodes_bottom = self.get_nodes(cell)
 
-        return euklid.vector.PolyLine2D(nodes_top.nodes+nodes_bottom.nodes)
+        return openglider.rs.vector.PolyLine2D(nodes_top.nodes+nodes_bottom.nodes)
 
-    def align_all(self, cell: Cell, data: euklid.vector.PolyLine2D) -> euklid.vector.PolyLine3D:
+    def align_all(self, cell: Cell, data: openglider.rs.vector.PolyLine2D) -> openglider.rs.vector.PolyLine3D:
         """align 2d coordinates to the 3d pos of the minirib"""
-        projection_plane: euklid.plane.Plane = self.get_profile_3d(cell).projection_layer
+        projection_plane: openglider.rs.plane.Plane = self.get_profile_3d(cell).projection_layer
 
-        nodes_3d: list[euklid.vector.Vector3D] = []
+        nodes_3d: list[openglider.rs.vector.Vector3D] = []
         
         for p in data:
             nodes_3d.append(
                 projection_plane.p0 + projection_plane.x_vector * p[0] + projection_plane.y_vector * p[1]
             )
         
-        return euklid.vector.PolyLine3D(nodes_3d)
+        return openglider.rs.vector.PolyLine3D(nodes_3d)
 
 
     def get_mesh(self, cell:Cell, filled: bool=True, max_area: float=None, hole_res: int = 40) -> Mesh:
@@ -185,7 +185,7 @@ class MiniRib:
             for lst in boundary:
                 segments += triangulate.Triangulation.get_segments(lst)
             return Mesh.from_indexed(
-                self.align_all(cell, euklid.vector.PolyLine2D(vertices)).nodes,
+                self.align_all(cell, openglider.rs.vector.PolyLine2D(vertices)).nodes,
                 {'minirib': [(segment, {}) for segment in segments]},
                 {}
             )
@@ -197,7 +197,7 @@ class MiniRib:
             tri.name = self.name
             mesh = tri.triangulate()
 
-            points = self.align_all(cell, euklid.vector.PolyLine2D(mesh.points))
+            points = self.align_all(cell, openglider.rs.vector.PolyLine2D(mesh.points))
             boundaries = {self.name: list(range(len(points)))}
 
 
@@ -207,7 +207,7 @@ class MiniRib:
         return minirib_mesh
     
 
-    def get_holes(self, cell: Cell, num_points: int=140) -> tuple[list[euklid.vector.PolyLine2D], list[euklid.vector.Vector2D]]:
+    def get_holes(self, cell: Cell, num_points: int=140) -> tuple[list[openglider.rs.vector.PolyLine2D], list[openglider.rs.vector.Vector2D]]:
         if self.hole_num < 1:
             return [], []
         nodes_top, nodes_bottom = self.get_nodes(cell)
@@ -235,10 +235,10 @@ class MiniRib:
 
             return Percentage(length.si/len_top)
         
-        def get_top(x: float) -> euklid.vector.Vector2D:
+        def get_top(x: float) -> openglider.rs.vector.Vector2D:
             return top_curve.get(top_curve.walk(0, len_top*x))
         
-        def get_bottom(x: float) -> euklid.vector.Vector2D:
+        def get_bottom(x: float) -> openglider.rs.vector.Vector2D:
             return bottom_curve.get(bottom_curve.walk(0, len_bot*x))
 
         holes = []

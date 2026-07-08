@@ -1,6 +1,6 @@
 import datetime
 import logging
-import euklid
+import openglider.rs
 import string
 import subprocess
 from typing import Any, Iterable
@@ -79,8 +79,8 @@ class PatternsNew:
         drawings_width = max([dwg.width for dwg in drawings])
 
         # put name and date inside the patterns
-        p1 = euklid.vector.Vector2D([0., 0.])
-        p2 = euklid.vector.Vector2D([drawings_width, 0.])
+        p1 = openglider.rs.vector.Vector2D([0., 0.])
+        p2 = openglider.rs.vector.Vector2D([drawings_width, 0.])
         text_name = Text(self.project.name or "unnamed", p1, p2, valign=1)
         date_str = datetime.datetime.now().strftime("%d.%m.%Y")
         text_date = Text(date_str, p1, p2, valign=0)

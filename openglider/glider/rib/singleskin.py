@@ -4,7 +4,7 @@ import logging
 import math
 import typing
 
-import euklid
+import openglider.rs
 import numpy as np
 import pyfoil
 
@@ -93,7 +93,7 @@ class SingleSkinRib(Rib):
 
             airfoil = self.profile_2d
             height = 2 * (self.single_skin_parameters.height.si - 0.5)
-            height_curve = euklid.vector.PolyLine2D([
+            height_curve = openglider.rs.vector.PolyLine2D([
                 airfoil.profilepoint(p[0], height)
                 for p in airfoil.curve.nodes[airfoil.noseindex:]
             ])
@@ -106,15 +106,15 @@ class SingleSkinRib(Rib):
                     ik_start = airfoil.get_ik(p1.rib_pos)
                     ik_end = airfoil.get_ik(p2.rib_pos)
 
-                    y_vector = euklid.vector.Vector2D([0,1])
+                    y_vector = openglider.rs.vector.Vector2D([0,1])
 
-                    p1_bottom = airfoil.get(p1.rib_pos) + euklid.vector.Vector2D([p1.width/2/self.chord, 0])
-                    p1_diff = euklid.vector.Rotation2D(-p1.angle_back.si).apply(y_vector/self.chord)
+                    p1_bottom = airfoil.get(p1.rib_pos) + openglider.rs.vector.Vector2D([p1.width/2/self.chord, 0])
+                    p1_diff = openglider.rs.vector.Rotation2D(-p1.angle_back.si).apply(y_vector/self.chord)
                     p1_diff *= p1.height.si / p1_diff.dot(y_vector)
                     p1_top = p1_bottom + p1_diff
 
-                    p2_bottom = airfoil.get(p2.rib_pos) + euklid.vector.Vector2D([-p2.width/2/self.chord, 0])
-                    p2_diff = euklid.vector.Rotation2D(p2.angle_front.si).apply(y_vector/self.chord)
+                    p2_bottom = airfoil.get(p2.rib_pos) + openglider.rs.vector.Vector2D([-p2.width/2/self.chord, 0])
+                    p2_diff = openglider.rs.vector.Rotation2D(p2.angle_front.si).apply(y_vector/self.chord)
                     p2_diff *= p2.height.si / p2_diff.dot(y_vector)
                     p2_top = p2_bottom + p2_diff
 
@@ -123,7 +123,7 @@ class SingleSkinRib(Rib):
                     spline_p1 = height_curve.get(spline_p1_ik)
                     spline_p2 = height_curve.get(spline_p2_ik)
 
-                    spline_curve = euklid.spline.BSplineCurve([
+                    spline_curve = openglider.rs.spline.BSplineCurve([
                         p1_top, spline_p1, spline_p2, p2_top
                     ]).get_sequence(self.single_skin_parameters.num_points).nodes
 
@@ -142,7 +142,7 @@ class SingleSkinRib(Rib):
                 airfoil = pyfoil.Airfoil(
                     airfoil.curve.get(0, ik_last).nodes +
                     [
-                        airfoil.curve.get(ik_last) + euklid.vector.Vector2D([last_point.width/2/self.chord, 0]),
+                        airfoil.curve.get(ik_last) + openglider.rs.vector.Vector2D([last_point.width/2/self.chord, 0]),
                         airfoil.curve.get(0)
                     ]
                 )
@@ -215,9 +215,9 @@ class SingleSkinRib(Rib):
                 height = (profile.profilepoint(-x_mid) - profile.profilepoint(x_mid)).length()
                 height *= self.single_skin_parameters.height.si # anything bewtween 0..1
                 
-                y_vec = euklid.vector.Rotation2D(math.pi/2).apply(x_end - x_start).normalized() * height
+                y_vec = openglider.rs.vector.Rotation2D(math.pi/2).apply(x_end - x_start).normalized() * height
 
-                def convert_point(x: euklid.vector.Vector2D, upper: bool) -> euklid.vector.Vector2D:
+                def convert_point(x: openglider.rs.vector.Vector2D, upper: bool) -> openglider.rs.vector.Vector2D:
                     if upper or x[0] < x_start[0] or x[0] > x_end[0]:
                         return x
                     else:
@@ -239,12 +239,12 @@ class SingleSkinRib(Rib):
         return profile
 
     @staticmethod
-    def straight_line(x: euklid.vector.Vector2D, x0: euklid.vector.Vector2D, x1: euklid.vector.Vector2D) -> euklid.vector.Vector2D:
+    def straight_line(x: openglider.rs.vector.Vector2D, x0: openglider.rs.vector.Vector2D, x1: openglider.rs.vector.Vector2D) -> openglider.rs.vector.Vector2D:
         x_proj = (x - x0).dot(x1 - x0) / (x1 - x0).length()**2
         return x0 + (x1 - x0) * x_proj
 
     @staticmethod
-    def parabola(x: euklid.vector.Vector2D, p_start: euklid.vector.Vector2D, p_end: euklid.vector.Vector2D, y_vector: euklid.vector.Vector2D) -> euklid.vector.Vector2D:
+    def parabola(x: openglider.rs.vector.Vector2D, p_start: openglider.rs.vector.Vector2D, p_end: openglider.rs.vector.Vector2D, y_vector: openglider.rs.vector.Vector2D) -> openglider.rs.vector.Vector2D:
         diff = p_end - p_start
         x_proj = (x - p_start).dot(diff) / diff.dot(diff)  # [0,1]
 

@@ -5,7 +5,7 @@ from openglider.glider.ballooning.base import BallooningBase
 from openglider.glider.project import GliderProject
 
 from openglider.gui.qt import QtWidgets, QtGui, QtCore
-import euklid
+import openglider.rs
 
 from openglider.glider.ballooning import BallooningBezierNeu, Ballooning
 from openglider.gui.views_2d import Canvas, DraggableLine
@@ -103,7 +103,7 @@ class BallooningInput(Canvas):
             curve.data["pos"][node_index][0] = -1.
             curve.data["pos"][-1][1] = curve.data["pos"][node_index][1]
 
-        self.ballooning.controlpoints = euklid.vector.PolyLine2D(self.ballooning_curve.controlpoints)
+        self.ballooning.controlpoints = openglider.rs.vector.PolyLine2D(self.ballooning_curve.controlpoints)
 
         self.update()
 

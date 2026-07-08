@@ -2,15 +2,15 @@ import unittest
 import random
 
 from openglider.glider import ballooning
-import euklid
+import openglider.rs
 
 class TestBallooningBezier(unittest.TestCase):
     @classmethod
     def get_ballooning(cls) -> ballooning.BallooningBezier:
         num = random.randint(10, 30)
         x_values = [i/(num-1) for i in range(num)]
-        upper = [euklid.vector.Vector2D([x, random.random()*0.1]) for x in x_values]
-        lower = [euklid.vector.Vector2D([x, random.random()*0.1]) for x in x_values]
+        upper = [openglider.rs.vector.Vector2D([x, random.random()*0.1]) for x in x_values]
+        lower = [openglider.rs.vector.Vector2D([x, random.random()*0.1]) for x in x_values]
         return ballooning.BallooningBezier(upper, lower)
 
     def setUp(self) -> None:

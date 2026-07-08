@@ -2,10 +2,10 @@ from __future__ import annotations
 from typing_extensions import Self
 
 import numpy
-import euklid
+import openglider.rs
 import math
 
-V2 = euklid.vector.Vector2D
+V2 = openglider.rs.vector.Vector2D
 
 class CirclePart:
     r"""
@@ -27,7 +27,7 @@ class CirclePart:
         l1 = p2 - p1
         l2 = p3 - p2
 
-        rotation = euklid.vector.Rotation2D(-math.pi/2)
+        rotation = openglider.rs.vector.Rotation2D(-math.pi/2)
 
         n1 = rotation.apply(l1)
         n2 = rotation.apply(l2)
@@ -35,28 +35,28 @@ class CirclePart:
         p12 = (p1 + p2)/2
         p23 = (p2 + p3)/2
 
-        cut_result: euklid.vector.CutResult = euklid.vector.cut(p12, p12+n1, p23, p23+n2)
+        cut_result: openglider.rs.vector.CutResult = openglider.rs.vector.cut(p12, p12+n1, p23, p23+n2)
 
         self.center = cut_result.point
-        self.r: euklid.vector.Vector2D = p1 - self.center
+        self.r: openglider.rs.vector.Vector2D = p1 - self.center
     
     @classmethod
-    def with_height(cls, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D, height: float) -> Self:
+    def with_height(cls, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D, height: float) -> Self:
         diff = (p2 - p1) / 2
-        diff_rot = euklid.vector.Rotation2D(-math.pi/2).apply(diff)
+        diff_rot = openglider.rs.vector.Rotation2D(-math.pi/2).apply(diff)
         p3 = p1 + diff * 0.5 + diff_rot * height
 
         return cls(p1, p3, p2)
     
-    def get_sequence(self, num: int=20) -> euklid.vector.PolyLine2D:
+    def get_sequence(self, num: int=20) -> openglider.rs.vector.PolyLine2D:
         lst = []
 
         end = self.r.angle() - (self.p3-self.center).angle()
         
         for angle in numpy.linspace(0, end, num):
-            lst.append(self.center + euklid.vector.Rotation2D(-angle).apply(self.r))
+            lst.append(self.center + openglider.rs.vector.Rotation2D(-angle).apply(self.r))
 
-        return euklid.vector.PolyLine2D(lst)
+        return openglider.rs.vector.PolyLine2D(lst)
 
     def _repr_svg_(self) -> str:
 
@@ -82,16 +82,16 @@ class Ellipse:
         self.height = height
         self.rotation = rotation
 
-    def get_sequence(self, num: int=20) -> euklid.vector.PolyLine2D:
+    def get_sequence(self, num: int=20) -> openglider.rs.vector.PolyLine2D:
         points = []
 
         for i in range(num):
             angle = math.pi * 2 * (i/(num-1))
-            diff = euklid.vector.Vector2D([math.cos(angle), self.height*math.sin(angle)]) * self.radius
+            diff = openglider.rs.vector.Vector2D([math.cos(angle), self.height*math.sin(angle)]) * self.radius
             
             points.append(self.center + diff)
 
-        line = euklid.vector.PolyLine2D(points)
+        line = openglider.rs.vector.PolyLine2D(points)
 
         return line.rotate(self.rotation, self.center)
 

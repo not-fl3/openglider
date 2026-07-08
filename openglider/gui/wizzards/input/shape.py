@@ -5,7 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Literal
 from collections.abc import Callable
 
-import euklid
+import openglider.rs
 from openglider.glider.parametric.shape import ParametricShape
 from openglider.glider.project import GliderProject
 from openglider.gui.qt import QtWidgets, QtCore
@@ -154,13 +154,13 @@ class RibDistInput(Canvas):
         self.addItem(self.curve)
 
         self.linear = Line2D([
-            euklid.vector.Vector2D([0,0]),
-            euklid.vector.Vector2D([1, 1])
+            openglider.rs.vector.Vector2D([0,0]),
+            openglider.rs.vector.Vector2D([1, 1])
             ], dashed=True)
         self.addItem(self.linear)
 
 
-        const_dist = euklid.vector.PolyLine2D(self.glider_shape.depth_integrated)
+        const_dist = openglider.rs.vector.PolyLine2D(self.glider_shape.depth_integrated)
         self.constant_ar = Line2D(const_dist.nodes, dashed=True)
         self.addItem(self.constant_ar)
 

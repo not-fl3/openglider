@@ -2,7 +2,7 @@ from typing import Any
 
 import math
 import numpy
-import euklid
+import openglider.rs
 
 d = 1e-4
 
@@ -22,8 +22,8 @@ class Quad:
 
     matrix_inverse: numpy.ndarray = numpy.linalg.inv(matrix)
 
-    def __init__(self, p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D, p3: euklid.vector.Vector2D, p4: euklid.vector.Vector2D):
-        self.nodes: list[euklid.vector.Vector2D] = [
+    def __init__(self, p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D, p3: openglider.rs.vector.Vector2D, p4: openglider.rs.vector.Vector2D):
+        self.nodes: list[openglider.rs.vector.Vector2D] = [
             p1, p2, p3, p4
         ]
 
@@ -31,14 +31,14 @@ class Quad:
         self.b = list(self.matrix_inverse.dot([p[1] for p in self.nodes]).flat)
 
 
-    def to_global(self, l: float, m: float) -> euklid.vector.Vector2D:
+    def to_global(self, l: float, m: float) -> openglider.rs.vector.Vector2D:
         #return self.nodes[0] + (self.nodes[4]-self.nodes[0]) * 
         x = self.a[0] + l*self.a[1] + m*self.a[2] + self.a[3]*l*m
         y = self.b[0] + l*self.b[1] + m*self.b[2] + self.b[3]*l*m
         
-        return euklid.vector.Vector2D([x,y])
+        return openglider.rs.vector.Vector2D([x,y])
 
-    def to_local(self, point: euklid.vector.Vector2D) -> tuple[float, float]:
+    def to_local(self, point: openglider.rs.vector.Vector2D) -> tuple[float, float]:
         #for i, node in enumerate(self.nodes):
         if abs(point[0] - self.nodes[0][0]) < 1e-10 and abs(point[1] - self.nodes[0][1]) < 1e-10:
             return 0., 0.
@@ -65,7 +65,7 @@ class Quad:
 
 
 class Mapping:
-    def __init__(self, curves: list[euklid.vector.PolyLine2D]):
+    def __init__(self, curves: list[openglider.rs.vector.PolyLine2D]):
         self.curves = curves
         self.curve_length = len(curves[0].nodes)
 
@@ -97,7 +97,7 @@ class Mapping:
             "curves": self.curves
         }
 
-    def get_point(self, ik_x: float, ik_y: float) -> euklid.vector.Vector2D:
+    def get_point(self, ik_x: float, ik_y: float) -> openglider.rs.vector.Vector2D:
         i_y = int(ik_y)
         k_y = ik_y-i_y
 
@@ -111,7 +111,7 @@ class Mapping:
         return poly.to_global(k_x, k_y)
 
     
-    def get_iks(self, point: euklid.vector.Vector2D) -> tuple[float, float]:
+    def get_iks(self, point: openglider.rs.vector.Vector2D) -> tuple[float, float]:
         for quads_row in self.quads:
             for quad in quads_row:
                 m, l = quad.to_local(point)
@@ -134,10 +134,10 @@ class Mapping:
 
 
 class Mapping3D:
-    def __init__(self, curves: list[euklid.vector.PolyLine3D]):
+    def __init__(self, curves: list[openglider.rs.vector.PolyLine3D]):
         self.curves = curves
 
-    def get_point(self, ik_x: float, ik_y: float) -> euklid.vector.Vector3D:
+    def get_point(self, ik_x: float, ik_y: float) -> openglider.rs.vector.Vector3D:
         i_y = int(ik_y)
         if i_y >= len(self.curves)-1:
             i_y = len(self.curves)-2

@@ -5,7 +5,7 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any
 
-import euklid
+import openglider.rs
 import numpy as np
 from openglider.airfoil.profile_3d import Profile3D
 import openglider.mesh as mesh
@@ -109,16 +109,16 @@ class PanelCut(BaseModel):
         ik_right = get_x_value(x_values_right, self.x_right)
 
         points_2d = [
-            euklid.vector.Vector2D([0, self.x_left]),
-            euklid.vector.Vector2D([1, self.x_right])
+            openglider.rs.vector.Vector2D([0, self.x_left]),
+            openglider.rs.vector.Vector2D([1, self.x_right])
         ]
 
         if self.x_center is not None:
-            points_2d.insert(1, euklid.vector.Vector2D([0.5, self.x_center]))
-            bspline = euklid.spline.BSplineCurve(points_2d).get_sequence(50)
-            curve = euklid.vector.Interpolation(bspline.nodes)
+            points_2d.insert(1, openglider.rs.vector.Vector2D([0.5, self.x_center]))
+            bspline = openglider.rs.spline.BSplineCurve(points_2d).get_sequence(50)
+            curve = openglider.rs.vector.Interpolation(bspline.nodes)
         else:
-            curve = euklid.vector.Interpolation(points_2d)
+            curve = openglider.rs.vector.Interpolation(points_2d)
         
         ik_values: list[float] = []
 
@@ -153,9 +153,9 @@ class PanelCut(BaseModel):
             points_2d.insert(1, p1+(p2-p1)*0.5)
         
         if self.x_center:
-            curve_exact = euklid.spline.BSplineCurve(points_2d).get_sequence(50)
+            curve_exact = openglider.rs.spline.BSplineCurve(points_2d).get_sequence(50)
         else:
-            curve_exact = euklid.vector.PolyLine2D(points_2d)
+            curve_exact = openglider.rs.vector.PolyLine2D(points_2d)
 
         for x, ik in zip(x_values, ik_values):
             line = flattened.at_position(Percentage(x))
@@ -173,40 +173,40 @@ class PanelCut(BaseModel):
 
 
     @cached_function("self")
-    def get_ik_interpolation(self, cell: Cell, numribs: int=5, exact: bool=True) -> euklid.vector.Interpolation:
+    def get_ik_interpolation(self, cell: Cell, numribs: int=5, exact: bool=True) -> openglider.rs.vector.Interpolation:
         ik_values = self.get_ik_values(cell, x_values=numribs, exact=exact)
         numpoints = len(ik_values)-1
-        ik_interpolation = euklid.vector.Interpolation(
+        ik_interpolation = openglider.rs.vector.Interpolation(
             [[i/numpoints, x] for i, x in enumerate(ik_values)]
             )
         
         return ik_interpolation
     
-    def get_curve_2d(self, cell: Cell, numribs: int=0, exact: bool=True) -> euklid.vector.PolyLine2D:
+    def get_curve_2d(self, cell: Cell, numribs: int=0, exact: bool=True) -> openglider.rs.vector.PolyLine2D:
         ik_values = self.get_ik_values(cell, x_values=numribs, exact=exact)
 
         ribs = cell.get_flattened_cell(num_inner=numribs+2).inner
         points_2d = [rib.get(ik) for rib, ik in zip(ribs, ik_values)]
 
-        return euklid.vector.PolyLine2D(points_2d)
+        return openglider.rs.vector.PolyLine2D(points_2d)
     
-    def get_curve_3d(self, cell: Cell, numribs: int=0, exact: bool=True) -> euklid.vector.PolyLine3D:
+    def get_curve_3d(self, cell: Cell, numribs: int=0, exact: bool=True) -> openglider.rs.vector.PolyLine3D:
         ik_values = self.get_ik_values(cell, numribs, exact)
 
         ribs = cell.get_midribs(numribs+2)
         points = [rib.get(ik) for rib, ik in zip(ribs, ik_values)]
 
-        return euklid.vector.PolyLine3D(points)
+        return openglider.rs.vector.PolyLine3D(points)
 
 class FlattenedPanel(BaseModel):
     panel: Panel
     flattened_cell: FlattenedCell
-    envelope: euklid.vector.PolyLine2D
+    envelope: openglider.rs.vector.PolyLine2D
     cut_front: cuts.CutResult
     cut_back: cuts.CutResult
     x_distribution: list[float]
 
-    def draw_straight_line(self, y: Percentage, start: Percentage, end: Percentage,) -> euklid.vector.PolyLine2D | None:
+    def draw_straight_line(self, y: Percentage, start: Percentage, end: Percentage,) -> openglider.rs.vector.PolyLine2D | None:
         if start > max(self.panel.cut_back.x_left, self.panel.cut_back.x_right):
             return None
         if end < min(self.panel.cut_front.x_left, self.panel.cut_front.x_right):
@@ -315,7 +315,7 @@ class Panel(BaseModel):
         
         return False
 
-    def get_3d(self, cell: Cell, numribs: int=0, midribs: list[Profile3D] | None=None) -> list[euklid.vector.PolyLine3D]:
+    def get_3d(self, cell: Cell, numribs: int=0, midribs: list[Profile3D] | None=None) -> list[openglider.rs.vector.PolyLine3D]:
         """
         Get 3d-Panel
         :param glider: glider class
@@ -323,7 +323,7 @@ class Panel(BaseModel):
         :return: List of rib-pieces (Vectorlist)
         """
         xvalues = cell.rib1.profile_2d.x_values
-        ribs: list[euklid.vector.PolyLine3D] = []
+        ribs: list[openglider.rs.vector.PolyLine3D] = []
         for i in range(numribs + 1):
             y = i / numribs
 
@@ -353,10 +353,10 @@ class Panel(BaseModel):
         # TODO: doesn't work for numribs=0?
         
         xvalues = cell.rib1.profile_2d.x_values
-        x_value_interpolation = euklid.vector.Interpolation([[i, x] for i, x in enumerate(xvalues)])
+        x_value_interpolation = openglider.rs.vector.Interpolation([[i, x] for i, x in enumerate(xvalues)])
 
         rib_iks: list[list[float]] = []
-        nodes: list[euklid.vector.Vector3D] = []
+        nodes: list[openglider.rs.vector.Vector3D] = []
         rib_node_indices: list[list[int]] = []
 
         ik_values = self.get_ik_values(cell, numribs, exact=exact)
@@ -476,13 +476,13 @@ class Panel(BaseModel):
         return [(ik1, ik2) for ik1, ik2 in zip(ik_front, ik_back)]
         
     @cached_function("self")
-    def get_ik_interpolation(self, cell: Cell, numribs: int=0, exact: bool=True) -> tuple[euklid.vector.Interpolation, euklid.vector.Interpolation]:
+    def get_ik_interpolation(self, cell: Cell, numribs: int=0, exact: bool=True) -> tuple[openglider.rs.vector.Interpolation, openglider.rs.vector.Interpolation]:
         i1 = self.cut_front.get_ik_interpolation(cell, numribs, exact)
         i2 = self.cut_back.get_ik_interpolation(cell, numribs, exact)
 
         return i1, i2
 
-    def integrate_3d_shaping(self, cell: Cell, inner_2d: list[euklid.vector.PolyLine2D], midribs: list[Profile3D] | None=None) -> tuple[list[float], list[float]]:
+    def integrate_3d_shaping(self, cell: Cell, inner_2d: list[openglider.rs.vector.PolyLine2D], midribs: list[Profile3D] | None=None) -> tuple[list[float], list[float]]:
         """
         :param cell: the parent cell of the panel
         :param sigma: std-deviation parameter of gaussian distribution used to weight the length differences.
@@ -612,26 +612,28 @@ class Panel(BaseModel):
         cut_front_result = cut_front.apply(inner_front, outer_left, outer_right, shape_3d_amount_front)
         cut_back_result = cut_back.apply(inner_back, outer_left, outer_right, shape_3d_amount_back)
 
-        panel_left: euklid.vector.PolyLine2D | None = None
+        panel_left: openglider.rs.vector.PolyLine2D | None = None
         if cut_front_result.index_left < cut_back_result.index_left:
             panel_left = outer_left.get(cut_front_result.index_left, cut_back_result.index_left).fix_errors()
         panel_back = cut_back_result.outline.copy()
 
-        panel_right: euklid.vector.PolyLine2D | None = None
+        panel_right: openglider.rs.vector.PolyLine2D | None = None
         if cut_back_result.index_right > cut_front_result.index_right:
             panel_right = outer_right.get(cut_back_result.index_right, cut_front_result.index_right).fix_errors()
         panel_front = cut_front_result.outline.copy()
 
         panel_back = panel_back.get(len(panel_back)-1, 0)
         if panel_right:
-            envelope = panel_right.reverse() + panel_back
+            envelope_nodes = panel_right.reverse().nodes + panel_back.nodes
         else:
-            envelope = panel_back
+            envelope_nodes = panel_back.nodes[:]
 
         if panel_left:
-            envelope += panel_left.reverse()
-        envelope += panel_front
-        envelope += euklid.vector.PolyLine2D([envelope.nodes[0]])
+            envelope_nodes += panel_left.reverse().nodes
+        envelope_nodes += panel_front.nodes
+        envelope_nodes.append(envelope_nodes[0])
+
+        envelope = openglider.rs.vector.PolyLine2D(envelope_nodes)
 
         plotpart.layers["envelope"].append(envelope)
 

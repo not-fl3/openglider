@@ -1,4 +1,4 @@
-import euklid
+import openglider.rs
 from collections.abc import Iterator, Sized
 from meshpy.triangle import MeshInfo
 import meshpy._internals as internals
@@ -22,7 +22,7 @@ class Triangle(Sized):
 
 class TriMesh:
     def __init__(self, mesh_info: MeshInfo, name: str=""):
-        self.points = [euklid.vector.Vector2D(p) for p in mesh_info.points]
+        self.points = [openglider.rs.vector.Vector2D(p) for p in mesh_info.points]
 
         self.elements = [
             Triangle(v, name) for v in mesh_info.elements

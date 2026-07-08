@@ -13,7 +13,7 @@ import vtkmodules.vtkFiltersCore
 import vtkmodules.vtkFiltersSources
 import vtkmodules.vtkRenderingCore
 
-import euklid
+import openglider.rs
 from openglider.lines.lineset import LineSet
 from openglider.glider.cell.panel import Panel
 from openglider.glider.cell.cell import Cell
@@ -46,7 +46,7 @@ class Sphere(vtkmodules.vtkRenderingCore.vtkActor):
 class Arrow(vtkmodules.vtkRenderingCore.vtkActor):
     color = (1., 0., 0.)
 
-    def __init__(self, p1: euklid.vector.Vector3D, p2: euklid.vector.Vector3D, shaft: float=0.01, tip: float=.2, color: tuple[float, float, float] | None=None):
+    def __init__(self, p1: openglider.rs.vector.Vector3D, p2: openglider.rs.vector.Vector3D, shaft: float=0.01, tip: float=.2, color: tuple[float, float, float] | None=None):
         super().__init__()
         if color:
             self.color = color
@@ -59,13 +59,13 @@ class Arrow(vtkmodules.vtkRenderingCore.vtkActor):
         self.arrow.SetTipResolution(10)
 
 
-        start = euklid.vector.Vector3D(p1)
-        end = euklid.vector.Vector3D(p2)
+        start = openglider.rs.vector.Vector3D(p1)
+        end = openglider.rs.vector.Vector3D(p2)
 
         diff = end - start
         length = diff.length()
         v_one = diff.normalized()
-        v_two = euklid.vector.Vector3D([v_one[1]+v_one[2], -v_one[0], -v_one[0]]).normalized()
+        v_two = openglider.rs.vector.Vector3D([v_one[1]+v_one[2], -v_one[0], -v_one[0]]).normalized()
         v_three = v_one.cross(v_two)
 
         matrix = vtkmodules.vtkCommonMath.vtkMatrix4x4()

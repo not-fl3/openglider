@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-import euklid
+import openglider.rs
 
 from openglider.vector.drawing.part import PlotPart
 from openglider.vector.unit import Length
@@ -60,8 +60,8 @@ class Text:
     def __init__(
         self,
         text: str,
-        p1: euklid.vector.Vector2D,
-        p2: euklid.vector.Vector2D,
+        p1: openglider.rs.vector.Vector2D,
+        p2: openglider.rs.vector.Vector2D,
         size: Length | float | None=None,
         align: Literal["left"] | Literal["right"] | Literal["center"]="left",
         height: float=0.8,
@@ -80,8 +80,8 @@ class Text:
         :param valign: vertical align ( -0.5: bottom, 0: centered, 0.5: top)
         """
         self.text = text
-        self.p1 = euklid.vector.Vector2D(list(p1)[:])
-        self.p2 = euklid.vector.Vector2D(list(p2)[:])
+        self.p1 = openglider.rs.vector.Vector2D(list(p1)[:])
+        self.p2 = openglider.rs.vector.Vector2D(list(p2)[:])
         self.size = size
         self.height = height
         self.space = space
@@ -111,7 +111,7 @@ class Text:
         
         return [letter_vec]
 
-    def get_vectors(self, replace_unknown: bool=True) -> list[euklid.vector.PolyLine2D]:
+    def get_vectors(self, replace_unknown: bool=True) -> list[openglider.rs.vector.PolyLine2D]:
         # todo: add valign (space)
         vectors = []
         diff = self.p2 - self.p1
@@ -136,21 +136,21 @@ class Text:
             raise ValueError(f"invalid alignment: {self.align}")
 
 
-        letter_pos = euklid.vector.Vector2D([0, letter_height * (self.valign - 0.5)])
+        letter_pos = openglider.rs.vector.Vector2D([0, letter_height * (self.valign - 0.5)])
 
         for letter in self.text:
             points = self.get_letter(letter, replace_unknown=replace_unknown)
             for lst in points:
                 if lst:
-                    line = euklid.vector.PolyLine2D(lst)\
-                        .scale(euklid.vector.Vector2D([letter_width, letter_height]))\
+                    line = openglider.rs.vector.PolyLine2D(lst)\
+                        .scale(openglider.rs.vector.Vector2D([letter_width, letter_height]))\
                         .move(letter_pos)\
-                        .rotate(angle, euklid.vector.Vector2D([0, 0]))\
+                        .rotate(angle, openglider.rs.vector.Vector2D([0, 0]))\
                         .move(p1)
 
                     vectors.append(line)
 
-            letter_pos += euklid.vector.Vector2D([letter_width, 0])
+            letter_pos += openglider.rs.vector.Vector2D([letter_width, 0])
 
         return vectors
 

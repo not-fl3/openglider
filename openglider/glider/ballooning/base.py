@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from typing import Self
 
 import numpy as np
-import euklid
+import openglider.rs
 
 import openglider
 from openglider.config import config
@@ -28,7 +28,7 @@ class ArcSinc:
             phi = self.end + (i * 1. / numpoints) * (self.start - self.end)  # reverse for interpolation (increasing x_values)
             data.append([np.sinc(phi / np.pi), phi])
 
-        self.arsinc = euklid.vector.Interpolation(data)
+        self.arsinc = openglider.rs.vector.Interpolation(data)
 
     @property
     def numpoints(self) -> int:
@@ -43,12 +43,12 @@ class BallooningBase(ABC):
     arcsinc = ArcSinc()
     name: str
 
-    def draw(self) -> euklid.vector.PolyLine2D:
+    def draw(self) -> openglider.rs.vector.PolyLine2D:
         points = []
         last_point = None
 
-        upper = euklid.vector.Vector2D([-1, 1])
-        lower = euklid.vector.Vector2D([1, -1])
+        upper = openglider.rs.vector.Vector2D([-1, 1])
+        lower = openglider.rs.vector.Vector2D([1, -1])
 
         for p in self:
             if p[0] < 0:
@@ -56,16 +56,16 @@ class BallooningBase(ABC):
             else:
                 if last_point and last_point[0] < 0:
                     amount_at_zero = self[0]
-                    points.append(euklid.vector.Vector2D([0, amount_at_zero]))
-                    points.append(euklid.vector.Vector2D([0, -amount_at_zero]))
+                    points.append(openglider.rs.vector.Vector2D([0, amount_at_zero]))
+                    points.append(openglider.rs.vector.Vector2D([0, -amount_at_zero]))
                 
                 points.append(p * lower)
             
             last_point = p
         
-        return euklid.vector.PolyLine2D(points)
+        return openglider.rs.vector.PolyLine2D(points)
 
-    def __iter__(self) -> Iterator[euklid.vector.Vector2D]:
+    def __iter__(self) -> Iterator[openglider.rs.vector.Vector2D]:
         raise NotImplementedError(f"no iter method defined on {self.__class__}")
 
     def __call__(self, xval: float) -> float:

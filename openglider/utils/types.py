@@ -1,18 +1,18 @@
 from typing import Union
-import euklid
+import openglider.rs
 
 AsymmetricCurveType = Union[
-    euklid.spline.BSplineCurve,
-    euklid.spline.BezierCurve,
-    euklid.spline.CubicBSplineCurve,
-    euklid.spline.QuadBSplineCurve
+    openglider.rs.spline.BSplineCurve,
+    openglider.rs.spline.BezierCurve,
+    openglider.rs.spline.CubicBSplineCurve,
+    openglider.rs.spline.QuadBSplineCurve
     ]
 
 SymmetricCurveType = Union[
-    euklid.spline.SymmetricBSplineCurve,
-    euklid.spline.SymmetricBezierCurve,
-    euklid.spline.SymmetricCubicBSplineCurve,
-    euklid.spline.SymmetricQuadBSplineCurve
+    openglider.rs.spline.SymmetricBSplineCurve,
+    openglider.rs.spline.SymmetricBezierCurve,
+    openglider.rs.spline.SymmetricCubicBSplineCurve,
+    openglider.rs.spline.SymmetricQuadBSplineCurve
     ]
     
 CurveType = Union[AsymmetricCurveType, SymmetricCurveType]

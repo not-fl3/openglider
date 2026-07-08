@@ -2,7 +2,7 @@ import logging
 from typing import Any
 from collections.abc import Callable
 
-import euklid
+import openglider.rs
 
 from openglider.glider.project import GliderProject
 from openglider.gui.app.main_window import MainWindow
@@ -41,7 +41,7 @@ class DistributionInput(Canvas):
 
 
     def on_node_move(self, curve: DraggableLine, event: Any) -> None:
-        self.curve.controlpoints = euklid.vector.PolyLine2D(curve.controlpoints)
+        self.curve.controlpoints = openglider.rs.vector.PolyLine2D(curve.controlpoints)
 
         points = self.curve.get_sequence(40)
         self.curve_drawing.curve_data = points.nodes

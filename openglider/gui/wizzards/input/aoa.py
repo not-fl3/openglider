@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any, TYPE_CHECKING
 
-import euklid
+import openglider.rs
 from openglider.glider.project import GliderProject
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.gui.views_2d import Canvas, DraggableLine
@@ -84,16 +84,16 @@ class AOAInput(Canvas):
         self.aoas = []
         self.addItem(self.aoa_2d)
 
-    def set_cp(self, cp: euklid.vector.PolyLine2D) -> None:
+    def set_cp(self, cp: openglider.rs.vector.PolyLine2D) -> None:
         cp_new = self.normalize(cp)
         self.arc_curve.set_controlpoints(cp_new.nodes)
 
     @classmethod
-    def normalize(cls, cp: euklid.vector.PolyLine2D) -> euklid.vector.PolyLine2D:
+    def normalize(cls, cp: openglider.rs.vector.PolyLine2D) -> openglider.rs.vector.PolyLine2D:
         span = cp.nodes[-1][0]
 
         # scale x -> [0,1], y [deg]
-        return cp  * euklid.vector.Vector2D([1./span, 180./math.pi])
+        return cp  * openglider.rs.vector.Vector2D([1./span, 180./math.pi])
 
     def draw_aoas(self, projects: list[GliderProject], clear: bool=True) -> None:
         if clear:
@@ -122,7 +122,7 @@ class AOAInput(Canvas):
         curve.data["pos"][node_index][0] = max(0, curve.data["pos"][node_index][0])#
 
         span = self.project.glider.aoa.controlpoints.nodes[-1][0]
-        controlpoints = euklid.vector.PolyLine2D([[p[0]*span, p[1] * math.pi / 180] for p in curve.controlpoints])
+        controlpoints = openglider.rs.vector.PolyLine2D([[p[0]*span, p[1] * math.pi / 180] for p in curve.controlpoints])
         self.project.glider.aoa.controlpoints = controlpoints
         #self.project.glider.rescale_curves()
         self.redraw()

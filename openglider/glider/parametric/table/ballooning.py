@@ -1,6 +1,6 @@
 import numbers
 from typing import Any, ClassVar, Self
-import euklid
+import openglider.rs
 
 from openglider.glider.ballooning.base import BallooningBase
 from openglider.glider.ballooning.new import BallooningBezierNeu
@@ -52,8 +52,8 @@ class BallooningTable(BaseModel):
                     while baloon[i + 1][0] > baloon[i][0]:
                         i += 1
 
-                    upper = [euklid.vector.Vector2D(p) for p in baloon[:i + 1]]
-                    lower = [euklid.vector.Vector2D([x, -y]) for x, y in baloon[i + 1:]]
+                    upper = [openglider.rs.vector.Vector2D(p) for p in baloon[:i + 1]]
+                    lower = [openglider.rs.vector.Vector2D([x, -y]) for x, y in baloon[i + 1:]]
 
                     ballooning = BallooningBezier(upper, lower, name=name)
                     balloonings.append(BallooningBezierNeu.from_classic(ballooning))

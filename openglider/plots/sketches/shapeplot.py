@@ -5,7 +5,7 @@ import math
 from os import PathLike
 from collections.abc import Iterator
 
-import euklid
+import openglider.rs
 import numpy as np
 from openglider.glider.shape import Shape
 from openglider.lines.line import Line
@@ -185,21 +185,21 @@ class ShapePlot:
                     else:
                         return max(float(-val), 0.)
 
-                def get_cut_line(cut: PanelCut) -> euklid.vector.PolyLine2D:
+                def get_cut_line(cut: PanelCut) -> openglider.rs.vector.PolyLine2D:
                     left = shape.get_point(cell_no, normalize_x(cut.x_left))
                     right = shape.get_point(cell_no+1, normalize_x(cut.x_right))
 
                     if cut.x_center is not None:
                         center = shape.get_point(cell_no+0.5, normalize_x(cut.x_center))
-                        return euklid.spline.BSplineCurve([left, center, right]).get_sequence(8)
+                        return openglider.rs.spline.BSplineCurve([left, center, right]).get_sequence(8)
                     
-                    return euklid.vector.PolyLine2D([left, right])
+                    return openglider.rs.vector.PolyLine2D([left, right])
                 
                 l1 = get_cut_line(panel.cut_front)
                 l2 = get_cut_line(panel.cut_back).reverse()
 
                 self.drawing.parts.append(PlotPart(
-                    cuts=[euklid.vector.PolyLine2D(l1.nodes + l2.nodes + [l1.nodes[0]])],
+                    cuts=[openglider.rs.vector.PolyLine2D(l1.nodes + l2.nodes + [l1.nodes[0]])],
                     material_code=f"{panel.material}#{panel.material.color_code}"
                 ))
 
@@ -214,7 +214,7 @@ class ShapePlot:
 
         part = PlotPart()
         
-        line = euklid.vector.PolyLine2D([shape.get_point(rib, pct) for rib in self._get_rib_range(left)])
+        line = openglider.rs.vector.PolyLine2D([shape.get_point(rib, pct) for rib in self._get_rib_range(left)])
         part.layers["marks"].append(line)
         self.drawing.parts.append(part)
 
@@ -235,22 +235,22 @@ class ShapePlot:
         
         dist = abs(front[1]-back[1])
 
-        def baseline(pct: float) -> euklid.vector.PolyLine2D:
-            return euklid.vector.PolyLine2D(
+        def baseline(pct: float) -> openglider.rs.vector.PolyLine2D:
+            return openglider.rs.vector.PolyLine2D(
                 [shapes[0].get_point(rib, pct) for rib in self._get_rib_range(True)][::-1] +
                 [shapes[1].get_point(rib, pct) for rib in self._get_rib_range(False)]
             )
 
-        collapse_side_50 = euklid.vector.PolyLine2D([
-            euklid.vector.Vector2D((0, front[1])),
-            euklid.vector.Vector2D((-dist, back[1]))
+        collapse_side_50 = openglider.rs.vector.PolyLine2D([
+            openglider.rs.vector.Vector2D((0, front[1])),
+            openglider.rs.vector.Vector2D((-dist, back[1]))
         ])
-        collapse_side_75 = euklid.vector.PolyLine2D([
-            euklid.vector.Vector2D((0, back[1])),
-            euklid.vector.Vector2D((dist, front[1]))
+        collapse_side_75 = openglider.rs.vector.PolyLine2D([
+            openglider.rs.vector.Vector2D((0, back[1])),
+            openglider.rs.vector.Vector2D((dist, front[1]))
         ])
 
-        diff = euklid.vector.Vector2D([self.glider_2d.shape.span*0.05, 0])
+        diff = openglider.rs.vector.Vector2D([self.glider_2d.shape.span*0.05, 0])
 
         part.layers["marks"] +=  [
             collapse_side_50,
@@ -262,7 +262,7 @@ class ShapePlot:
 
         self.drawing.parts.append(part)
 
-    def _get_attachment_point_positions(self, left: bool=False) -> dict[str, euklid.vector.Vector2D]:
+    def _get_attachment_point_positions(self, left: bool=False) -> dict[str, openglider.rs.vector.Vector2D]:
 
         points = {}
         shapes = self._get_shapes()
@@ -284,7 +284,7 @@ class ShapePlot:
         points = self._get_attachment_point_positions(left=left)
 
         for name, p1 in points.items():
-            p2 = p1 + euklid.vector.Vector2D([0.1, 0])
+            p2 = p1 + openglider.rs.vector.Vector2D([0.1, 0])
 
 
             diff = (p2-p1)*0.2
@@ -295,8 +295,8 @@ class ShapePlot:
             part.layers["marks"] += sum(cross.values(), start=[])
 
             if add_text and name:
-                p1 = p1 + euklid.vector.Vector2D([0, 0.02])
-                p2 = p2 + euklid.vector.Vector2D([0, 0.02])
+                p1 = p1 + openglider.rs.vector.Vector2D([0, 0.02])
+                p2 = p2 + openglider.rs.vector.Vector2D([0, 0.02])
                 text = Text(f" {name} ", p1, p2)
                 vectors = text.get_vectors()
                 part.layers["text"] += vectors
@@ -314,7 +314,7 @@ class ShapePlot:
             p2 = shape.get_point(cell_no+1, 0)
             p3 = shape.get_point(cell_no+1, 1)
             p4 = shape.get_point(cell_no, 1)
-            cells.append(euklid.vector.PolyLine2D([p1,p2,p3,p4,p1]))
+            cells.append(openglider.rs.vector.PolyLine2D([p1,p2,p3,p4,p1]))
 
         self.drawing.parts.append(PlotPart(
             marks=cells,
@@ -379,7 +379,7 @@ class ShapePlot:
                 points_left = [shape.get_point(cell_no, p) for p in left_x_values]
                 points_right = [shape.get_point(cell_no+1, p) for p in right_x_values]
 
-                self.drawing.parts.append(PlotPart(marks=[euklid.vector.PolyLine2D(points_left + points_right[::-1] + points_left[:1])]))
+                self.drawing.parts.append(PlotPart(marks=[openglider.rs.vector.PolyLine2D(points_left + points_right[::-1] + points_left[:1])]))
 
         return self
 
@@ -396,7 +396,7 @@ class ShapePlot:
                 points_left = [shape.get_point(cell_no, p) for p in left_x_values]
                 points_right = [shape.get_point(cell_no+1, p) for p in right_x_values]
 
-                self.drawing.parts.append(PlotPart(marks=[euklid.vector.PolyLine2D(points_left + points_right[::-1] + points_left[:1])]))
+                self.drawing.parts.append(PlotPart(marks=[openglider.rs.vector.PolyLine2D(points_left + points_right[::-1] + points_left[:1])]))
 
         return self
 
@@ -413,7 +413,7 @@ class ShapePlot:
             if node.node_type == node.NODE_TYPE.UPPER:
                 all_nodes[node] = attachment_point_positions[node.name]
 
-        def get_node_position(node: Node) -> euklid.vector.Vector2D:
+        def get_node_position(node: Node) -> openglider.rs.vector.Vector2D:
             if node in all_nodes:
                 return all_nodes[node]
 
@@ -422,24 +422,24 @@ class ShapePlot:
             if len(nodes) == 0:
                 raise ValueError(f"no upper nodes for node {node}, {type(node)}")
             elif len(nodes) == 1:
-                position = get_node_position(nodes[0]) + euklid.vector.Vector2D([0, -0.2])
+                position = get_node_position(nodes[0]) + openglider.rs.vector.Vector2D([0, -0.2])
             else:
 
                 node_positions = [get_node_position(node) for node in nodes]
 
-                position = sum(node_positions, euklid.vector.Vector2D()) * (1/len(node_positions))
+                position = sum(node_positions, openglider.rs.vector.Vector2D()) * (1/len(node_positions))
 
-                direction = euklid.vector.Vector2D()
+                direction = openglider.rs.vector.Vector2D()
 
                 for node_pos in node_positions:
                     diff = node_pos - position
 
-                    if diff.dot(euklid.vector.Vector2D([1, -1])) < 0:
+                    if diff.dot(openglider.rs.vector.Vector2D([1, -1])) < 0:
                         direction += diff * -1
                     else:
                         direction += diff
                 
-                rotation = euklid.vector.Rotation2D(-math.pi/2)
+                rotation = openglider.rs.vector.Rotation2D(-math.pi/2)
                 direction.normalized()
             
                 position += rotation.apply(direction.normalized()*0.1)
@@ -457,19 +457,19 @@ class ShapePlot:
             return lines
         
         text_width = self.glider_3d.span / 300
-        diff_vect = euklid.vector.Vector2D([text_width, 0])
+        diff_vect = openglider.rs.vector.Vector2D([text_width, 0])
         def insert_line(glider_line: Line, index: int) -> None:
             if glider_line.line_type.name == "riser":
                 return
             pp = PlotPart()
             layer = pp.layers[f"line_{glider_line.name}"]
-            line = euklid.vector.PolyLine2D([
+            line = openglider.rs.vector.PolyLine2D([
                 # TODO: fix!
                 all_nodes[glider_line.upper_node],
                 all_nodes[glider_line.lower_node]
             ])
             if index % 2:
-                line = line.scale(euklid.vector.Vector2D([-1, 1]))
+                line = line.scale(openglider.rs.vector.Vector2D([-1, 1]))
 
             text = Text(
                 glider_line.name,

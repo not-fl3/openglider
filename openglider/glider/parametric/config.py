@@ -2,7 +2,7 @@ import re
 from typing import Any, ClassVar, Self, Annotated
 
 from packaging.version import Version
-import euklid
+import openglider.rs
 import pydantic
 
 from openglider.lines.node import Node
@@ -50,7 +50,7 @@ class ConfigTable(BaseModel):
 
                 assert target_type is not None
 
-                if target_type == euklid.vector.Vector3D:
+                if target_type == openglider.rs.vector.Vector3D:
                     data_length = 3
                 else:
                     data_length = 1
@@ -78,7 +78,7 @@ class ConfigTable(BaseModel):
         for i, (key, value) in enumerate(self):
             if key == "version":
                 value = [Version(__version__)]
-            elif isinstance(value, euklid.vector.Vector3D):
+            elif isinstance(value, openglider.rs.vector.Vector3D):
                 value = list(value)
             elif isinstance(value, unit.Quantity):
                 value = [str(value)]
@@ -114,10 +114,10 @@ class ParametricGliderConfig(ConfigTable):
     speed: float
     glide: float
 
-    pilot_position: euklid.vector.Vector3D
+    pilot_position: openglider.rs.vector.Vector3D
     pilot_position_name: str = "main"
 
-    brake_offset: euklid.vector.Vector3D = euklid.vector.Vector3D([0.05, 0, 0.4])
+    brake_offset: openglider.rs.vector.Vector3D = openglider.rs.vector.Vector3D([0.05, 0, 0.4])
     brake_name: str = "brake"
 
     has_stabicell: bool = False
@@ -139,7 +139,7 @@ class ParametricGliderConfig(ConfigTable):
     @classmethod
     def __from_json__(cls, **data: Any) -> Self:
         for name in "pilot_position", "brake_offset":
-            data[name] = euklid.vector.Vector3D(data[name])
+            data[name] = openglider.rs.vector.Vector3D(data[name])
         
         return cls(**data)
     
@@ -180,7 +180,7 @@ class ParametricGliderConfig(ConfigTable):
                 data.pop(keyword)
             
             nodes = [
-                (name, euklid.vector.Vector3D([node["x"], node["y"], node["z"]]))
+                (name, openglider.rs.vector.Vector3D([node["x"], node["y"], node["z"]]))
                 for name, node in node_data.items()
             ]
             # take the lower node as main point

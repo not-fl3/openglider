@@ -4,7 +4,7 @@ from abc import ABC
 import math
 from typing import TYPE_CHECKING
 
-import euklid
+import openglider.rs
 
 from openglider.glider.ballooning.base import BallooningBase
 from openglider.glider.ballooning.new import BallooningNew
@@ -24,18 +24,18 @@ class BallooningRamp(BallooningModifier):
     distance: Percentage | Length
 
     def apply(self, ballooning: BallooningBase, cell: Cell) -> BallooningBase:
-        def y(x: euklid.vector.Vector2D) -> euklid.vector.Vector2D:
+        def y(x: openglider.rs.vector.Vector2D) -> openglider.rs.vector.Vector2D:
             distance = abs(x[0]-self.position.si)
             y_new = x[1]
 
             if distance <= self.distance.si:
                 y_new *= -(math.cos(distance / self.distance.si * math.pi) - 1) / 2
             
-                return euklid.vector.Vector2D([x[0], y_new])
+                return openglider.rs.vector.Vector2D([x[0], y_new])
             
             return x
 
-        return BallooningNew(euklid.vector.Interpolation([y(x) for x in ballooning]), ballooning.name)
+        return BallooningNew(openglider.rs.vector.Interpolation([y(x) for x in ballooning]), ballooning.name)
     
 class EntryRamp(BallooningModifier):
     ramp_distance: Percentage | Length
@@ -67,21 +67,21 @@ class BallooningFixed(BallooningModifier):
     amount: float = 0
     
     def apply(self, ballooning: BallooningBase, cell: Cell) -> BallooningBase:
-        def scale(distance: float, vector: euklid.vector.Vector2D) -> euklid.vector.Vector2D:
+        def scale(distance: float, vector: openglider.rs.vector.Vector2D) -> openglider.rs.vector.Vector2D:
             factor = -0.5 * (math.cos(distance / self.ramp_distance.si * math.pi) - 1)
-            return euklid.vector.Vector2D((
+            return openglider.rs.vector.Vector2D((
                 vector[0],
                 vector[1] * factor + (1-factor) * self.amount
             ))
         
-        def y(vec: euklid.vector.Vector2D) -> euklid.vector.Vector2D:
+        def y(vec: openglider.rs.vector.Vector2D) -> openglider.rs.vector.Vector2D:
             x = vec[0]
             if x > self.start - self.ramp_distance and x < self.start:
                 return scale(self.start.si - x, vec)
             elif x < self.end + self.ramp_distance and x > self.end:
                 return scale(x - self.end.si, vec)
             elif x < self.end and x > self.start:
-                return euklid.vector.Vector2D([x, self.amount])
+                return openglider.rs.vector.Vector2D([x, self.amount])
             return vec
 
-        return BallooningNew(euklid.vector.Interpolation([y(x) for x in ballooning]), ballooning.name)
+        return BallooningNew(openglider.rs.vector.Interpolation([y(x) for x in ballooning]), ballooning.name)

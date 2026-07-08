@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import typing
-import euklid
+import openglider.rs
 
 import openglider.airfoil
 from openglider.utils.dataclass import BaseModel
@@ -27,7 +27,7 @@ class Sharknose(BaseModel):
     straight_reinforcement_allowance: Length | None = None
 
     def get_modified_airfoil(self, rib: Rib) -> openglider.airfoil.Profile2D:
-        data: list[euklid.vector.Vector2D] = []
+        data: list[openglider.rs.vector.Vector2D] = []
 
         ik_start = rib.profile_2d.get_ik(self.start)
         ik_position = round(rib.profile_2d.get_ik(self.position))
@@ -41,8 +41,8 @@ class Sharknose(BaseModel):
         point_position[1] = point_position[1] + (point_start[1]-point_position[1])*self.amount.si
 
         # get tangents to create a tangential bspline on each side
-        tangents = euklid.vector.PolyLine2D(rib.profile_2d.curve.get_tangents())
-        def get_tangent(ik: float, from_point: euklid.vector.Vector2D, to_point: euklid.vector.Vector2D, amount: Percentage) -> euklid.vector.Vector2D:
+        tangents = openglider.rs.vector.PolyLine2D(rib.profile_2d.curve.get_tangents())
+        def get_tangent(ik: float, from_point: openglider.rs.vector.Vector2D, to_point: openglider.rs.vector.Vector2D, amount: Percentage) -> openglider.rs.vector.Vector2D:
             #ik -= 0.5
             #ik = max(ik, 0)
             #ik = min(ik, len(tangents)-1)
@@ -57,21 +57,21 @@ class Sharknose(BaseModel):
 
             return tangent * scale * amount.si
 
-        curve_1 = euklid.spline.BSplineCurve([
+        curve_1 = openglider.rs.spline.BSplineCurve([
             point_start,
             point_start + get_tangent(ik_start, point_start, point_position, self.angle_front),
             point_position
         ]).get_sequence(50)
 
-        curve_2 = euklid.spline.BSplineCurve([
+        curve_2 = openglider.rs.spline.BSplineCurve([
             point_position,
             point_end - get_tangent(ik_end, point_end, point_position, self.angle_back),
             point_end
         ]).get_sequence(50)
 
         # evaluate at pre-defined x-values
-        interpolation_1 = euklid.vector.Interpolation(curve_1.nodes)
-        interpolation_2 = euklid.vector.Interpolation(curve_2.nodes)
+        interpolation_1 = openglider.rs.vector.Interpolation(curve_1.nodes)
+        interpolation_2 = openglider.rs.vector.Interpolation(curve_2.nodes)
         
 
         for i, point in enumerate(rib.profile_2d.curve):
@@ -84,7 +84,7 @@ class Sharknose(BaseModel):
                 elif x > self.position and x < self.end:
                     y = interpolation_2.get_value(x)
 
-            data.append(euklid.vector.Vector2D([x, y]))
+            data.append(openglider.rs.vector.Vector2D([x, y]))
         
         return openglider.airfoil.Profile2D(data)
 

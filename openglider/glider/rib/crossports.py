@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import euklid
+import openglider.rs
 import pyfoil
 
 from openglider.mesh import Mesh
@@ -36,14 +36,14 @@ class RibHoleBase(BaseModel):
 
         return Percentage(x1), Percentage(x2)
     
-    def align_contolpoints(self, controlpoints: list[euklid.vector.Vector2D], rib: Rib) -> list[euklid.vector.Vector2D]:
+    def align_contolpoints(self, controlpoints: list[openglider.rs.vector.Vector2D], rib: Rib) -> list[openglider.rs.vector.Vector2D]:
         envelope = self.get_envelope_airfoil(rib)
         return [envelope.align(cp) for cp in controlpoints]
 
-    def _get_curves(self, rib: Rib, num: int) -> list[euklid.vector.PolyLine2D]:
+    def _get_curves(self, rib: Rib, num: int) -> list[openglider.rs.vector.PolyLine2D]:
         raise NotImplementedError()
     
-    def get_curves(self, rib: Rib, num: int=80, scale: bool=False) -> list[euklid.vector.PolyLine2D]:
+    def get_curves(self, rib: Rib, num: int=80, scale: bool=False) -> list[openglider.rs.vector.PolyLine2D]:
         curves = self._get_curves(rib, num)
 
         if scale:
@@ -51,10 +51,10 @@ class RibHoleBase(BaseModel):
         else:
             return curves
 
-    def get_centers(self, rib: Rib, scale: bool=False) -> list[euklid.vector.Vector2D]:
+    def get_centers(self, rib: Rib, scale: bool=False) -> list[openglider.rs.vector.Vector2D]:
         raise NotImplementedError()
     
-    def get_3d(self, rib: Rib, num: int=20) -> list[euklid.vector.PolyLine3D]:
+    def get_3d(self, rib: Rib, num: int=20) -> list[openglider.rs.vector.PolyLine3D]:
         hole = self.get_curves(rib, num=num)
         return [rib.align_all(c) for c in hole]
 
@@ -84,20 +84,20 @@ class RibHole(RibHoleBase):
     vertical_shift: Percentage=Percentage(0)
     rotation: Angle=Angle(0)
 
-    def _get_points(self, rib: Rib) -> tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]:
+    def _get_points(self, rib: Rib) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:
         lower = rib.profile_2d.get(self.pos.si)
         upper = rib.profile_2d.get(-self.pos.si)
 
         diff = upper - lower
         if self.rotation:
-            diff = euklid.vector.Rotation2D(self.rotation.si).apply(diff)
+            diff = openglider.rs.vector.Rotation2D(self.rotation.si).apply(diff)
 
         center = lower + diff * (0.5 + self.vertical_shift.si/2)
         outer_point = center + diff.normalized() * self.get_diameter(rib)/2
 
         return center, outer_point
 
-    def _get_curves(self, rib: Rib, num: int=80) -> list[euklid.vector.PolyLine2D]:
+    def _get_curves(self, rib: Rib, num: int=80) -> list[openglider.rs.vector.PolyLine2D]:
         center, outer_point = self._get_points(rib)
         
         circle = Ellipse.from_center_p2(center, outer_point, self.width.si)
@@ -112,14 +112,14 @@ class RibHole(RibHoleBase):
         
         return diff.length() * self.size.si
     
-    def get_centers(self, rib: Rib, scale: bool=False) -> list[euklid.vector.Vector2D]:
+    def get_centers(self, rib: Rib, scale: bool=False) -> list[openglider.rs.vector.Vector2D]:
         return [self._get_points(rib)[0]]
 
 
-def polygon(points: list[euklid.vector.Vector2D], corner_size: float, num_points: int) -> euklid.vector.PolyLine2D:
+def polygon(points: list[openglider.rs.vector.Vector2D], corner_size: float, num_points: int) -> openglider.rs.vector.PolyLine2D:
     segments = []
 
-    def get_point(index: int) -> euklid.vector.Vector2D:
+    def get_point(index: int) -> openglider.rs.vector.Vector2D:
         if index >= len(points):
             index -= len(points)
         
@@ -138,7 +138,7 @@ def polygon(points: list[euklid.vector.Vector2D], corner_size: float, num_points
 
     sequence = []
     for i, segment in enumerate(segments):
-        sequence += euklid.spline.BSplineCurve(segment).get_sequence(num_points).nodes
+        sequence += openglider.rs.spline.BSplineCurve(segment).get_sequence(num_points).nodes
 
         if corner_size < 1:
             if i+1 >= len(segments):
@@ -148,23 +148,23 @@ def polygon(points: list[euklid.vector.Vector2D], corner_size: float, num_points
             
             sequence += [segment[-1], segment2[0]]
 
-    return euklid.vector.PolyLine2D(sequence).resample(num_points)
+    return openglider.rs.vector.PolyLine2D(sequence).resample(num_points)
 
 
 class PolygonHole(RibHoleBase):
-    points: list[euklid.vector.Vector2D]
+    points: list[openglider.rs.vector.Vector2D]
     corner_size: float=1
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def get_centers(self, rib: Rib, scale: bool=False) -> list[euklid.vector.Vector2D]:
-        centers = [sum(self.points, start=euklid.vector.Vector2D())/len(self.points)]
+    def get_centers(self, rib: Rib, scale: bool=False) -> list[openglider.rs.vector.Vector2D]:
+        centers = [sum(self.points, start=openglider.rs.vector.Vector2D())/len(self.points)]
 
         if scale:
             return [p * rib.chord for p in centers]
         
         return centers
 
-    def _get_curves(self, rib: Rib, num: int=160) -> list[euklid.vector.PolyLine2D]:
+    def _get_curves(self, rib: Rib, num: int=160) -> list[openglider.rs.vector.PolyLine2D]:
         return [polygon(self.points, self.corner_size, num)]
 
 
@@ -174,7 +174,7 @@ class RibSquareHole(RibHoleBase):
     height: Percentage
     corner_size: float = 1
 
-    def get_centers(self, rib: Rib, scale: bool=False) -> list[euklid.vector.Vector2D]:
+    def get_centers(self, rib: Rib, scale: bool=False) -> list[openglider.rs.vector.Vector2D]:
         width = rib.convert_to_percentage(self.width)
 
         x1 = self.x - width/2
@@ -191,7 +191,7 @@ class RibSquareHole(RibHoleBase):
         
         return centers
     
-    def _get_curves(self, rib: Rib, num: int=80) -> list[euklid.vector.PolyLine2D]:
+    def _get_curves(self, rib: Rib, num: int=80) -> list[openglider.rs.vector.PolyLine2D]:
         width = rib.convert_to_percentage(self.width)
         x1 = self.x - width/2
         x2 = self.x + width/2
@@ -201,10 +201,10 @@ class RibSquareHole(RibHoleBase):
             return []
         
         p1, p2, p3, p4 = self.align_contolpoints([
-            euklid.vector.Vector2D([x1, -self.height]),
-            euklid.vector.Vector2D([x2, -self.height]),
-            euklid.vector.Vector2D([x2, self.height]),
-            euklid.vector.Vector2D([x1, self.height])
+            openglider.rs.vector.Vector2D([x1, -self.height]),
+            openglider.rs.vector.Vector2D([x2, -self.height]),
+            openglider.rs.vector.Vector2D([x2, self.height]),
+            openglider.rs.vector.Vector2D([x1, self.height])
         ], rib)
 
         return PolygonHole(points=[p1, p2, p3, p4]).get_curves(rib, num)
@@ -246,14 +246,14 @@ class MultiSquareHole(RibHoleBase):
 
         return holes
     
-    def get_centers(self, rib: Rib, scale: bool=False) -> list[euklid.vector.Vector2D]:
+    def get_centers(self, rib: Rib, scale: bool=False) -> list[openglider.rs.vector.Vector2D]:
         holes = []
         for hole in self._get_holes(rib):
             holes += hole.get_centers(rib, scale=scale)
         
         return holes
     
-    def _get_curves(self, rib: Rib, num: int=80) -> list[euklid.vector.PolyLine2D]:
+    def _get_curves(self, rib: Rib, num: int=80) -> list[openglider.rs.vector.PolyLine2D]:
         curves = []
         for hole in self._get_holes(rib):
             curves += hole.get_curves(rib, num)
@@ -279,8 +279,8 @@ class AttachmentPointHole(RibHoleBase):
     def fit_holes(
             self,
             hole_positions: list[tuple[Percentage, Percentage]],
-            upper: euklid.vector.Interpolation,
-            lower: euklid.vector.Interpolation,
+            upper: openglider.rs.vector.Interpolation,
+            lower: openglider.rs.vector.Interpolation,
             triangle_factors: tuple[Percentage | None, Percentage | None] = (None, None)
             ) -> list[PolygonHole]:
         holes = []
@@ -289,7 +289,7 @@ class AttachmentPointHole(RibHoleBase):
         end = max([p[0] for p in upper.nodes + lower.nodes])
 
         # todo: find measure
-        def get_nodes(x: Percentage, triangle_factor: Percentage | None) -> list[euklid.vector.Vector2D]:
+        def get_nodes(x: Percentage, triangle_factor: Percentage | None) -> list[openglider.rs.vector.Vector2D]:
             x_normalized = max(start, min(end, x.si))
             upper_y = upper.get_value(x_normalized)
             lower_y = lower.get_value(x_normalized)
@@ -299,12 +299,12 @@ class AttachmentPointHole(RibHoleBase):
             
             if abs(upper_y - lower_y) < self.min_hole_height:
                 return [
-                    euklid.vector.Vector2D([x_normalized, (upper_y+lower_y)/2])
+                    openglider.rs.vector.Vector2D([x_normalized, (upper_y+lower_y)/2])
                 ]
             else:
                 return [
-                    euklid.vector.Vector2D([x_normalized, upper_y]),
-                    euklid.vector.Vector2D([x_normalized, lower_y])
+                    openglider.rs.vector.Vector2D([x_normalized, upper_y]),
+                    openglider.rs.vector.Vector2D([x_normalized, lower_y])
                 ]
 
         for hole_start, hole_end in hole_positions:
@@ -322,7 +322,7 @@ class AttachmentPointHole(RibHoleBase):
     def _get_holes_bottom(self, rib: Rib) -> list[PolygonHole]:
         envelope = self.get_envelope_airfoil(rib)
         lower_envelope = envelope.curve.get(envelope.noseindex, len(envelope.curve.nodes))
-        lower_interpolation = euklid.vector.Interpolation(lower_envelope.nodes)
+        lower_interpolation = openglider.rs.vector.Interpolation(lower_envelope.nodes)
 
         diagonal_border = rib.convert_to_percentage(self.border_diagonal).si
         side_border_pct = rib.convert_to_percentage(self.border_side)
@@ -334,12 +334,12 @@ class AttachmentPointHole(RibHoleBase):
         start_ik = envelope.get_ik(self.start) - envelope.noseindex
         end_ik = envelope.get_ik(self.end) - envelope.noseindex
 
-        upper_with_border = euklid.vector.PolyLine2D([upper_1, upper_2, upper_3]).offset(diagonal_border)
+        upper_with_border = openglider.rs.vector.PolyLine2D([upper_1, upper_2, upper_3]).offset(diagonal_border)
         cut_front = lower_envelope.cut(upper_with_border.nodes[0], upper_with_border.nodes[1], start_ik)
         cut_end = lower_envelope.cut(upper_with_border.nodes[1], upper_with_border.nodes[2], end_ik)
 
-        lower = euklid.vector.Interpolation(lower_envelope.get(cut_front[0], cut_end[0]).nodes)
-        upper = euklid.vector.Interpolation(upper_with_border.get(cut_front[1], 1+cut_end[1]).nodes)
+        lower = openglider.rs.vector.Interpolation(lower_envelope.get(cut_front[0], cut_end[0]).nodes)
+        upper = openglider.rs.vector.Interpolation(upper_with_border.get(cut_front[1], 1+cut_end[1]).nodes)
 
         border_pct = rib.convert_to_percentage(self.border)
 
@@ -376,19 +376,19 @@ class AttachmentPointHole(RibHoleBase):
         diagonal_border = rib.convert_to_percentage(self.border_diagonal).si
         side_border_pct = rib.convert_to_percentage(self.border_side)
 
-        upper_curve = euklid.vector.PolyLine2D(envelope.curve.nodes[:envelope.noseindex][::-1])
+        upper_curve = openglider.rs.vector.PolyLine2D(envelope.curve.nodes[:envelope.noseindex][::-1])
 
         top_center = rib.profile_2d.align([(self.start+self.end)/2, 1])
         bottom_start = rib.profile_2d.align([self.start, -1])
         bottom_end = rib.profile_2d.align([self.end, -1])
 
-        def get_ik_x(polyline: euklid.vector.PolyLine2D, x: float) -> float:
+        def get_ik_x(polyline: openglider.rs.vector.PolyLine2D, x: float) -> float:
             return polyline.cut(
-                euklid.vector.Vector2D([x, 0.]),
-                euklid.vector.Vector2D([x, 1.])
+                openglider.rs.vector.Vector2D([x, 0.]),
+                openglider.rs.vector.Vector2D([x, 1.])
             )[0][0]
 
-        diagonal_with_border = euklid.vector.PolyLine2D([bottom_start, top_center, bottom_end]).offset(-diagonal_border)
+        diagonal_with_border = openglider.rs.vector.PolyLine2D([bottom_start, top_center, bottom_end]).offset(-diagonal_border)
         nearest_top_x = diagonal_with_border.nodes[1][0]
         nearest_top_ik = get_ik_x(upper_curve, nearest_top_x)
 
@@ -400,26 +400,26 @@ class AttachmentPointHole(RibHoleBase):
         diagonal_cut_front = get_ik_x(diagonal_with_border, self.start.si)
         diagonal_cut_back = get_ik_x(diagonal_with_border, self.end.si)
 
-        upper_interpolation_front = euklid.vector.Interpolation(
+        upper_interpolation_front = openglider.rs.vector.Interpolation(
             upper_curve.get(
                 cut_1_front,
                 cut_1_back[0]
             ).nodes)
 
-        upper_interpolation_back = euklid.vector.Interpolation(
+        upper_interpolation_back = openglider.rs.vector.Interpolation(
             upper_curve.get(
                 cut_2_front[0],
                 cut_2_back
             ).nodes
         )
 
-        diagonal_interpolation_front = euklid.vector.Interpolation(
+        diagonal_interpolation_front = openglider.rs.vector.Interpolation(
             diagonal_with_border.get(
                 diagonal_cut_front,
                 cut_1_back[1]
             ).nodes
         )
-        diagonal_interpolation_back = euklid.vector.Interpolation(
+        diagonal_interpolation_back = openglider.rs.vector.Interpolation(
             diagonal_with_border.get(
                 cut_2_front[1]+1,
                 diagonal_cut_back
@@ -449,7 +449,7 @@ class AttachmentPointHole(RibHoleBase):
 
         return holes
 
-    def _get_curves(self, rib: Rib, num: int=80) -> list[euklid.vector.PolyLine2D]:
+    def _get_curves(self, rib: Rib, num: int=80) -> list[openglider.rs.vector.PolyLine2D]:
         curves = []
         for hole in self._get_holes_bottom(rib):
             curves += hole.get_curves(rib, num)
@@ -458,7 +458,7 @@ class AttachmentPointHole(RibHoleBase):
 
         return curves
 
-    def get_centers(self, rib: Rib, scale: bool=False) -> list[euklid.vector.Vector2D]:
+    def get_centers(self, rib: Rib, scale: bool=False) -> list[openglider.rs.vector.Vector2D]:
         holes = []
         for hole in self._get_holes_bottom(rib):
             holes += hole.get_centers(rib, scale=scale)

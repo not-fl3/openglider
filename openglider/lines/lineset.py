@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 from collections.abc import Callable
 from functools import cmp_to_key
 
-import euklid
+import openglider.rs
 from openglider.lines.node import Node
 from openglider.lines.line import Line
 from openglider.lines.elements import SagMatrix
@@ -68,8 +68,8 @@ class LineSet:
     knot_corrections = KnotCorrections.read_csv(os.path.join(os.path.dirname(__file__), "knots.csv"))
     mat: SagMatrix
 
-    def __init__(self, lines: list[Line], v_inf: euklid.vector.Vector3D | None=None):
-        self._v_inf = v_inf or euklid.vector.Vector3D([0,0,0])
+    def __init__(self, lines: list[Line], v_inf: openglider.rs.vector.Vector3D | None=None):
+        self._v_inf = v_inf or openglider.rs.vector.Vector3D([0,0,0])
         self.lines = lines or []
 
         self.mat = SagMatrix(len(self.lines))
@@ -99,7 +99,7 @@ class LineSet:
         }
 
     @classmethod
-    def __from_json__(cls, lines: list[dict[str, Any]], nodes: list[Node], v_inf: euklid.vector.Vector3D) -> LineSet:
+    def __from_json__(cls, lines: list[dict[str, Any]], nodes: list[Node], v_inf: openglider.rs.vector.Vector3D) -> LineSet:
         lines_new: list[Line] = []
         for line in lines:
             if isinstance(line["upper_node"], int):
@@ -111,18 +111,18 @@ class LineSet:
             
             lines_new.append(Line(**line))
         
-        v_inf = euklid.vector.Vector3D(v_inf)
+        v_inf = openglider.rs.vector.Vector3D(v_inf)
         obj = cls(lines_new, v_inf)
         obj.recalc()
         return obj
 
     @property
-    def v_inf(self) -> euklid.vector.Vector3D:
+    def v_inf(self) -> openglider.rs.vector.Vector3D:
         return self._v_inf
     
     @v_inf.setter
-    def v_inf(self, v_inf: euklid.vector.Vector3D) -> None:
-        self._v_inf = euklid.vector.Vector3D(v_inf)
+    def v_inf(self, v_inf: openglider.rs.vector.Vector3D) -> None:
+        self._v_inf = openglider.rs.vector.Vector3D(v_inf)
         for line in self.lines:
             line.v_inf = self._v_inf
 
@@ -357,7 +357,7 @@ class LineSet:
                 lines_upper = self.get_upper_connected_lines(upper_node)
                 self.calc_forces(lines_upper)
 
-                force = euklid.vector.Vector3D()
+                force = openglider.rs.vector.Vector3D()
                 for line in lines_upper:
                     if line.force is None:
                         logger.warning(f"error line force not set: {line}")
@@ -405,13 +405,13 @@ class LineSet:
     def get_connected_lines(self, node: Node) -> list[Line]:
         return self.get_upper_connected_lines(node) + self.get_lower_connected_lines(node)
 
-    def get_drag(self) -> tuple[euklid.vector.Vector3D, float]:
+    def get_drag(self) -> tuple[openglider.rs.vector.Vector3D, float]:
         """
         Get Total drag of the lineset
         :return: Center of Pressure, Drag (1/2*cw*A*v^2)
         """
         drag_total = 0.
-        center = euklid.vector.Vector3D()
+        center = openglider.rs.vector.Vector3D()
 
         for line in self.lines:
             drag_total += line.drag_total
@@ -434,7 +434,7 @@ class LineSet:
         return self.get_drag()[1] / self.v_inf.length()**2 * 2
 
     # -----CALCULATE GEO-----#
-    def get_tangential_comp(self, line: Line, pos_vec: euklid.vector.Vector3D) -> euklid.vector.Vector3D:
+    def get_tangential_comp(self, line: Line, pos_vec: openglider.rs.vector.Vector3D) -> openglider.rs.vector.Vector3D:
         # upper_lines = self.get_upper_connected_lines(line.upper_node)
         # first we try to use already computed forces
         # and shift the upper node by residual force
@@ -471,7 +471,7 @@ class LineSet:
         else:
             # if there are no computed forces available, use all the uppermost forces to compute
             # the direction of the line
-            tangent = euklid.vector.Vector3D([0,0,0])
+            tangent = openglider.rs.vector.Vector3D([0,0,0])
             upper_node = self.get_upper_influence_nodes(line)
             for node in upper_node:
                 tangent += node.calc_force_infl(pos_vec)
@@ -988,21 +988,21 @@ class LineSet:
         
         return table
 
-    def get_upper_connected_force(self, node: Node) -> euklid.vector.Vector3D:
+    def get_upper_connected_force(self, node: Node) -> openglider.rs.vector.Vector3D:
         '''
         get the sum of the forces of all upper-connected lines
         '''
-        force = euklid.vector.Vector3D()
+        force = openglider.rs.vector.Vector3D()
         for line in self.get_upper_connected_lines(node):
             if line.force:
                 force += line.diff_vector * line.force
         return force
 
-    def get_residual_force(self, node: Node) -> euklid.vector.Vector3D:
+    def get_residual_force(self, node: Node) -> openglider.rs.vector.Vector3D:
         '''
         compute the residual force in a node to due simplified computation of lines
         '''
-        residual_force = euklid.vector.Vector3D()
+        residual_force = openglider.rs.vector.Vector3D()
         upper_lines = self.get_upper_connected_lines(node)
         lower_lines = self.get_lower_connected_lines(node)
         for line in upper_lines:

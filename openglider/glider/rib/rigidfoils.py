@@ -5,7 +5,7 @@ import logging
 import math
 from typing import TYPE_CHECKING
 
-import euklid
+import openglider.rs
 import numpy as np
 from openglider.utils.dataclass import BaseModel, dataclass
 from openglider.vector.unit import Length, Percentage
@@ -29,21 +29,21 @@ class RigidFoilBase(ABC, BaseModel):
     material: str = "Plastic"
     diameter: Length = Length("2mm")
 
-    def get_3d(self, rib: Rib) -> euklid.vector.PolyLine3D:
-        return euklid.vector.PolyLine3D([rib.align(p, scale=False) for p in self.get_center_line(rib)])
+    def get_3d(self, rib: Rib) -> openglider.rs.vector.PolyLine3D:
+        return openglider.rs.vector.PolyLine3D([rib.align(p, scale=False) for p in self.get_center_line(rib)])
 
     def get_length(self, rib: Rib) -> float:
         return self.get_center_line(rib).get_length() * self.tension.si
 
-    def get_flattened(self, center_line: euklid.vector.PolyLine2D) -> euklid.vector.PolyLine2D:
+    def get_flattened(self, center_line: openglider.rs.vector.PolyLine2D) -> openglider.rs.vector.PolyLine2D:
         outer_line = center_line.offset(self.diameter.si/2).fix_errors()
         inner_line = center_line.offset(-self.diameter.si/2).fix_errors()
 
-        outline = euklid.vector.PolyLine2D(outer_line.nodes + inner_line.nodes[::-1]).close()
+        outline = openglider.rs.vector.PolyLine2D(outer_line.nodes + inner_line.nodes[::-1]).close()
 
         return outline
     
-    def get_center_line(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
+    def get_center_line(self, rib: Rib, glider: Glider=None) -> openglider.rs.vector.PolyLine2D:
         raise NotImplementedError()
 
     def get_cap_radius(self, start: bool) -> tuple[Length, Percentage]:
@@ -69,7 +69,7 @@ class RigidFoil(RigidFoilBase):
     def get_cap_radius(self, start: bool) -> tuple[Length, Percentage]:
         return -self.circle_radius, Percentage(0.35)
 
-    def get_center_line(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
+    def get_center_line(self, rib: Rib, glider: Glider=None) -> openglider.rs.vector.PolyLine2D:
         max_segment = 0.005  # 5mm
         profile = rib.get_hull()
         profile_normvectors = profile.normvectors
@@ -105,14 +105,14 @@ class RigidFoil(RigidFoilBase):
             for ik, x in zip(indices, point_range)
             ]
 
-        return euklid.vector.PolyLine2D(nodes)
+        return openglider.rs.vector.PolyLine2D(nodes)
 
 
 class _RigidFoilCurved(RigidFoilBase):
     append_curve: bool = True
     straight_part: Length = Length(0)
 
-    def get_center_line(self, rib: Rib, glider: Glider=None) -> euklid.vector.PolyLine2D:
+    def get_center_line(self, rib: Rib, glider: Glider=None) -> openglider.rs.vector.PolyLine2D:
         profile = rib.get_hull()
 
         start = profile.get_ik(self.start.si)
@@ -124,7 +124,7 @@ class _RigidFoilCurved(RigidFoilBase):
         inner_curve = rigidfoil_curve
 
         segments = rigidfoil_curve.get_segments()
-        rot_90 = euklid.vector.Rotation2D(math.pi/2)
+        rot_90 = openglider.rs.vector.Rotation2D(math.pi/2)
 
         # first ending
         _radius, _amount = self.get_cap_radius(True)
@@ -144,7 +144,7 @@ class _RigidFoilCurved(RigidFoilBase):
             inner_curve = inner_curve.get(cp1_ik, len(inner_curve)-1)
 
 
-        ending_1 = euklid.spline.BSplineCurve([cp3, cp2, cp1]).get_sequence(10).get(0, 9).nodes
+        ending_1 = openglider.rs.spline.BSplineCurve([cp3, cp2, cp1]).get_sequence(10).get(0, 9).nodes
         if self.straight_part:
             ending_1.insert(0, ending_1[0] + (ending_1[0] - ending_1[1]).normalized() * self.straight_part.si)
 
@@ -166,11 +166,11 @@ class _RigidFoilCurved(RigidFoilBase):
             inner_curve = inner_curve.get(0, cp1_ik)
 
 
-        ending_2 = euklid.spline.BSplineCurve([cp1, cp2, cp3]).get_sequence(10).get(0, 9).nodes
+        ending_2 = openglider.rs.spline.BSplineCurve([cp1, cp2, cp3]).get_sequence(10).get(0, 9).nodes
         if self.straight_part:
             ending_2.append(ending_2[-1] + (ending_2[-1] - ending_2[-2]).normalized() * self.straight_part.si)
 
-        return euklid.vector.PolyLine2D(ending_1 + inner_curve.nodes + ending_2)
+        return openglider.rs.vector.PolyLine2D(ending_1 + inner_curve.nodes + ending_2)
 
 
 class RigidFoilCurved(_RigidFoilCurved):
@@ -201,7 +201,7 @@ class FoilCurve:
     front: float = 0
     end: float = 0.17
 
-    def get_flattened(self, rib: Rib, numpoints: int=30) -> euklid.vector.PolyLine2D:
+    def get_flattened(self, rib: Rib, numpoints: int=30) -> openglider.rs.vector.PolyLine2D:
         curve = [
             [self.end, 0.75],
             [self.end-0.05, 1],
@@ -213,4 +213,4 @@ class FoilCurve:
 
         controlpoints = [profile.align(point)*rib.chord for point in curve]
 
-        return euklid.spline.BezierCurve(controlpoints).get_sequence(numpoints)
+        return openglider.rs.spline.BezierCurve(controlpoints).get_sequence(numpoints)

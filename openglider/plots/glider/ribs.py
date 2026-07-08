@@ -5,7 +5,7 @@ import math
 from typing import TYPE_CHECKING, Literal
 from collections.abc import Callable
 
-import euklid
+import openglider.rs
 
 from openglider.airfoil import get_x_value
 from openglider.glider.cell.diagonals import DiagonalSide
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from openglider.glider import Glider
 
 
-Vector2D = euklid.vector.Vector2D
+Vector2D = openglider.rs.vector.Vector2D
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,9 @@ class RigidFoilPlot:
     ribplot: RibPlot
 
     drawing: PlotPart
-    inner_curve: euklid.vector.PolyLine2D | None = None
-    outer_curve: euklid.vector.PolyLine2D | None = None
-    center_curve: euklid.vector.PolyLine2D | None = None
+    inner_curve: openglider.rs.vector.PolyLine2D | None = None
+    outer_curve: openglider.rs.vector.PolyLine2D | None = None
+    center_curve: openglider.rs.vector.PolyLine2D | None = None
 
     def __init__(self, rigidfoil: RigidFoilBase, ribplot: RibPlot) -> None:
         self.rigidfoil = rigidfoil
@@ -74,7 +74,7 @@ class RigidFoilPlot:
         outer_point = center_point + normal * outer_distance
         inner_point = center_point - normal * inner_distance
         # back cap
-        diff = euklid.vector.Rotation2D(angle).apply(inner_point - outer_point).normalized() * self.rigidfoil.cap_length.si
+        diff = openglider.rs.vector.Rotation2D(angle).apply(inner_point - outer_point).normalized() * self.rigidfoil.cap_length.si
 
         return (
             (inner_point, outer_point),
@@ -93,7 +93,7 @@ class RigidFoilPlot:
         
         return (self.rigidfoil.diameter/2+allowance)
     
-    def setup(self, glider: Glider) -> tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]:
+    def setup(self, glider: Glider) -> tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]:
         if any([x is None for x in [self.inner_curve, self.outer_curve, self.center_curve]]):
             curve = self.rigidfoil.get_center_line(self.ribplot.rib, glider)
 
@@ -119,25 +119,26 @@ class RigidFoilPlot:
         curve, inner_curve, outer_curve = self.setup(glider)
         plotpart = self.drawing
 
-        controlpoints: list[tuple[float, list[euklid.vector.PolyLine2D]]] = []
+        controlpoints: list[tuple[float, list[openglider.rs.vector.PolyLine2D]]] = []
         for x in self.ribplot.config.get_controlpoints(self.ribplot.rib):
             for mark in self.ribplot.insert_mark(x, self.ribplot.config.marks_controlpoint, insert=False):
                 controlpoints.append((x, mark))
 
         # add marks into the profile
-        self.ribplot.plotpart.layers[self.ribplot.layer_name_laser_dots].append(euklid.vector.PolyLine2D([curve.get(0)]))
-        self.ribplot.plotpart.layers[self.ribplot.layer_name_laser_dots].append(euklid.vector.PolyLine2D([curve.get(len(curve)-1)]))
+        self.ribplot.plotpart.layers[self.ribplot.layer_name_laser_dots].append(openglider.rs.vector.PolyLine2D([curve.get(0)]))
+        self.ribplot.plotpart.layers[self.ribplot.layer_name_laser_dots].append(openglider.rs.vector.PolyLine2D([curve.get(len(curve)-1)]))
 
         back_cap = self.get_cap("back")
-        plotpart.layers[self.ribplot.layer_name_marks].append(euklid.vector.PolyLine2D(list(back_cap[0])))
+        plotpart.layers[self.ribplot.layer_name_marks].append(openglider.rs.vector.PolyLine2D(list(back_cap[0])))
 
         front_cap = self.get_cap("front")
-        plotpart.layers[self.ribplot.layer_name_marks].append(euklid.vector.PolyLine2D(list(front_cap[0])))
+        plotpart.layers[self.ribplot.layer_name_marks].append(openglider.rs.vector.PolyLine2D(list(front_cap[0])))
         
-        outline = inner_curve
-        outline += euklid.vector.PolyLine2D(list(back_cap[1]))
-        outline += outer_curve.reverse()
-        outline += euklid.vector.PolyLine2D(list(front_cap[1])).reverse()
+        outline_nodes = inner_curve.nodes[:]
+        outline_nodes += list(back_cap[1])
+        outline_nodes += outer_curve.reverse().nodes
+        outline_nodes += openglider.rs.vector.PolyLine2D(list(front_cap[1])).reverse().nodes
+        outline = openglider.rs.vector.PolyLine2D(outline_nodes)
 
         for x, controlpoint in controlpoints:
             p = controlpoint[0].nodes[0]
@@ -156,8 +157,8 @@ class RigidFoilPlot:
 
 class RibPlot:
     x_values: list[float]
-    inner: euklid.vector.PolyLine2D
-    outer: euklid.vector.PolyLine2D
+    inner: openglider.rs.vector.PolyLine2D
+    outer: openglider.rs.vector.PolyLine2D
 
     config: PatternConfig
     DefaultConf = PatternConfig
@@ -326,13 +327,13 @@ class RibPlot:
         if add_rigidfoils_to_plot and rigidfoils:
             diff = max([r.max_x for r in rigidfoils])
             for rigidfoil in rigidfoils:
-                rigidfoil.move(euklid.vector.Vector2D([-(diff-self.plotpart.min_x+0.2), 0]))
+                rigidfoil.move(openglider.rs.vector.Vector2D([-(diff-self.plotpart.min_x+0.2), 0]))
 
                 self.plotpart += rigidfoil
 
         return self.plotpart
 
-    def _get_inner_outer(self, x_value: Percentage | float) -> tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]:
+    def _get_inner_outer(self, x_value: Percentage | float) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:
         ik = get_x_value(self.x_values, x_value)
 
         inner = self.inner.get(ik)
@@ -343,10 +344,10 @@ class RibPlot:
     def insert_mark(
         self,
         position: float | Percentage,
-        mark_function: Callable[[euklid.vector.Vector2D, euklid.vector.Vector2D], dict[str, list[euklid.vector.PolyLine2D]]],
+        mark_function: Callable[[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D], dict[str, list[openglider.rs.vector.PolyLine2D]]],
         insert: bool=True,
         force_layer_name: str | None = None
-        ) -> list[list[euklid.vector.PolyLine2D]]:
+        ) -> list[list[openglider.rs.vector.PolyLine2D]]:
 
         marks = []
         #if mark_function_func := getattr(mark_function, "__func__", None):
@@ -378,7 +379,7 @@ class RibPlot:
             if x_end is None or abs(x) <= x_end:
                 self.insert_mark(x, self.config.marks_controlpoint)
 
-    def get_point(self, x: float | Percentage, y: float=-1.) -> euklid.vector.Vector2D:
+    def get_point(self, x: float | Percentage, y: float=-1.) -> openglider.rs.vector.Vector2D:
         x = float(x)
         assert x >= 0
         p = self.rib.profile_2d.profilepoint(x, y)
@@ -395,14 +396,14 @@ class RibPlot:
         else:
             p1 = self.get_point(side.start_x(self.rib), side.height)
             p2 = self.get_point(side.end_x(self.rib), side.height)
-            self.plotpart.layers[self.layer_name_marks].append(euklid.vector.PolyLine2D([p1, p2]))
+            self.plotpart.layers[self.layer_name_marks].append(openglider.rs.vector.PolyLine2D([p1, p2]))
 
-    def insert_holes(self) -> list[euklid.vector.PolyLine2D]:
+    def insert_holes(self) -> list[openglider.rs.vector.PolyLine2D]:
         holes: list[PlotPart] = []
         for hole in self.rib.holes:
             holes.append(hole.get_flattened(self.rib, num=200, layer_name=self.layer_name_crossports))
         
-        curves: list[euklid.vector.PolyLine2D] = []
+        curves: list[openglider.rs.vector.PolyLine2D] = []
         for plotpart in holes:
             self.plotpart += plotpart
             curves += list(plotpart.layers["cuts"])
@@ -417,7 +418,7 @@ class RibPlot:
         ik = self.outer.cut(inner_point, outer_point, min(ik_inner, len(self.outer)-1))
         return ik[0]
 
-    def draw_outline(self, glider: Glider) -> euklid.vector.PolyLine2D:
+    def draw_outline(self, glider: Glider) -> openglider.rs.vector.PolyLine2D:
         """
         Cut trailing edge of outer rib
         """
@@ -439,8 +440,8 @@ class RibPlot:
             inner_start = 0
             inner_end = len(self.inner)-1
 
-            p1 = self.inner.nodes[0] + euklid.vector.Vector2D([0, 1])
-            p2 = self.inner.nodes[0] + euklid.vector.Vector2D([0, -1])
+            p1 = self.inner.nodes[0] + openglider.rs.vector.Vector2D([0, 1])
+            p2 = self.inner.nodes[0] + openglider.rs.vector.Vector2D([0, -1])
             cuts = self.outer.cut(p1, p2)
 
             if len(cuts) != 2:
@@ -451,8 +452,8 @@ class RibPlot:
 
             if self.rib.trailing_edge_extra is not None:
                 trailing_edge = [
-                    self.outer.get(stop) + euklid.vector.Vector2D([self.rib.trailing_edge_extra.si, 0]),
-                    self.outer.get(start) + euklid.vector.Vector2D([self.rib.trailing_edge_extra.si, 0]),
+                    self.outer.get(stop) + openglider.rs.vector.Vector2D([self.rib.trailing_edge_extra.si, 0]),
+                    self.outer.get(start) + openglider.rs.vector.Vector2D([self.rib.trailing_edge_extra.si, 0]),
                     self.outer.get(start)
                     ]
             else:
@@ -500,7 +501,7 @@ class RibPlot:
                     p2 = line2[0]
                     
                     diff = p2 - p1
-                    normal = euklid.vector.Vector2D([diff[1], -diff[0]]).normalized()
+                    normal = openglider.rs.vector.Vector2D([diff[1], -diff[0]]).normalized()
 
                     outline_lst.append(p1 + normal * allowance_diff.si)
                     outline_lst.append(p2 + normal * allowance_diff.si)
@@ -508,10 +509,10 @@ class RibPlot:
                 outline_lst += line2
                 outline_lst += trailing_edge
 
-                outline = euklid.vector.PolyLine2D(outline_lst)
+                outline = openglider.rs.vector.PolyLine2D(outline_lst)
         
         if outline is None:
-            outline = euklid.vector.PolyLine2D(
+            outline = openglider.rs.vector.PolyLine2D(
                 self.outer.get(start, stop).nodes + trailing_edge
             ).fix_errors()
 
@@ -541,7 +542,7 @@ class RibPlot:
             diff = outer - inner
 
             p1 = inner + diff * 0.5
-            p2 = p1 + euklid.vector.Rotation2D(-math.pi/2).apply(diff)
+            p2 = p1 + openglider.rs.vector.Rotation2D(-math.pi/2).apply(diff)
 
             _text = Text(text, p1, p2, size=(outer-inner).length()*0.5, valign=0)
             #_text = Text(text, p1, p2, size=0.05)
@@ -568,7 +569,7 @@ class RibPlot:
 class SingleSkinRibPlot(RibPlot):
     skin_cut: Percentage | None = None
 
-    def _get_inner_outer(self, x_value: Percentage | float) -> tuple[euklid.vector.Vector2D, euklid.vector.Vector2D]:
+    def _get_inner_outer(self, x_value: Percentage | float) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:
         # TODO: shift when after the endpoint
 
         if self.skin_cut is None or x_value < self.skin_cut:
@@ -579,7 +580,7 @@ class SingleSkinRibPlot(RibPlot):
             ik = hull.get_ik(x_value)
 
             segment = segments[min(int(ik), len(segments)-1)].normalized()
-            normal = euklid.vector.Rotation2D(math.pi/2).apply(segment)
+            normal = openglider.rs.vector.Rotation2D(math.pi/2).apply(segment)
 
 
             p1 = hull.curve.get(ik) * self.rib.chord
@@ -622,20 +623,20 @@ class SingleSkinRibPlot(RibPlot):
         self._get_singleskin_cut(glider)
         return super().flatten(glider, add_rigidfoils_to_plot=add_rigidfoils_to_plot)
 
-    def draw_outline(self, glider: Glider) -> euklid.vector.PolyLine2D:
+    def draw_outline(self, glider: Glider) -> openglider.rs.vector.PolyLine2D:
         """
         Cut trailing edge of outer rib
         """
         outer_rib = self.outer
         inner_rib = self.inner
 
-        p1 = inner_rib.get(0) + euklid.vector.Vector2D([0, 1])
-        p2 = inner_rib.get(0) + euklid.vector.Vector2D([0, -1])
+        p1 = inner_rib.get(0) + openglider.rs.vector.Vector2D([0, 1])
+        p2 = inner_rib.get(0) + openglider.rs.vector.Vector2D([0, -1])
         cuts = outer_rib.cut(p1, p2)
 
         start = cuts[0][0]
 
-        contour = euklid.vector.PolyLine2D([])
+        contour = openglider.rs.vector.PolyLine2D([])
 
         # outer is going from the back back until the singleskin cut
 
@@ -643,14 +644,14 @@ class SingleSkinRibPlot(RibPlot):
         single_skin_cut = self.rib.profile_2d(singleskin_cut_left)
 
         if self.rib.trailing_edge_extra is not None:
-            buerzl = euklid.vector.PolyLine2D([
+            buerzl = openglider.rs.vector.PolyLine2D([
                 inner_rib.get(0),
-                inner_rib.get(0) + euklid.vector.Vector2D([self.rib.trailing_edge_extra.si, 0]),
-                outer_rib.get(start) + euklid.vector.Vector2D([self.rib.trailing_edge_extra.si, 0]),
+                inner_rib.get(0) + openglider.rs.vector.Vector2D([self.rib.trailing_edge_extra.si, 0]),
+                outer_rib.get(start) + openglider.rs.vector.Vector2D([self.rib.trailing_edge_extra.si, 0]),
                 outer_rib.get(start)
                 ])
         else:
-            buerzl = euklid.vector.PolyLine2D([
+            buerzl = openglider.rs.vector.PolyLine2D([
                 inner_rib.get(0),
                 outer_rib.get(start)
             ])

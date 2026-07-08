@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import euklid
+import openglider.rs
 import os
 import re
 import datetime
@@ -115,10 +115,10 @@ class GliderProject:
         table["B11"] = f"{z_rel:.01f} %"
 
         rib = self.glider_3d.ribs[0]
-        p0 = rib.align(euklid.vector.Vector2D([0, 0]))
+        p0 = rib.align(openglider.rs.vector.Vector2D([0, 0]))
         
         diff = attachment_point - p0
-        rib_diff = rib.align(euklid.vector.Vector2D([1, 0]))-p0
+        rib_diff = rib.align(openglider.rs.vector.Vector2D([1, 0]))-p0
 
         x_rel = diff.dot(rib_diff) / rib_diff.dot(rib_diff) * 100
 

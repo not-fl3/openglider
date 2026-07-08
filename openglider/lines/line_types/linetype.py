@@ -4,7 +4,7 @@ from openglider.utils.colors import Color
 from openglider.utils.dataclass import dataclass, Field
 import logging
 
-import euklid
+import openglider.rs
 
 logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class LineType:
         if abs(stretch_curve[0][0]-0) > 1e-3:
             stretch_curve.insert(0, (.0, 0.))
         
-        self.stretch_interpolation = euklid.vector.Interpolation(stretch_curve, extrapolate=True)
+        self.stretch_interpolation = openglider.rs.vector.Interpolation(stretch_curve, extrapolate=True)
 
         # TODO: REMOVE!
         self.thickness = self.thickness / 1000

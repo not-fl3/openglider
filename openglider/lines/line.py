@@ -5,7 +5,7 @@ import logging
 import math
 
 import pydantic
-import euklid
+import openglider.rs
 
 from openglider.lines.node import Node
 from openglider.lines import line_types
@@ -27,7 +27,7 @@ class Line(BaseModel):
 
     target_length: Length | None
 
-    v_inf: euklid.vector.Vector3D
+    v_inf: openglider.rs.vector.Vector3D
 
     line_type: line_types.LineType = line_types.LineType.get("default")
     color: str = "default"
@@ -69,12 +69,12 @@ class Line(BaseModel):
             return False
 
     @property
-    def v_inf_0(self) -> euklid.vector.Vector3D:
+    def v_inf_0(self) -> openglider.rs.vector.Vector3D:
         return self.v_inf.normalized()
 
     #@cached_property('lower_node.position', 'upper_node.position')
     @property
-    def diff_vector(self) -> euklid.vector.Vector3D:
+    def diff_vector(self) -> openglider.rs.vector.Vector3D:
         """
         Line Direction vector (normalized)
         :return:
@@ -83,7 +83,7 @@ class Line(BaseModel):
 
     #@cached_property('lower_node.position', 'upper_node.position')
     @property
-    def diff_vector_projected(self) -> euklid.vector.Vector3D:
+    def diff_vector_projected(self) -> openglider.rs.vector.Vector3D:
         return (self.upper_node.vec_proj - self.lower_node.vec_proj).normalized()
 
     @cached_property('lower_node.vec_proj', 'upper_node.vec_proj')
@@ -168,7 +168,7 @@ class Line(BaseModel):
             logger.error(f"invalid force: {self.name}, {self.force} {self.length_no_sag}")
             raise e
 
-    def get_line_points(self, sag: bool=True, numpoints: int=10) -> list[euklid.vector.Vector3D]:
+    def get_line_points(self, sag: bool=True, numpoints: int=10) -> list[openglider.rs.vector.Vector3D]:
         """
         Return points of the line
         """
@@ -176,7 +176,7 @@ class Line(BaseModel):
             sag=False
         return [self.get_line_point(i / (numpoints - 1), sag=sag) for i in range(numpoints)]
 
-    def get_line_point(self, x: float, sag: bool=True) -> euklid.vector.Vector3D:
+    def get_line_point(self, x: float, sag: bool=True) -> openglider.rs.vector.Vector3D:
         """pos(x) [x,y,z], x: [0,1]"""
         point = self.lower_node.position * (1. - x) + self.upper_node.position * x
         if sag:
@@ -250,12 +250,12 @@ class Line(BaseModel):
         
         return ribs
 
-    def get_rib_normal(self, glider: Glider) -> euklid.vector.Vector3D:
+    def get_rib_normal(self, glider: Glider) -> openglider.rs.vector.Vector3D:
         '''
         return the rib normal of the connected rib(s)
         '''
         ribs = self.get_connected_ribs(glider)
-        result = euklid.vector.Vector3D()
+        result = openglider.rs.vector.Vector3D()
 
         for rib in ribs:
             result += rib.normalized_normale
@@ -270,7 +270,7 @@ class Line(BaseModel):
         '''
         return self.diff_vector.dot(self.get_rib_normal(glider))
 
-    def get_correction_influence(self, residual_force: euklid.vector.Vector3D) -> float:
+    def get_correction_influence(self, residual_force: openglider.rs.vector.Vector3D) -> float:
         '''
         returns an influence factor [force / length] which is a proposal for
         the correction of a residual force if the line is moved in the direction

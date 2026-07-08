@@ -5,7 +5,7 @@ import math
 from collections.abc import Sequence
 from typing import Literal
 
-import euklid
+import openglider.rs
 import openglider.utils
 import pyfoil.airfoil
 from openglider.airfoil import Profile3D
@@ -28,10 +28,10 @@ logger = logging.getLogger(__file__)
 
 
 class FlattenedCell(BaseModel):
-    inner: list[euklid.vector.PolyLine2D]
-    ballooned: tuple[euklid.vector.PolyLine2D, euklid.vector.PolyLine2D]
+    inner: list[openglider.rs.vector.PolyLine2D]
+    ballooned: tuple[openglider.rs.vector.PolyLine2D, openglider.rs.vector.PolyLine2D]
 
-    def at_position(self, y: Percentage) -> euklid.vector.PolyLine2D:
+    def at_position(self, y: Percentage) -> openglider.rs.vector.PolyLine2D:
         if y.si == 0:
             return self.ballooned[0]
         elif y.si == 1:
@@ -114,7 +114,7 @@ class Cell(BaseModel):
         # project the base point of prof2 on the line of prof1
 
         diff = self.rib2.pos - self.rib1.pos
-        rib1_chord_line = self.rib1.rotation_matrix.apply(euklid.vector.Vector2D([1, 0]))
+        rib1_chord_line = self.rib1.rotation_matrix.apply(openglider.rs.vector.Vector2D([1, 0]))
 
         return diff.cross(rib1_chord_line).length()
 
@@ -136,7 +136,7 @@ class Cell(BaseModel):
         
         return BasicCell(prof1=profile1, prof2=profile2, ballooning_phi=list(self.ballooning_phi))
 
-    def get_normvector(self) -> euklid.vector.Vector3D:
+    def get_normvector(self) -> openglider.rs.vector.Vector3D:
         p1 = self.rib1.point(-1)
         p2 = self.rib2.point(0)
 
@@ -176,13 +176,13 @@ class Cell(BaseModel):
         # self.basic_cell.prof2 = self.prof2
         shape_with_ballooning = self.basic_cell.midrib(minirib.yvalue, ballooning=True, arc_argument=True).curve.nodes
         shape_without_ballooning = self.basic_cell.midrib(minirib.yvalue, ballooning=False).curve.nodes
-        points: list[euklid.vector.Vector3D] = []
+        points: list[openglider.rs.vector.Vector3D] = []
         for xval, with_bal, without_bal in zip(
                 self.x_values, shape_with_ballooning, shape_without_ballooning):
             fakt = minirib.get_multiplier(xval)  # factor ballooned/unb. (0-1)
             point = without_bal + (with_bal - without_bal) * fakt
             points.append(point)
-        return Profile3D(curve=euklid.vector.PolyLine3D(points), x_values=self.x_values)
+        return Profile3D(curve=openglider.rs.vector.PolyLine3D(points), x_values=self.x_values)
 
     @cached_property('rib_profiles_3d')
     def _child_cells(self) -> list[BasicCell]:
@@ -271,7 +271,7 @@ class Cell(BaseModel):
     def prof2(self) -> Profile3D:
         return self.rib2.profile_3d
 
-    def point(self, y: float=0, i: int=0, k: float=0.) -> euklid.vector.Vector3D:
+    def point(self, y: float=0, i: int=0, k: float=0.) -> openglider.rs.vector.Vector3D:
         return self.midrib(y).get(i+k)
 
     @cached_function("self")
@@ -356,14 +356,14 @@ class Cell(BaseModel):
 
     @property
     def span(self) -> float:
-        return ((self.rib1.pos - self.rib2.pos) * euklid.vector.Vector3D([0, 1, 1])).length()
+        return ((self.rib1.pos - self.rib2.pos) * openglider.rs.vector.Vector3D([0, 1, 1])).length()
 
     @property
     def area(self) -> float:
-        p1_1 = self.rib1.align(euklid.vector.Vector2D([0, 0]))
-        p1_2 = self.rib1.align(euklid.vector.Vector2D([1, 0]))
-        p2_1 = self.rib2.align(euklid.vector.Vector2D([0, 0]))
-        p2_2 = self.rib2.align(euklid.vector.Vector2D([1, 0]))
+        p1_1 = self.rib1.align(openglider.rs.vector.Vector2D([0, 0]))
+        p1_2 = self.rib1.align(openglider.rs.vector.Vector2D([1, 0]))
+        p2_1 = self.rib2.align(openglider.rs.vector.Vector2D([0, 0]))
+        p2_2 = self.rib2.align(openglider.rs.vector.Vector2D([1, 0]))
 
         return 0.5 * ((p1_2 - p1_1).cross(p2_1 - p1_1).length() + (p2_2-p2_1).cross(p2_2-p1_2).length())
 
@@ -371,19 +371,19 @@ class Cell(BaseModel):
     def projected_area(self) -> float:
         """ return the z component of the crossproduct
             of the cell diagonals"""
-        p1_1 = self.rib1.align(euklid.vector.Vector2D([0, 0]))
-        p1_2 = self.rib1.align(euklid.vector.Vector2D([1, 0]))
-        p2_1 = self.rib2.align(euklid.vector.Vector2D([0, 0]))
-        p2_2 = self.rib2.align(euklid.vector.Vector2D([1, 0]))
+        p1_1 = self.rib1.align(openglider.rs.vector.Vector2D([0, 0]))
+        p1_2 = self.rib1.align(openglider.rs.vector.Vector2D([1, 0]))
+        p2_1 = self.rib2.align(openglider.rs.vector.Vector2D([0, 0]))
+        p2_2 = self.rib2.align(openglider.rs.vector.Vector2D([1, 0]))
 
         return -0.5 * (p2_1-p1_2).cross(p2_2-p1_1)[2]
 
     @property
-    def centroid(self) -> euklid.vector.Vector3D:
-        p1_1 = self.rib1.align(euklid.vector.Vector2D([0, 0]))
-        p1_2 = self.rib1.align(euklid.vector.Vector2D([1, 0]))
-        p2_1 = self.rib2.align(euklid.vector.Vector2D([0, 0]))
-        p2_2 = self.rib2.align(euklid.vector.Vector2D([1, 0]))
+    def centroid(self) -> openglider.rs.vector.Vector3D:
+        p1_1 = self.rib1.align(openglider.rs.vector.Vector2D([0, 0]))
+        p1_2 = self.rib1.align(openglider.rs.vector.Vector2D([1, 0]))
+        p2_1 = self.rib2.align(openglider.rs.vector.Vector2D([0, 0]))
+        p2_2 = self.rib2.align(openglider.rs.vector.Vector2D([1, 0]))
 
         centroid = (p1_1 + p1_2 + p2_1 + p2_2) / 4
         return centroid
@@ -479,12 +479,12 @@ class Cell(BaseModel):
         def get_length(ik1: float, ik2: float) -> float:
             index_str = f"{ik1}:{ik2}"
             if index_str not in len_dct:
-                points: list[euklid.vector.Vector3D] = []
+                points: list[openglider.rs.vector.Vector3D] = []
                 for i, rib in enumerate(midribs):
                     x = ik1 + i/(numribs-1) * (ik2-ik1)
                     points.append(rib[x])
                 
-                line = euklid.vector.PolyLine3D(points)
+                line = openglider.rs.vector.PolyLine3D(points)
 
                 len_dct[index_str] = line.get_length()
 
@@ -492,13 +492,13 @@ class Cell(BaseModel):
 
         l_0 = get_length(0, 0)
 
-        left_bal = [euklid.vector.Vector2D([0, 0])]
-        right_bal = [euklid.vector.Vector2D([l_0, 0])]
+        left_bal = [openglider.rs.vector.Vector2D([0, 0])]
+        right_bal = [openglider.rs.vector.Vector2D([l_0, 0])]
 
-        rotate_left = euklid.vector.Rotation2D(-math.pi/2)
-        rotate_right = euklid.vector.Rotation2D(math.pi/2)
+        rotate_left = openglider.rs.vector.Rotation2D(-math.pi/2)
+        rotate_right = openglider.rs.vector.Rotation2D(math.pi/2)
 
-        def get_point(p1: euklid.vector.Vector2D, p2: euklid.vector.Vector2D, l_0: float, l_l: float, l_r: float, left: bool=True) -> euklid.vector.Vector2D:
+        def get_point(p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D, l_0: float, l_l: float, l_r: float, left: bool=True) -> openglider.rs.vector.Vector2D:
             lx = (l_0**2 + l_l**2 - l_r**2) / (2*l_0)
             ly_sq = l_l**2 - lx**2
             if ly_sq > 0:
@@ -536,11 +536,11 @@ class Cell(BaseModel):
             #right_bal.append(get_point(p2, p1, l_0, d_r, get_length(i, i+1), left=False))
 
         ballooned = (
-            euklid.vector.PolyLine2D(left_bal),
-            euklid.vector.PolyLine2D(right_bal)
+            openglider.rs.vector.PolyLine2D(left_bal),
+            openglider.rs.vector.PolyLine2D(right_bal)
         )
 
-        inner: list[euklid.vector.PolyLine2D] = []
+        inner: list[openglider.rs.vector.PolyLine2D] = []
 
         if num_inner is None:
             num_inner = numribs+2

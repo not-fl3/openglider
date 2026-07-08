@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import logging
-import euklid
+import openglider.rs
 
 from openglider.plots.config import PatternConfig
 from openglider.utils.config import Config
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from openglider.glider.cell import Cell
 
 
-Vector2D = euklid.vector.Vector2D
+Vector2D = openglider.rs.vector.Vector2D
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class MiniRibPlot:
     layer_name_crossports = "cuts"
 
 
-    outer_curve: euklid.vector.PolyLine2D | None = None
+    outer_curve: openglider.rs.vector.PolyLine2D | None = None
     
 
     def __init__(self, minirib: MiniRib, cell :Cell, config: Config | None=None) -> None:
@@ -51,7 +51,7 @@ class MiniRibPlot:
         self.config = self.DefaultConf(config)
 
 
-    def get_point(self, x: float | Percentage, y: float=-1.) -> euklid.vector.Vector2D:
+    def get_point(self, x: float | Percentage, y: float=-1.) -> openglider.rs.vector.Vector2D:
         x = float(x)
         assert x >= 0
 
@@ -63,7 +63,7 @@ class MiniRibPlot:
 
         p_temp[0] = p_temp[0] * profile.curve.nodes[0][0]
 
-        return euklid.vector.Vector2D(p_temp)
+        return openglider.rs.vector.Vector2D(p_temp)
 
 
     def add_text(self, plotpart: PlotPart) -> None:
@@ -74,7 +74,7 @@ class MiniRibPlot:
         p2 = self.get_point(posX, -1)
 
         p1 = (p1+p2)/2
-        p2 = p1 +euklid.vector.Vector2D([0.02,-0.005])
+        p2 = p1 +openglider.rs.vector.Vector2D([0.02,-0.005])
 
         _text = Text(self.minirib.name, p1, p2, size=0.01, align="center", valign=0)
 
@@ -82,19 +82,19 @@ class MiniRibPlot:
         plotpart.layers[self.layer_name_text] += _text.get_vectors()
 
     
-    def draw_outline(self) -> euklid.vector.PolyLine2D:
+    def draw_outline(self) -> openglider.rs.vector.PolyLine2D:
         """
         get 2d line
         """
         outer_minirib = self.outer.fix_errors()
         inner_minirib = self.inner
         t_e_allowance = self.cell.panels[-1].cut_back.seam_allowance.si
-        p1 = inner_minirib.nodes[0] + euklid.vector.Vector2D([0, 1])
-        p2 = inner_minirib.nodes[0] + euklid.vector.Vector2D([0, -1])
+        p1 = inner_minirib.nodes[0] + openglider.rs.vector.Vector2D([0, 1])
+        p2 = inner_minirib.nodes[0] + openglider.rs.vector.Vector2D([0, -1])
 
 
-        p3 = euklid.vector.Vector2D([min(x[0] for x in inner_minirib.tolist()), max(x[1] for x in inner_minirib.tolist())]) # probably there is a euklid function for that,... 
-        p4 = euklid.vector.Vector2D([min(x[0] for x in inner_minirib.tolist()), min(x[1] for x in inner_minirib.tolist())])
+        p3 = openglider.rs.vector.Vector2D([min(x[0] for x in inner_minirib.tolist()), max(x[1] for x in inner_minirib.tolist())]) # probably there is a openglider.rs function for that,... 
+        p4 = openglider.rs.vector.Vector2D([min(x[0] for x in inner_minirib.tolist()), min(x[1] for x in inner_minirib.tolist())])
 
         cuts = outer_minirib.cut(p1, p2)
 
@@ -128,13 +128,13 @@ class MiniRibPlot:
             #sewing allowance back
             end = [
             outer_minirib.get(stop),
-            outer_minirib.get(stop) + euklid.vector.Vector2D([t_e_allowance, 0]),
-            outer_minirib.get(start) + euklid.vector.Vector2D([t_e_allowance, 0]),
+            outer_minirib.get(stop) + openglider.rs.vector.Vector2D([t_e_allowance, 0]),
+            outer_minirib.get(start) + openglider.rs.vector.Vector2D([t_e_allowance, 0]),
             outer_minirib.get(start)
             ]
 
         
-        contour = euklid.vector.PolyLine2D(
+        contour = openglider.rs.vector.PolyLine2D(
              outer_minirib.get(start, middle_top).nodes + nosew + outer_minirib.get(middle_bot, stop).nodes + end
         )
 

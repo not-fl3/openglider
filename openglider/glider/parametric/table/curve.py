@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import euklid
+import openglider.rs
 from typing import Any, Type
 from packaging.version import Version
 from openglider.glider.parametric.table.base import TableType
@@ -41,7 +41,7 @@ class CurveTable:
             curve_type = self.table[1, column+1] or "Curve"
             curve_unit = self.table[2, column+1]
 
-            points: list[euklid.vector.Vector2D] = []
+            points: list[openglider.rs.vector.Vector2D] = []
 
             for row in range(3, self.table.num_rows):
                 coords = [self.table[row, column+i] for i in range(curve_columns)]
@@ -49,7 +49,7 @@ class CurveTable:
                 if any([c is None for c in coords]):
                     break
 
-                points.append(euklid.vector.Vector2D(coords))
+                points.append(openglider.rs.vector.Vector2D(coords))
             
             try:
                 curve_cls: Type[openglider.glider.curve.Curve] = getattr(openglider.glider.curve, curve_type)
