@@ -167,33 +167,17 @@ class MiniRib:
 
 
     def get_mesh(self, cell:Cell, filled: bool=True, max_area: float=None, hole_res: int = 40) -> Mesh:
-        vertices = [(p[0], p[1]) for p in self.get_hull(cell).nodes[:-1]]
-        boundary = [list(range(len(vertices))) + [0]]
-        
+        outline = self.get_hull(cell)
+        holes, _hole_centers = self.get_holes(cell, hole_res)
 
-        holes, hole_centers = self.get_holes(cell, hole_res)
-
-        for curve in holes:
-            start_index = len(vertices)
-            hole_vertices = curve.tolist()[:-1]
-            hole_indices = list(range(len(hole_vertices))) + [0]
-            vertices+= hole_vertices
-            boundary.append([start_index + i for i in hole_indices])
-
-        if not filled:
-            segments = []
-            for lst in boundary:
-                segments += triangulate.Triangulation.get_segments(lst)
-            return Mesh.from_indexed(
-                self.align_all(cell, openglider.rs.vector.PolyLine2D(vertices)).nodes,
-                {'minirib': [(segment, {}) for segment in segments]},
-                {}
+        if filled:
+            tri = triangulate.Triangulation(
+                outline,
+                holes,
             )
-        else:
-            tri = triangulate.Triangulation(vertices, boundary, hole_centers)
             if max_area is not None:
-                tri.meshpy_max_area = max_area
-            
+                tri.max_area = max_area
+
             tri.name = self.name
             mesh = tri.triangulate()
 
@@ -202,7 +186,25 @@ class MiniRib:
 
 
             minirib_mesh = Mesh.from_indexed(points.nodes, polygons={"miniribs": [(tri, {}) for tri in mesh.elements]} , boundaries=boundaries)
- 
+
+        else:
+            vertices = [(p[0], p[1]) for p in outline.nodes[:-1]]
+            boundary = [list(range(len(vertices))) + [0]]
+            for curve in holes:
+                start_index = len(vertices)
+                hole_vertices = curve.tolist()[:-1]
+                hole_indices = list(range(len(hole_vertices))) + [0]
+                vertices+= hole_vertices
+                boundary.append([start_index + i for i in hole_indices])
+
+            segments = []
+            for lst in boundary:
+                segments += triangulate.Triangulation.get_segments(lst)
+            return Mesh.from_indexed(
+                self.align_all(cell, openglider.rs.vector.PolyLine2D(vertices)).nodes,
+                {'minirib': [(segment, {}) for segment in segments]},
+                {}
+            )
 
         return minirib_mesh
     

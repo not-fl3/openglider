@@ -1,3 +1,13 @@
-from .vector import Vector3D
+from .vector import PolyLine2D, Vector2D, Vector3D
 from collections.abc import Sequence
+from typing import final
+
+@final
+class Triangulation2D:
+    @property
+    def nodes(self, /) -> list[Vector2D]: ...
+    @property
+    def triangles(self, /) -> list[tuple[int, int, int]]: ...
+
 def find_duplicates(points: Sequence[Vector3D], max_distance: float) -> list[tuple[int, int]]: ...
+def triangulate_with_holes(outline: PolyLine2D, holes: Sequence[PolyLine2D], min_area: float |None = None, max_area: float |None = None) -> Triangulation2D: ...

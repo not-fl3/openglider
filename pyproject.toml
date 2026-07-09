@@ -29,7 +29,6 @@ dependencies = [
     "lxml",
     "pyexcel-ods",
     "packaging",
-    "meshpy",
     "svglib",
 ]
 

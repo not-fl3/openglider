@@ -224,25 +224,43 @@ class Rib(RibBase):
             # TODO: return line
             return Mesh.from_indexed([], {}, {})
 
-        vertices = [(p[0], p[1]) for p in self.get_hull().curve.nodes[:-1]]
-        boundary = [list(range(len(vertices))) + [0]]
-        hole_centers: list[tuple[float, float]] = []
-
+        outline = self.get_hull().curve
+        hole_curves: list[openglider.rs.vector.PolyLine2D] = []
         if len(self.holes) > 0 and hole_num > 3:
             for hole in self.holes:
                 curves = hole.get_curves(self, num=hole_num, scale=False)
-
                 for curve in curves:
-                    start_index = len(vertices)
-                    hole_vertices = list(curve)[:-1]
-                    hole_indices = list(range(len(hole_vertices))) + [0]
-                    vertices += hole_vertices
-                    boundary.append([start_index + i for i in hole_indices])
+                    hole_curves.append(openglider.rs.vector.PolyLine2D(list(curve)[:-1]))
 
-                for p in hole.get_centers(self, scale=False):
-                    hole_centers.append((p[0], p[1]))
+        if filled:
+            tri = triangulate.Triangulation(outline, hole_curves)
+            if max_area is not None:
+                tri.max_area = max_area
 
-        if not filled:
+            tri.name = self.name
+            mesh = tri.triangulate()
+
+            points = self.align_all(openglider.rs.vector.PolyLine2D(mesh.points))
+            boundaries = {self.name: list(range(len(mesh.points)))}
+
+            rib_mesh = Mesh.from_indexed(points.nodes, polygons={f"ribs_{self.material}": [(tri, {}) for tri in mesh.elements]} , boundaries=boundaries)
+
+            for hole in self.holes:
+                if hole_mesh := hole.get_mesh(self):
+                    rib_mesh += hole_mesh
+
+            return rib_mesh
+
+        else:
+            vertices = [(p[0], p[1]) for p in outline.nodes[:-1]]
+            boundary = [list(range(len(vertices))) + [0]]
+            for curve in hole_curves:
+                start_index = len(vertices)
+                hole_vertices = [(p[0], p[1]) for p in curve.nodes]
+                hole_indices = list(range(len(hole_vertices))) + [0]
+                vertices += hole_vertices
+                boundary.append([start_index + i for i in hole_indices])
+
             segments = []
             for lst in boundary:
                 segments += triangulate.Triangulation.get_segments(lst)
@@ -251,24 +269,6 @@ class Rib(RibBase):
                 {'rib': [(segment, {}) for segment in segments]},
                 {}
                 )
-        else:
-            tri = triangulate.Triangulation(vertices, boundary, hole_centers)
-            if max_area is not None:
-                tri.meshpy_max_area = max_area
-            
-            tri.name = self.name
-            mesh = tri.triangulate()
-
-            points = self.align_all(openglider.rs.vector.PolyLine2D(mesh.points))
-            boundaries = {self.name: list(range(len(mesh.points)))}
-
-            rib_mesh = Mesh.from_indexed(points.nodes, polygons={f"ribs_{self.material}": [(tri, {}) for tri in mesh.elements]} , boundaries=boundaries)
-            
-            for hole in self.holes:
-                if hole_mesh := hole.get_mesh(self):
-                    rib_mesh += hole_mesh
-
-            return rib_mesh
 
     @cached_function("self")
     def get_offset_outline(self, margin: Percentage | Length) -> pyfoil.Airfoil:

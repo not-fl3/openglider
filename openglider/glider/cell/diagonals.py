@@ -242,21 +242,13 @@ class DiagonalRib(BaseModel):
             envelope_3d += get_list_3d(right.nodes[0], left.nodes[0])
 
         boundary_nodes = list(range(len(envelope_2d)))
-        boundary = [boundary_nodes+[0]]
         
-        holes, hole_centers = self.get_holes(cell, hole_res)
+        holes, _hole_centers = self.get_holes(cell, hole_res)
 
-        triangulation_points = envelope_2d[:]
-        
-        for curve in holes:
-            start_index = len(triangulation_points)
-            hole_vertices = curve.tolist()[:-1]
-            hole_indices = list(range(len(hole_vertices))) + [0]
-            triangulation_points += hole_vertices
-            boundary.append([start_index + i for i in hole_indices])
-
-        hole_centers_lst = [(p[0], p[1]) for p in hole_centers]
-        tri = openglider.mesh.triangulate.Triangulation([(p[0], p[1]) for p in triangulation_points], boundary, hole_centers_lst)
+        tri = openglider.mesh.triangulate.Triangulation(
+            openglider.rs.vector.PolyLine2D(envelope_2d),
+            holes,
+        )
         tri_mesh = tri.triangulate()
 
         # map 2d-points to 3d-points
@@ -498,9 +490,8 @@ class FingerDiagonal(BaseModel):
         envelope_3d += get_list_3d(right.nodes[0], left.nodes[0])
         
         boundary_nodes = list(range(len(envelope_2d)))
-        boundary = [boundary_nodes+[0]]
         
-        tri = openglider.mesh.triangulate.Triangulation([(p[0], p[1]) for p in envelope_2d], boundary)
+        tri = openglider.mesh.triangulate.Triangulation(openglider.rs.vector.PolyLine2D(envelope_2d))
         tri_mesh = tri.triangulate()
 
         # map 2d-points to 3d-points
