@@ -14,3 +14,106 @@ Alternatively do a static install
   ```
   python2 setup.py install
   ```
+
+## Development
+
+### 1. Install UV
+
+```bash
+# Option 1: Using curl (recommended)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Option 2: Using pip
+pip install uv
+
+# Option 3: Using cargo (if you have Rust installed)
+cargo install uv
+```
+
+### 2. Set Up Development Environment
+
+```bash
+# Create virtual environment
+uv venv
+
+# Activate it
+source .venv/bin/activate  # Linux/macOS
+```
+
+
+### 3. Install
+
+Install in development mode:
+
+```bash
+uv pip install -e .
+```
+
+## PyO3 Stub Generation
+
+This project uses PyO3's `experimental-inspect` feature to automatically generate `.pyi` type stub files for the Rust extension module.
+
+### How It Works
+
+1. **PyO3 Configuration**: The `Cargo.toml` includes the `experimental-inspect` feature which enables runtime introspection of PyO3 classes and functions.
+
+2. **Build System**: The project uses `setuptools-rust` to build the PyO3 extension during installation.
+
+3. **Stub Generation**: After building, the `.pyi` stub files are automatically generated using the introspection data.
+
+### Building and Generating Stubs
+
+#### Development Installation
+
+To build the extension and generate stubs in editable mode:
+
+```bash
+pip install -e .
+```
+
+This will:
+1. Compile the Rust extension using `setuptools-rust`
+2. Generate `.pyi` stub files from the introspection data
+3. Install the package in development mode
+
+#### Manual Stub Generation
+
+If you need to regenerate stubs after modifying the Rust code:
+
+```bash
+python scripts/generate_pyi_stubs.py
+```
+
+### Generated Files
+
+The stub files are generated in `openglider/rs/`
+
+### Type Checking
+
+With the stubs in place, you can now use full type checking with mypy:
+
+```bash
+mypy openglider
+```
+
+### Troubleshooting
+
+#### Stubs not generated
+- Ensure the extension built successfully: `python -c "import openglider.rs; print(openglider.rs.version())"`
+- Run the stub generation script manually: `python scripts/generate_pyi_stubs.py`
+
+#### Import errors
+- Rebuild the extension: `pip install -e . --force-reinstall --no-cache-dir`
+- Check that all dependencies are installed: `pip install setuptools-rust pyo3`
+
+#### Type checking issues
+- Ensure `py.typed` marker exists in `openglider/py.typed`
+- Check that mypy configuration in `pyproject.toml` is correct
+- Verify stubs are in the correct locations
+
+### Future Improvements
+
+- Use `pyo3-inspect` CLI tool once it's stable
+- Automate stub generation in CI/CD
+- Generate more detailed stubs with type information
+- Consider using `stubgen` from mypy for comparison
