@@ -1,7 +1,6 @@
-use nalgebra::{Matrix4, Vector4};
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyList, PyModule};
+use pyo3::types::{PyAny, PyList};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -48,7 +47,7 @@ pub trait VectorOps: Sized + Copy + Clone {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Vector2D {
     #[pyo3(get, set)]
@@ -258,7 +257,7 @@ impl Vector2D {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Vector3D {
     #[pyo3(get, set)]
@@ -280,10 +279,6 @@ impl Vector3D {
 
     pub fn from_xyz(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
-    }
-
-    fn to_2d(self) -> Vector2D {
-        Vector2D { x: self.x, y: self.y }
     }
 }
 

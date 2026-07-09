@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyModule};
+use pyo3::types::{PyAny};
 use nalgebra::{DMatrix, DVector};
 
 use crate::vector::{Interpolation, PolyLine2D, Vector2D};
@@ -21,7 +21,7 @@ impl SplinePointInput {
 
 #[derive(FromPyObject)]
 enum SplineControlPointsInput {
-    PolyLine(PolyLine2D),
+    PolyLine(Py<PolyLine2D>),
     Points(Vec<SplinePointInput>),
 }
 
@@ -397,7 +397,7 @@ fn curvature_nodes(nodes: &[Vector2D]) -> Vec<Vector2D> {
 
 macro_rules! define_curve_type {
     ($name:ident, $has_derivate:expr, $base:expr, $symmetric:expr) => {
-        #[pyclass]
+        #[pyclass(from_py_object)]
         #[derive(Clone, Debug)]
         pub struct $name {
             pub controlpoints: PolyLine2D,
@@ -412,10 +412,11 @@ macro_rules! define_curve_type {
             }
 
             #[setter(controlpoints)]
-            fn set_controlpoints(&mut self, value: SplineControlPointsInput) -> PyResult<()> {
+            fn set_controlpoints(&mut self, py: Python<'_>, value: SplineControlPointsInput) -> PyResult<()> {
                 match value {
                     SplineControlPointsInput::PolyLine(polyline) => {
-                        self.controlpoints = polyline;
+                        let polyline = polyline.bind(py).borrow();
+                        self.controlpoints = polyline.clone();
                     }
                     SplineControlPointsInput::Points(points) => {
                         let mut parsed = Vec::with_capacity(points.len());

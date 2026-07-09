@@ -1,9 +1,5 @@
-use nalgebra::{Matrix4, Vector4};
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyList, PyModule};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+
 use crate::vector::vector::{Vector2D, Vector3D};
 use crate::vector::polyline::{PolyLine2D, PolyLine3D};
 use super::interpolation::*;
@@ -106,19 +102,19 @@ impl VectorXD {
 
 #[derive(FromPyObject)]
 pub enum PolyLineXD {
-    PolyLine2(PolyLine2D),
-    PolyLine3(PolyLine3D),
+    PolyLine2(Py<PolyLine2D>),
+    PolyLine3(Py<PolyLine3D>),
 }
 
 #[derive(FromPyObject)]
 pub enum PolyLine2DCutInput {
     Vector(Vector2DInput),
-    PolyLine(PolyLine2D),
+    PolyLine(Py<PolyLine2D>),
 }
 
 #[derive(FromPyObject)]
 pub enum InterpolationNodesInput {
-    Interpolation(Interpolation),
-    PolyLine(PolyLine2D),
+    Interpolation(Py<Interpolation>),
+    PolyLine(Py<PolyLine2D>),
     Points(Vec<Vector2DInput>),
 }

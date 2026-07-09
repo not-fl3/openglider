@@ -1,16 +1,12 @@
 use nalgebra::{Matrix4, Vector4};
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyList, PyModule};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 
 use crate::vector::vector::{Vector2D, Vector3D};
 use crate::vector::polyline::{PolyLine2D, PolyLine3D};
 use crate::vector::signature::*;
 
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Rotation2D {
     angle: f64,
@@ -33,7 +29,7 @@ impl Rotation2D {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Copy, Debug)]
 pub struct Transformation {
     #[pyo3(get)]
@@ -60,15 +56,15 @@ impl Transformation {
         Self { matrix: values }
     }
 
-    fn apply_polyline2(&self, polyline: PolyLine2D) -> PolyLine3D {
+    fn apply_polyline2(&self, polyline: &PolyLine2D) -> PolyLine3D {
         PolyLine3D {
-            nodes: polyline.nodes.into_iter().map(|node| self.apply_vector3(node.to_3d())).collect(),
+            nodes: polyline.nodes.iter().map(|node| self.apply_vector3(node.to_3d())).collect(),
         }
     }
 
-    fn apply_polyline3(&self, polyline: PolyLine3D) -> PolyLine3D {
+    fn apply_polyline3(&self, polyline: &PolyLine3D) -> PolyLine3D {
         PolyLine3D {
-            nodes: polyline.nodes.into_iter().map(|node| self.apply_vector3(node)).collect(),
+            nodes: polyline.nodes.iter().map(|node| self.apply_vector3(*node)).collect(),
         }
     }
 }
@@ -179,10 +175,16 @@ impl Transformation {
         Ok(self.apply_vector3(vector.into_vector_3d()?))
     }
 
-    fn apply_polyline(&self, polyline: PolyLineXD) -> PolyLine3D {
+    fn apply_polyline(&self, polyline: PolyLineXD, py: Python<'_>) -> PolyLine3D {
         match polyline {
-            PolyLineXD::PolyLine2(polyline) => self.apply_polyline2(polyline),
-            PolyLineXD::PolyLine3(polyline) => self.apply_polyline3(polyline),
+            PolyLineXD::PolyLine2(polyline) => {
+                let polyline = polyline.bind(py).borrow();
+                self.apply_polyline2(&polyline)
+            }
+            PolyLineXD::PolyLine3(polyline) => {
+                let polyline = polyline.bind(py).borrow();
+                self.apply_polyline3(&polyline)
+            }
         }
     }
 

@@ -27,10 +27,10 @@ enum PlaneInitInput {
 #[derive(FromPyObject)]
 enum PlaneProjectInput {
     Point(PlaneVectorInput),
-    PolyLine(PolyLine3D),
+    PolyLine(Py<PolyLine3D>),
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct Plane {
     #[pyo3(get)]
@@ -103,17 +103,18 @@ impl Plane {
     fn project(&self, value: PlaneProjectInput, py: Python<'_>) -> PyResult<Py<PyAny>> {
         match value {
             PlaneProjectInput::Point(point) => {
-                Py::new(py, self.project_vector(point.into_vector()?))
+                Py::new(py, self.project_vector(&point.into_vector()?))
                     .map(|value| value.into_bound(py).into_any().unbind())
             }
             PlaneProjectInput::PolyLine(polyline) => {
-                Py::new(py, self.project_polyline(polyline))
+                let polyline = polyline.bind(py).borrow();
+                Py::new(py, self.project_polyline(&polyline))
                     .map(|value| value.into_bound(py).into_any().unbind())
             }
         }
     }
 
-    fn project_vector(&self, point: Vector3D) -> Vector2D {
+    fn project_vector(&self, point: &Vector3D) -> Vector2D {
         let matrix = self.basis_matrix();
         let inverse = matrix.try_inverse().unwrap_or_else(Matrix3::identity);
         let diff = Vector3::new(point.x - self.p0.x, point.y - self.p0.y, point.z - self.p0.z);
@@ -121,9 +122,9 @@ impl Plane {
         Vector2D { x: result.x, y: result.y }
     }
 
-    fn project_polyline(&self, polyline: PolyLine3D) -> PolyLine2D {
+    fn project_polyline(&self, polyline: &PolyLine3D) -> PolyLine2D {
         PolyLine2D {
-            nodes: polyline.nodes.into_iter().map(|node| self.project_vector(node)).collect(),
+            nodes: polyline.nodes.iter().map(|node| self.project_vector(node)).collect(),
         }
     }
 }

@@ -1,22 +1,19 @@
-use nalgebra::{Matrix4, Vector4};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyList, PyModule};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use pyo3::types::{PyAny, PyList};
 
 use super::signature::*;
 use super::vector::*;
 
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PolyLine2D {
     #[pyo3(get)]
     pub nodes: Vec<Vector2D>,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PolyLine3D {
     #[pyo3(get)]
@@ -24,7 +21,7 @@ pub struct PolyLine3D {
 }
 
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Copy, Debug)]
 pub struct CutResult {
     #[pyo3(get)]
@@ -620,6 +617,7 @@ impl PolyLine2D {
 
                 let tolerance = 1e-5;
                 let mut intersections = Vec::new();
+                let other = other.bind(py).borrow();
                 for index_b in 0..other.nodes.len().saturating_sub(1) {
                     let cuts = polyline2d_cut_line(&self.nodes, other.nodes[index_b], other.nodes[index_b + 1]);
                     for cut in cuts {

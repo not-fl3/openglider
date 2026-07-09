@@ -6,7 +6,7 @@ use super::vector::*;
 use super::polyline::{PolyLine2D};
 
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct Interpolation {
     #[pyo3(get)]
@@ -19,13 +19,15 @@ pub struct Interpolation {
 impl Interpolation {
     #[new]
     #[pyo3(signature = (nodes, extrapolate = false))]
-    fn new(nodes: InterpolationNodesInput, extrapolate: bool) -> PyResult<Self> {
+    fn new(nodes: InterpolationNodesInput, extrapolate: bool, py: Python<'_>) -> PyResult<Self> {
         match nodes {
             InterpolationNodesInput::Interpolation(interpolation) => {
-                Ok(Self { curve: interpolation.curve, extrapolate })
+                let interpolation = interpolation.bind(py).borrow();
+                Ok(Self { curve: interpolation.curve.clone(), extrapolate })
             }
             InterpolationNodesInput::PolyLine(polyline) => {
-                Ok(Self { curve: polyline, extrapolate })
+                let polyline = polyline.bind(py).borrow();
+                Ok(Self { curve: polyline.clone(), extrapolate })
             }
             InterpolationNodesInput::Points(points) => {
                 let mut parsed = Vec::with_capacity(points.len());
