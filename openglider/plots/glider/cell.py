@@ -17,7 +17,7 @@ from openglider.plots.usage_stats import MaterialUsage
 from openglider.utils.config import Config
 from openglider.vector.drawing import PlotPart
 from openglider.vector.text import Text
-from openglider.vector.unit import Percentage
+from openglider.vector.unit import Length, Percentage
 
 if TYPE_CHECKING:
     from openglider.glider.cell import Cell
@@ -191,13 +191,12 @@ class PanelPlot:
         text = self.panel.name
 
         if self.config.layout_seperate_panels and not self.panel.is_lower():
-            allowance = self.panel.cut_back.seam_allowance
             curve = self.panel.cut_back.get_curve_2d(self.cell, self.config.midribs, exact=True)
         else:
-            allowance = self.panel.cut_front.seam_allowance
             curve = self.panel.cut_front.get_curve_2d(self.cell, self.config.midribs, exact=True).reverse()
 
-        text_width = allowance.si * 0.8 * len(text)
+        letter_width = Length("8mm")
+        text_width = letter_width.si * len(text)
         ik_p1 = curve.walk(0, curve.get_length()*0.15)
 
         p1 = curve.get(ik_p1)
@@ -205,6 +204,7 @@ class PanelPlot:
         p2 = curve.get(ik_p2)
 
         part_text = Text(text, p1, p2,
+                         size=letter_width,
                          align="left",
                          valign=-0.9,
                          height=0.8)
