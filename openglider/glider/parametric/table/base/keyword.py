@@ -13,6 +13,7 @@ KeywordsType = list[Union[tuple[str, typing.Any], str]]
 class Keyword(Generic[ElementType]):
     NoneType = typing.Any
     target_cls: typing.Any
+
     def __init__(self, attributes: KeywordsType | None=None, description: str="", target_cls: type[ElementType]=None):
         if attributes is None:
             if target_cls is not None:

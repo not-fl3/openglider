@@ -310,15 +310,26 @@ class Cell(BaseModel):
     def ballooning_phi(self) -> HashedList[float]:
         # get ballooning arc angles for each x value of the profiles
 
-        x_values = [max(-1, min(1, x)) for x in self.rib1.profile_2d.x_values]
-        balloon = [max(0., self.ballooning_modified[i]) for i in x_values]
+        rib1 = self.rib1
+        rib2 = self.rib2
+        ballooning_modified = self.ballooning_modified
+        x_values = rib1.profile_2d.x_values
+
+        balloon = [0.0] * len(x_values)
+        for index, x in enumerate(x_values):
+            balloon[index] = max(0.0, ballooning_modified[max(-1.0, min(1.0, x))])
 
         if self.ballooning_reference == "cell":
-            lengths = [(p1 - p2).length() for p1, p2 in zip(self.rib1.profile_3d.curve.nodes, self.rib2.profile_3d.curve.nodes)]
+            rib1_nodes = rib1.profile_3d.curve.nodes
+            rib2_nodes = rib2.profile_3d.curve.nodes
             width = self.width
-            sinc = [length / (length + width * bal) for length, bal in zip(lengths, balloon)]
+
+            sinc = []
+            for p1, p2, bal in zip(rib1_nodes, rib2_nodes, balloon):
+                length = (p1 - p2).length()
+                sinc.append(length / (length + width * bal))
         else:
-            sinc = [1. / (1+bal) for bal in balloon]
+            sinc = [1.0 / (1.0 + bal) for bal in balloon]
         return HashedList([BallooningBase.arcsinc(x) if x < 1. else 0. for x in sinc])
     
     @cached_property('ballooning', '_child_cells')

@@ -34,6 +34,7 @@ class Parser(BaseModel):
 
     _parser: Forward | None =  pydantic.PrivateAttr(default=None)
     _units: dict[str, type[Quantity]] | None = pydantic.PrivateAttr(default=None)
+    _parse_cache: dict[tuple[str, tuple[type[Quantity], ...], int], Quantity | float | None] = pydantic.PrivateAttr(default_factory=dict)
 
     stack: list[str | float | Quantity] = Field(default_factory=list)
 
@@ -146,6 +147,10 @@ class Parser(BaseModel):
             return None
         if isinstance(expression, (float, int)):
             return float(expression)
+
+        cache_key = (expression, tuple(self.units), id(self.variable_resolver))
+        if cache_key in self._parse_cache:
+            return self._parse_cache[cache_key]
         
         self.stack.clear()
 
@@ -155,8 +160,9 @@ class Parser(BaseModel):
         if len(parse_result) == 0 or parse_result[0] != "Parse Failure":
             #for i, ob in enumerate(self.stack):
             #    if isinstance(ob, str) and ob[0].isalpha() and ob not in self._constants:
-                    
-            return self.evaluate_stack()
+            result = self.evaluate_stack()
+            self._parse_cache[cache_key] = result
+            return result
         
         raise Exception("")
 

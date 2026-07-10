@@ -20,6 +20,8 @@ class Table:
 
     dct: dict[str, Any]
     coords: dict[str, tuple[int, int]]
+    _version: int
+    _element_table_cache: dict[tuple[str, str, int, int], tuple[tuple[int, tuple[tuple[int, int, Any], ...]], ...]]
 
     @classmethod
     def str_decrypt(cls, str: str) -> tuple[int, int]:
@@ -54,6 +56,8 @@ class Table:
     def __init__(self, rows: int=0, columns: int=0, name: str=None):
         self.dct = {}
         self.coords = {}
+        self._element_table_cache = {}
+        self._version = 0
         self.num_rows = rows
         self.num_columns = columns
         self.name=name or ""
@@ -152,6 +156,8 @@ class Table:
         key = self.str_encrypt(column_no, row_no)
         self.dct[key] = value
         self.coords[key] = (column_no, row_no)
+        self._version += 1
+        self._element_table_cache.clear()
 
     def insert_row(self, row: list[Any], row_no: int | None=None) -> None:
         if row_no is None:

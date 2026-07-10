@@ -55,7 +55,8 @@ class ElementTable(Generic[ElementType]):
     @classmethod
     def get_columns(cls, table: Table, keyword: str, data_length: int) -> list[Table]:
         columns: list[Table] = []
-        column = 0
+        cache_key = (cls.__name__, keyword, data_length, table._version)
+        cached_columns = table._element_table_cache.get(cache_key)
 
         if keyword in cls.keywords:
             keyword_instance = cls.keywords[keyword]
@@ -70,16 +71,32 @@ class ElementTable(Generic[ElementType]):
         else:
             raise ValueError(f"unknown keyword {keyword}")
 
-        while column < table.num_columns:
-            if table[0, column] == keyword:
-                columns_part_header = header.copy()
-                columns_part = table.get_columns(column, column+data_length).get_rows(2, None)
-                columns_part_header.append_bottom(columns_part)
-                columns.append(columns_part_header)
-                
-                column += data_length
-            else:
-                column += 1
+        if cached_columns is None:
+            header_starts = [column for key, (column, row) in table.coords.items() if row == 0 and table.dct.get(key) == keyword]
+            header_starts.sort()
+
+            cached_columns = []
+            for column in header_starts:
+                cells: list[tuple[int, int, Any]] = []
+
+                for key, value in table.dct.items():
+                    source_column, source_row = table.coords[key]
+                    if source_row >= 2 and column <= source_column < column + data_length and value is not None:
+                        cells.append((source_column - column, source_row - 2, value))
+
+                cached_columns.append((column, tuple(cells)))
+
+            table._element_table_cache[cache_key] = tuple(cached_columns)
+
+        for column, cells in cached_columns:
+            columns_part_header = header.copy()
+            columns_part = Table()
+
+            for source_column, source_row, value in cells:
+                columns_part.set_value(source_column, source_row, value)
+
+            columns_part_header.append_bottom(columns_part)
+            columns.append(columns_part_header)
 
         return columns
 
