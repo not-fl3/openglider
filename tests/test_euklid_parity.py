@@ -101,7 +101,7 @@ def test_rs_core_smoke() -> None:
     assert poly3.get_positions(0.0, 2.0) == [0.0, 1.0, 2.0]
     assert len(poly3.get_segments()) == 2
     assert len(poly3.get_segment_lengthes()) == 2
-    assert len(poly3.get_tangents()) == 2
+    assert len(poly3.get_tangents()) == 3
     assert len(poly3.tolist()) == 3
     assert isinstance(poly3.mix(poly3, 0.5), rs.vector.PolyLine3D)
     assert isinstance(poly3.walk(0.0, 0.2), float)

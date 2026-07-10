@@ -192,7 +192,23 @@ fn polyline_segments<V: VectorOps>(nodes: &[V]) -> Vec<V> {
 }
 
 fn polyline_tangents<V: VectorOps>(nodes: &[V]) -> Vec<V> {
-    polyline_segments(nodes).into_iter().map(VectorOps::normalized).collect()
+    let segments: Vec<V> = polyline_segments(nodes)
+        .into_iter()
+        .map(VectorOps::normalized)
+        .collect();
+    if segments.is_empty() {
+        return Vec::new();
+    }
+
+    let mut tangents = Vec::with_capacity(nodes.len());
+    tangents.push(segments[0]);
+
+    for index in 0..segments.len().saturating_sub(1) {
+        tangents.push(segments[index].add(segments[index + 1]));
+    }
+
+    tangents.push(*segments.last().unwrap());
+    tangents
 }
 
 fn polyline_scale_nodes<V: VectorOps>(nodes: &[V], factors: &[f64]) -> Result<Vec<V>, SimpleError> {
