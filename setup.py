@@ -1,18 +1,18 @@
 # type: ignore
-"""Setup script with PyO3 stub generation."""
+"""Setup script with Pybind11 and PyO3 extensions."""
 
 from pathlib import Path
 import subprocess
 import sys
 
 from setuptools import setup
+from pybind11.setup_helpers import Pybind11Extension, build_ext
 
 
 def generate_stubs_after_build():
-    """Generate .pyi stub files after building the PyO3 extension."""
+    """Generate .pyi stub files after building extensions."""
     script_path = Path(__file__).parent / "scripts" / "generate_pyi_stubs.py"
     subprocess.run([sys.executable, str(script_path)], check=True)
-
 
 
 SRC_CPP = "src_cpp"
@@ -30,8 +30,8 @@ HEADER_FILES = [
     "version.hpp",
 ]
 
-XFOIL_EXTENSION = Pybind11Extension(
-    "xfoil",
+xfoil_extension = Pybind11Extension(
+    "openglider.xfoil",
     [f"{SRC_CPP}/{file_name}" for file_name in CPP_FILES],
     include_dirs=[SRC_CPP],
     libraries=["fmt"],
@@ -39,7 +39,18 @@ XFOIL_EXTENSION = Pybind11Extension(
     depends=[f"{SRC_CPP}/{file_name}" for file_name in HEADER_FILES],
 )
 
-if __name__ == "__main__":
-    setup()
-    # Generate stubs after installation
-    generate_stubs_after_build()
+
+class BuildExtWithStubs(build_ext):
+    def run(self):
+        super().run()
+        generate_stubs_after_build()
+
+
+setup(
+    ext_modules=[
+        xfoil_extension,
+    ],
+    cmdclass={
+        "build_ext": BuildExtWithStubs,
+    },
+)

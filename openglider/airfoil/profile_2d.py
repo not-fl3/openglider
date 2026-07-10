@@ -6,7 +6,7 @@ import math
 import logging
 
 import openglider.rs
-import xfoil
+import openglider.xfoil as xfoil
 import pandas
 
 from openglider.airfoil.generators import JoukowskyAirfoil, VanDeVoorenAirfoil, TrefftzKuttaAirfoil, compute_naca
