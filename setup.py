@@ -7,6 +7,7 @@ import sys
 
 from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension, build_ext
+from setuptools_rust import build_rust
 
 
 def generate_stubs_after_build():
@@ -39,8 +40,7 @@ xfoil_extension = Pybind11Extension(
     depends=[f"{SRC_CPP}/{file_name}" for file_name in HEADER_FILES],
 )
 
-
-class BuildExtWithStubs(build_ext):
+class BuildExtWithStubs(build_rust):
     def run(self):
         super().run()
         generate_stubs_after_build()
@@ -51,6 +51,6 @@ setup(
         xfoil_extension,
     ],
     cmdclass={
-        "build_ext": BuildExtWithStubs,
+        "build_rust": BuildExtWithStubs
     },
 )
