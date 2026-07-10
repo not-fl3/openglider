@@ -314,13 +314,13 @@ def rib_rotation(aoa: float, arc: float, zrot: Angle | None, xrot: Angle | None)
     # rotate arc
     rot2 = openglider.rs.vector.Transformation.rotation(-arc, [1,0,0])  # type: ignore
 
-    # reverse order
-    result = rot2 * rot1 * rot0
+    # Compose in the order the transforms are meant to be applied to vectors.
+    result = rot0 * rot1 * rot2
 
     if zrot is not None:
-        axis = (rot1 * rot2).apply(openglider.rs.vector.Vector3D([0,0,1]))
+        axis = (rot2 * rot1).apply(openglider.rs.vector.Vector3D([0,0,1]))
         rot3 = openglider.rs.vector.Transformation.rotation(zrot.si, axis)  # type: ignore
-        return rot3 * result
+        return result * rot3
     
     return result
 
