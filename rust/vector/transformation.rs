@@ -34,16 +34,21 @@ impl Rotation2D {
 pub struct Transformation {
     #[pyo3(get)]
     pub matrix: [[f64; 4]; 4],
+    matrix4: Matrix4<f64>,
 }
 
 impl Transformation {
-    fn as_matrix4(&self) -> Matrix4<f64> {
+    fn matrix4_from_values(values: &[[f64; 4]; 4]) -> Matrix4<f64> {
         Matrix4::from_row_slice(&[
-            self.matrix[0][0], self.matrix[0][1], self.matrix[0][2], self.matrix[0][3],
-            self.matrix[1][0], self.matrix[1][1], self.matrix[1][2], self.matrix[1][3],
-            self.matrix[2][0], self.matrix[2][1], self.matrix[2][2], self.matrix[2][3],
-            self.matrix[3][0], self.matrix[3][1], self.matrix[3][2], self.matrix[3][3],
+            values[0][0], values[0][1], values[0][2], values[0][3],
+            values[1][0], values[1][1], values[1][2], values[1][3],
+            values[2][0], values[2][1], values[2][2], values[2][3],
+            values[3][0], values[3][1], values[3][2], values[3][3],
         ])
+    }
+
+    fn as_matrix4(&self) -> &Matrix4<f64> {
+        &self.matrix4
     }
 
     fn from_matrix4(matrix: Matrix4<f64>) -> Self {
@@ -53,18 +58,45 @@ impl Transformation {
                 values[row][col] = matrix[(row, col)];
             }
         }
-        Self { matrix: values }
+        Self {
+            matrix: values,
+            matrix4: matrix,
+        }
+    }
+
+    pub(crate) fn from_values(matrix: [[f64; 4]; 4]) -> Self {
+        let matrix4 = Self::matrix4_from_values(&matrix);
+        Self { matrix, matrix4 }
     }
 
     fn apply_polyline2(&self, polyline: &PolyLine2D) -> PolyLine3D {
+        let matrix = self.as_matrix4();
         PolyLine3D {
-            nodes: polyline.nodes.iter().map(|node| self.apply_vector3(node.to_3d())).collect(),
+            nodes: polyline
+                .nodes
+                .iter()
+                .map(|node| Self::apply_vector3_with_matrix(matrix, node.to_3d()))
+                .collect(),
         }
     }
 
     fn apply_polyline3(&self, polyline: &PolyLine3D) -> PolyLine3D {
+        let matrix = self.as_matrix4();
         PolyLine3D {
-            nodes: polyline.nodes.iter().map(|node| self.apply_vector3(*node)).collect(),
+            nodes: polyline
+                .nodes
+                .iter()
+                .map(|node| Self::apply_vector3_with_matrix(matrix, *node))
+                .collect(),
+        }
+    }
+
+    fn apply_vector3_with_matrix(matrix: &Matrix4<f64>, vector: Vector3D) -> Vector3D {
+        let result = matrix * Vector4::new(vector.x, vector.y, vector.z, 1.0);
+        Vector3D {
+            x: result.x,
+            y: result.y,
+            z: result.z,
         }
     }
 }
@@ -73,14 +105,12 @@ impl Transformation {
 impl Transformation {
     #[new]
     pub(crate) fn new() -> Self {
-        Self {
-            matrix: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-        }
+        Self::from_values([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
     }
 
     #[staticmethod]
@@ -111,7 +141,7 @@ impl Transformation {
 
     #[staticmethod]
     fn translation(vector: VectorXD) -> PyResult<Self> {
-        let mut matrix = Self::new().as_matrix4();
+        let mut matrix = Matrix4::identity();
         let vector = vector.into_vector_3d()?;
         matrix[(0, 3)] = vector.x;
         matrix[(1, 3)] = vector.y;
@@ -149,7 +179,7 @@ impl Transformation {
 
     #[staticmethod]
     fn scale(scale: f64) -> Self {
-        let mut matrix = Self::new().as_matrix4();
+        let mut matrix = Matrix4::identity();
         matrix[(0, 0)] = scale;
         matrix[(1, 1)] = scale;
         matrix[(2, 2)] = scale;
@@ -172,7 +202,7 @@ impl Transformation {
     }
 
     fn apply(&self, vector: VectorXD) -> PyResult<Vector3D> {
-        Ok(self.apply_vector3(vector.into_vector_3d()?))
+        Ok(Self::apply_vector3_with_matrix(self.as_matrix4(), vector.into_vector_3d()?))
     }
 
     fn apply_polyline(&self, polyline: PolyLineXD, py: Python<'_>) -> PolyLine3D {
@@ -189,9 +219,7 @@ impl Transformation {
     }
 
     pub(crate) fn apply_vector3(&self, vector: Vector3D) -> Vector3D {
-        let matrix = self.as_matrix4();
-        let result = matrix * Vector4::new(vector.x, vector.y, vector.z, 1.0);
-        Vector3D { x: result.x, y: result.y, z: result.z }
+        Self::apply_vector3_with_matrix(self.as_matrix4(), vector)
     }
 
 }

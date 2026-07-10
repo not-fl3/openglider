@@ -31,11 +31,7 @@ pub trait VectorOps: Sized + Copy + Clone {
 
     fn normalized(self) -> Self {
         let length = self.length();
-        if length == 0.0 {
-            Self::zero()
-        } else {
-            self.scale(1.0 / length)
-        }
+        self.scale(1.0 / length)
     }
 
     fn hash_value(&self) -> u64 {

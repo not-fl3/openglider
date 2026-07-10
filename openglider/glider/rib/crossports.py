@@ -323,7 +323,6 @@ class AttachmentPointHole(RibHoleBase):
     def _get_holes_bottom(self, rib: Rib) -> list[PolygonHole]:
         envelope = self.get_envelope_airfoil(rib)
         lower_envelope = envelope.curve.get(envelope.noseindex, len(envelope.curve.nodes))
-        lower_interpolation = openglider.rs.vector.Interpolation(lower_envelope.nodes)
 
         diagonal_border = rib.convert_to_percentage(self.border_diagonal).si
         side_border_pct = rib.convert_to_percentage(self.border_side)

@@ -1,10 +1,33 @@
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyList};
+use std::fmt;
 
 use super::signature::*;
 use super::vector::*;
 
+#[derive(Debug, Clone)]
+pub struct SimpleError(pub String);
+
+impl SimpleError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self(message.into())
+    }
+}
+
+impl fmt::Display for SimpleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for SimpleError {}
+
+impl From<SimpleError> for PyErr {
+    fn from(error: SimpleError) -> Self {
+        PyRuntimeError::new_err(error.to_string())
+    }
+}
 
 #[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
@@ -172,8 +195,15 @@ fn polyline_tangents<V: VectorOps>(nodes: &[V]) -> Vec<V> {
     polyline_segments(nodes).into_iter().map(VectorOps::normalized).collect()
 }
 
-fn polyline_scale_nodes<V: VectorOps>(nodes: &[V], factors: &[f64]) -> Vec<V> {
-    nodes.iter().zip(factors.iter().copied()).map(|(node, factor)| node.scale(factor)).collect()
+fn polyline_scale_nodes<V: VectorOps>(nodes: &[V], factors: &[f64]) -> Result<Vec<V>, SimpleError> {
+    if nodes.len() != factors.len() {
+        return Err(SimpleError::new(format!(
+            "PolyLine sizes don't match! ({}/{})",
+            nodes.len(),
+            factors.len()
+        )));
+    }
+    Ok(nodes.iter().zip(factors.iter().copied()).map(|(node, factor)| node.scale(factor)).collect())
 }
 
 fn polyline2d_fix_errors(nodes: &[Vector2D]) -> Vec<Vector2D> {
@@ -222,7 +252,7 @@ fn polyline2d_fix_errors(nodes: &[Vector2D]) -> Vec<Vector2D> {
     cleaned
 }
 
-fn polyline2d_cut_line(nodes: &[Vector2D], p1: Vector2D, p2: Vector2D) -> Vec<(f64, f64)> {
+pub(crate) fn polyline2d_cut_line(nodes: &[Vector2D], p1: Vector2D, p2: Vector2D) -> Vec<(f64, f64)> {
     let mut intersections = Vec::new();
     let tolerance = 1e-5;
     if nodes.len() < 2 {
@@ -447,25 +477,78 @@ impl PolyLine2D {
         })
     }
 
-    pub fn add(&self, other: &PolyLine2D) -> Self {
-        let len = self.nodes.len().min(other.nodes.len());
-        Self { nodes: self.nodes[..len].iter().copied().zip(other.nodes[..len].iter().copied()).map(|(left, right)| left.add(right)).collect() }
+    pub fn add(&self, other: &PolyLine2D) -> Result<Self, SimpleError> {
+        if self.nodes.len() != other.nodes.len() {
+            return Err(SimpleError::new(format!(
+                "PolyLine sizes don't match! ({}/{})",
+                self.nodes.len(),
+                other.nodes.len()
+            )));
+        }
+
+        Ok(Self {
+            nodes: self
+                .nodes
+                .iter()
+                .copied()
+                .zip(other.nodes.iter().copied())
+                .map(|(left, right)| left.add(right))
+                .collect(),
+        })
     }
 
-    pub fn sub(&self, other: &PolyLine2D) -> Self {
-        let len = self.nodes.len().min(other.nodes.len());
-        Self { nodes: self.nodes[..len].iter().copied().zip(other.nodes[..len].iter().copied()).map(|(left, right)| left.sub(right)).collect() }
+    pub fn sub(&self, other: &PolyLine2D) -> Result<Self, SimpleError> {
+        if self.nodes.len() != other.nodes.len() {
+            return Err(SimpleError::new(format!(
+                "PolyLine sizes don't match! ({}/{})",
+                self.nodes.len(),
+                other.nodes.len()
+            )));
+        }
+
+        Ok(Self {
+            nodes: self
+                .nodes
+                .iter()
+                .copied()
+                .zip(other.nodes.iter().copied())
+                .map(|(left, right)| left.sub(right))
+                .collect(),
+        })
     }
 
-    pub fn scale_nodes(&self, factors: Vec<f64>) -> Self { Self { nodes: polyline_scale_nodes(&self.nodes, &factors) } }
+    pub fn scale_nodes(&self, factors: Vec<f64>) -> Result<Self, SimpleError> {
+        Ok(Self {
+            nodes: polyline_scale_nodes(&self.nodes, &factors)?,
+        })
+    }
     pub fn reverse(&self) -> Self { let mut nodes = self.nodes.clone(); nodes.reverse(); Self { nodes } }
-    pub fn mix(&self, other: &PolyLine2D, factor: f64) -> Self {
-        let len = self.nodes.len().min(other.nodes.len());
-        let factor = factor.clamp(0.0, 1.0);
-        Self { nodes: self.nodes[..len].iter().copied().zip(other.nodes[..len].iter().copied()).map(|(left, right)| left.scale(1.0 - factor).add(right.scale(factor))).collect() }
+    pub fn mix(&self, other: &PolyLine2D, factor: f64) -> Result<Self, SimpleError> {
+        if self.nodes.len() != other.nodes.len() {
+            return Err(SimpleError::new(format!(
+                "PolyLine sizes don't match! ({}/{})",
+                self.nodes.len(),
+                other.nodes.len()
+            )));
+        }
+
+        Ok(Self {
+            nodes: self
+                .nodes
+                .iter()
+                .copied()
+                .zip(other.nodes.iter().copied())
+                .map(|(left, right)| left.scale(1.0 - factor).add(right.scale(factor)))
+                .collect(),
+        })
     }
-    fn __add__(&self, other: &PolyLine2D) -> Self { self.add(other) }
-    fn __sub__(&self, other: &PolyLine2D) -> Self { self.sub(other) }
+    fn __add__(&self, other: &PolyLine2D) -> Self {
+        let mut nodes = Vec::with_capacity(self.nodes.len() + other.nodes.len());
+        nodes.extend_from_slice(&self.nodes);
+        nodes.extend_from_slice(&other.nodes);
+        Self { nodes }
+    }
+    fn __sub__(&self, other: &PolyLine2D) -> Result<Self, SimpleError> { self.sub(other) }
     fn __mul__(&self, factor: Vector2DScaleInput) -> PyResult<Self> { self.scale(factor) }
 
     pub fn segment_normals(&self) -> Self {
@@ -806,16 +889,72 @@ impl PolyLine3D {
                 .collect(),
         })
     }
-    fn add(&self, other: &Self) -> Self { let len = self.nodes.len().min(other.nodes.len()); Self { nodes: self.nodes[..len].iter().copied().zip(other.nodes[..len].iter().copied()).map(|(left, right)| left.add(right)).collect() } }
-    fn sub(&self, other: &Self) -> Self { let len = self.nodes.len().min(other.nodes.len()); Self { nodes: self.nodes[..len].iter().copied().zip(other.nodes[..len].iter().copied()).map(|(left, right)| left.sub(right)).collect() } }
-    fn mix(&self, other: &PolyLine3D, factor: f64) -> Self {
-        let len = self.nodes.len().min(other.nodes.len());
-        let factor = factor.clamp(0.0, 1.0);
-        Self { nodes: self.nodes[..len].iter().copied().zip(other.nodes[..len].iter().copied()).map(|(left, right)| left.scale(1.0 - factor).add(right.scale(factor))).collect() }
+    fn add(&self, other: &Self) -> Result<Self, SimpleError> {
+        if self.nodes.len() != other.nodes.len() {
+            return Err(SimpleError::new(format!(
+                "PolyLine sizes don't match! ({}/{})",
+                self.nodes.len(),
+                other.nodes.len()
+            )));
+        }
+        Ok(Self {
+            nodes: self
+                .nodes
+                .iter()
+                .copied()
+                .zip(other.nodes.iter().copied())
+                .map(|(left, right)| left.add(right))
+                .collect(),
+        })
     }
-    fn scale_nodes(&self, factors: Vec<f64>) -> Self { Self { nodes: polyline_scale_nodes(&self.nodes, &factors) } }
-    fn __add__(&self, other: &Self) -> Self { self.add(other) }
-    fn __sub__(&self, other: &Self) -> Self { self.sub(other) }
+    fn sub(&self, other: &Self) -> Result<Self, SimpleError> {
+        if self.nodes.len() != other.nodes.len() {
+            return Err(SimpleError::new(format!(
+                "PolyLine sizes don't match! ({}/{})",
+                self.nodes.len(),
+                other.nodes.len()
+            )));
+        }
+        Ok(Self {
+            nodes: self
+                .nodes
+                .iter()
+                .copied()
+                .zip(other.nodes.iter().copied())
+                .map(|(left, right)| left.sub(right))
+                .collect(),
+        })
+    }
+    fn mix(&self, other: &PolyLine3D, factor: f64) -> Result<Self, SimpleError> {
+        if self.nodes.len() != other.nodes.len() {
+            return Err(SimpleError::new(format!(
+                "PolyLine sizes don't match! ({}/{})",
+                self.nodes.len(),
+                other.nodes.len()
+            )));
+        }
+        Ok(Self {
+            nodes: self
+                .nodes
+                .iter()
+                .copied()
+                .zip(other.nodes.iter().copied())
+                .map(|(left, right)| left.scale(1.0 - factor).add(right.scale(factor)))
+                .collect(),
+        })
+    }
+    fn scale_nodes(&self, factors: Vec<f64>) -> Result<Self, SimpleError> {
+        Ok(Self {
+            nodes: polyline_scale_nodes(&self.nodes, &factors)?,
+        })
+    }
+    fn __add__(&self, other: &Self) -> Self {
+        let mut nodes = Vec::with_capacity(self.nodes.len() + other.nodes.len());
+        nodes.extend_from_slice(&self.nodes);
+        nodes.extend_from_slice(&other.nodes);
+        Self { nodes }
+    }
+    fn __sub__(&self, other: &Self) -> Result<Self, SimpleError> { self.sub(other) }
     fn __mul__(&self, factor: Vector3DScaleInput) -> PyResult<Self> { self.scale(factor) }
     fn __getitem__(&self, index: usize) -> PyResult<Vector3D> { self.nodes.get(index).copied().ok_or_else(|| PyValueError::new_err("index out of range")) }
 }
