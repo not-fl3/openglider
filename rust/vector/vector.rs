@@ -65,7 +65,7 @@ impl Vector2D {
         <Self as VectorOps>::from_components(values)
     }
 
-    fn from_xy(x: f64, y: f64) -> Self {
+    pub(crate) fn from_xy(x: f64, y: f64) -> Self {
         Self { x, y }
     }
 

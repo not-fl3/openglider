@@ -473,83 +473,10 @@ class Cell(BaseModel):
     @cached_function("self")
     def get_flattened_cell(self, numribs: int=50, num_inner: int | None=None) -> FlattenedCell:
         midribs = self.get_midribs(numribs)
-        numpoints = len(midribs[0].curve.nodes)
-
-        len_dct: dict[str, float] = {}
-        def get_length(ik1: float, ik2: float) -> float:
-            index_str = f"{ik1}:{ik2}"
-            if index_str not in len_dct:
-                points: list[openglider.rs.vector.Vector3D] = []
-                for i, rib in enumerate(midribs):
-                    x = ik1 + i/(numribs-1) * (ik2-ik1)
-                    points.append(rib[x])
-                
-                line = openglider.rs.vector.PolyLine3D(points)
-
-                len_dct[index_str] = line.get_length()
-
-            return len_dct[index_str]
-
-        l_0 = get_length(0, 0)
-
-        left_bal = [openglider.rs.vector.Vector2D([0, 0])]
-        right_bal = [openglider.rs.vector.Vector2D([l_0, 0])]
-
-        rotate_left = openglider.rs.vector.Rotation2D(-math.pi/2)
-        rotate_right = openglider.rs.vector.Rotation2D(math.pi/2)
-
-        def get_point(p1: openglider.rs.vector.Vector2D, p2: openglider.rs.vector.Vector2D, l_0: float, l_l: float, l_r: float, left: bool=True) -> openglider.rs.vector.Vector2D:
-            lx = (l_0**2 + l_l**2 - l_r**2) / (2*l_0)
-            ly_sq = l_l**2 - lx**2
-            if ly_sq > 0:
-                ly = math.sqrt(ly_sq)
-            else:
-                ly = 0
-            diff = (p2 - p1).normalized()
-            if left:
-                diff_y = rotate_right.apply(diff)
-            else:
-                diff_y = rotate_left.apply(diff)
-
-            return p1 + diff*lx + diff_y*ly
-
-
-        for i in range(numpoints-1):
-            p1 = left_bal[-1]
-            p2 = right_bal[-1]
-
-
-            d_l = (midribs[0][i] - midribs[0][i+1]).length()
-            d_r = (midribs[-1][i] - midribs[-1][i+1]).length()
-            l_0 = get_length(i, i)
-
-            #if False:
-            #    pr_2 = get_point(p2, pl_2, get_length(i+1, i), d_r, get_length(i+1, i+1), left=False)
-            #    pl_2 = get_point(p1, p2, l_0, d_l, get_length(i+1, i))
-            #else:
-            
-            pr_2 = get_point(p2, p1, l_0, d_r, get_length(i, i+1), left=False)
-            pl_2 = get_point(p1, pr_2, get_length(i, i+1), d_l, get_length(i+1, i+1))
-
-            left_bal.append(pl_2)
-            right_bal.append(pr_2)
-            #right_bal.append(get_point(p2, p1, l_0, d_r, get_length(i, i+1), left=False))
-
-        ballooned = (
-            openglider.rs.vector.PolyLine2D(left_bal),
-            openglider.rs.vector.PolyLine2D(right_bal)
+        inner, ballooned = openglider.rs.flatten_midribs(
+            [rib.curve for rib in midribs],
+            num_inner=num_inner,
         )
-
-        inner: list[openglider.rs.vector.PolyLine2D] = []
-
-        if num_inner is None:
-            num_inner = numribs+2
-
-        for x in openglider.utils.linspace(0, 1, num_inner):
-            inner.append(ballooned[0].mix(ballooned[1], x))
-
-        #ballooned = [left_bal, right_bal]
-
         return FlattenedCell(
             inner=inner,
             ballooned=ballooned

@@ -5,6 +5,7 @@ mod mesh;
 mod plane;
 mod spline;
 mod vector;
+mod cell;
 
 #[pyfunction]
 #[pyo3(signature = (a, b, c))]
@@ -33,6 +34,10 @@ mod rs {
     use super::triangle_area;
     #[pymodule_export]
     use super::version;
+    #[pymodule_export]
+    use crate::cell::basic_cell_midrib;
+    #[pymodule_export]
+    use crate::cell::flatten_midribs;
     #[pymodule_export]
     use crate::mesh::find_duplicates;
     #[pymodule_export]

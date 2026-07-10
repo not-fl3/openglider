@@ -160,7 +160,7 @@ pub(crate) fn polyline_get<V: VectorOps>(nodes: &[V], ik: f64) -> V {
     nodes[i].add(diff.scale(k))
 }
 
-fn polyline_length<V: VectorOps>(nodes: &[V]) -> f64 {
+pub(crate) fn polyline_length<V: VectorOps>(nodes: &[V]) -> f64 {
     nodes.windows(2).map(|pair| pair[0].distance(pair[1])).sum()
 }
 

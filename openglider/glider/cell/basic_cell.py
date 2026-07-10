@@ -27,51 +27,20 @@ class BasicCell(BaseModel):
         elif y_value >= 1:
             return self.prof2
         else:
-            # Ballooning is considered to be arcs, these simple rules:
-            # 1: x = y_value * diff_vector
-            # 2: y = ballooning_radius * normal * (cos(phi2)-cos(phi))
-            # 3: 2 * sin(phi2) * ballooning_radius = norm(diff_vector)
-
-            x_values: list[float] = []
-            distances: list[float] = []
-            heights: list[float] = []
-            node_len = len(self.prof1.curve)
-
-            diff = self.prof2.curve.sub(self.prof1.curve)
-
-            if not ballooning:
-                midrib = self.prof1.curve.add(diff * y_value)
-            else:
-                for i in range(len(self.prof1.curve.nodes)):  # Arc -> phi(bal) -> r  # oder so...
-                    x_left = self.prof1.x_values[i]
-                    x_right = self.prof2.x_values[i]
-                    x_values.append(x_left + y_value * (x_right - x_left))
-                    ballooning_radius = self.ballooning_radius[i]
-
-                    if close_trailing_edge and i in (0, node_len-1):
-                        d = y_value
-                        h = 0.
-
-                    elif ballooning_radius is not None:
-                        phi = self.ballooning_phi[i]    # phi is half only the half
-                        
-                        if arc_argument:
-                            psi = phi * 2 * y_value         # psi [-phi:phi]
-                            d = 0.5 - 0.5 * math.sin(phi - psi) / math.sin(phi)
-                            h = (math.cos(phi - psi) - math.cos(phi)) * ballooning_radius
-                        else:
-                            d = y_value
-                            h = (math.cos(math.asin((2 * d - 1) * math.sin(phi))) -  math.cos(phi)) * ballooning_radius
-                    else:  # Without ballooning
-                        d = y_value
-                        h = 0.
-                    
-                    distances.append(d)
-                    heights.append(h)
-            
-                midrib = self.prof1.curve.add(diff.scale_nodes(distances)).add(self.normvectors.scale_nodes(heights))
-
-            return Profile3D(curve=midrib, x_values=x_values)
+            curve, x_values = openglider.rs.basic_cell_midrib(
+                self.prof1.curve,
+                self.prof2.curve,
+                self.prof1.x_values,
+                self.prof2.x_values,
+                self.normvectors,
+                self.ballooning_phi,
+                self.ballooning_radius,
+                y_value,
+                ballooning=ballooning,
+                arc_argument=arc_argument,
+                close_trailing_edge=close_trailing_edge,
+            )
+            return Profile3D(curve=curve, x_values=x_values)
 
     @cached_property('prof1', 'prof2')
     def normvectors(self) -> openglider.rs.vector.PolyLine3D:
