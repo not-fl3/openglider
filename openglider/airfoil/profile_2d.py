@@ -1,3 +1,4 @@
+from functools import cached_property as std_cached_property
 from typing import List, Self, Sequence
 import os
 import re
@@ -233,8 +234,7 @@ class Profile2D:
                 out.write("\n{: 10.8f}\t{: 10.8f}".format(*p))
         return pfad
 
-    #@cached_property('self')
-    @property
+    @std_cached_property
     def x_values(self) -> List[float]:
         """Get XValues of airfoil. upper side neg, lower positive"""
         i = self.noseindex

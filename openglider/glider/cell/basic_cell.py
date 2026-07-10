@@ -1,6 +1,7 @@
 from __future__ import annotations
 import math
 import openglider.rs
+from typing import ClassVar
 
 from openglider.airfoil import Profile3D
 from openglider.utils.cache import cached_property
@@ -11,6 +12,7 @@ class BasicCell(BaseModel):
     """
     A very simple cell without any extras like midribs, diagonals,..
     """
+    cache_versioned: ClassVar[bool] = True
     prof1: Profile3D
     prof2: Profile3D
     ballooning_phi: list[float]

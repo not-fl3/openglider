@@ -172,21 +172,15 @@ def c_mul(a: float, b: int) -> int:
     return eval(hex((int(a) * b) & 0xFFFFFFFF)[:-1])
 
 def hash_value(value: Any) -> int:
-    hash_func = getattr(value, "__hash__", None)
-    if hash_func is not None:
-        thahash = value.__hash__()
-    else:
+    try:
+        return hash(value)
+    except TypeError:  # Lists p.e.
+        logger.debug(f"bad hash value: {value}")
+        #logger.debug(f"bad cache: {type(class_instance)} -> {attribute}, {type(value)} {type(value)}")
         try:
-            thahash = hash(value)
-        except TypeError:  # Lists p.e.
-            logger.debug(f"bad hash value: {value}")
-            #logger.debug(f"bad cache: {type(class_instance)} -> {attribute}, {type(value)} {type(value)}")
-            try:
-                thahash = hash(frozenset(value))
-            except TypeError:
-                thahash = hash(str(value))
-    
-    return thahash
+            return hash(frozenset(value))
+        except TypeError:
+            return hash(str(value))
 
 
 def hash_attributes(class_instance: CLS, hashlist: list[str], exclude: list[str] | None=None, generator: Callable[[CLS], Iterator[Any]]=None) -> int:
@@ -215,20 +209,14 @@ def hash_list(*lst: Any) -> int:
     value_lst: list[int] = []
     for el in lst:
 
-        hash_func = getattr(el, "__hash__", None)
-        if hash_func is not None:
-            thahash = el.__hash__()
-        else:
+        try:
+            value_lst.append(hash(el))
+        except TypeError:  # Lists p.e.
+            #logging.warning(f"bad cache: {el}")
             try:
-                thahash = hash(el)
-            except TypeError:  # Lists p.e.
-                #logging.warning(f"bad cache: {el}")
-                try:
-                    thahash = hash(frozenset(el))
-                except TypeError:
-                    thahash = hash(str(el))
-        
-        value_lst.append(thahash)
+                value_lst.append(hash(frozenset(el)))
+            except TypeError:
+                value_lst.append(hash(str(el)))
 
     return hash(tuple(value_lst))
 

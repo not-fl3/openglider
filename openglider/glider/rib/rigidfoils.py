@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class RigidFoilBase(ABC, BaseModel):
+    cache_versioned: ClassVar[bool] = True
     name: str = "unnamed"
     start: Percentage = Percentage(-0.1)
     end: Percentage = Percentage(0.1)

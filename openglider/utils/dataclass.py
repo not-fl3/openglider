@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 from collections.abc import Callable
 import openglider.rs
+import weakref
 
 import pydantic
 from pydantic import PrivateAttr, model_validator
@@ -107,22 +108,74 @@ class BaseModel(pydantic.BaseModel):
 
     _cache_version: int = PrivateAttr(default=0)
     _cache_ready: bool = PrivateAttr(default=False)
+    _cache_parents: list[weakref.ReferenceType[BaseModel]] = PrivateAttr(default_factory=list)
+    _cache_missing = object()
     
     def __eq__(self, other: Any) -> bool:
         return other.__class__ == self.__class__ and self.__dict__ == other.__dict__
 
     def model_post_init(self, __context: Any) -> None:
         object.__setattr__(self, "_cache_ready", True)
+        for field_name in self.model_fields:
+            self._cache_link_value(getattr(self, field_name))
 
-    def touch(self) -> None:
+    def touch(self, propagate: bool=True) -> None:
         if self.cache_versioned:
             object.__setattr__(self, "_cache_version", self._cache_version + 1)
 
+            if propagate:
+                for parent_ref in list(self._cache_parents):
+                    parent = parent_ref()
+                    if parent is None:
+                        self._cache_parents.remove(parent_ref)
+                    else:
+                        parent.touch(propagate=True)
+
+    def _cache_add_parent(self, parent: BaseModel) -> None:
+        if not self.cache_versioned:
+            return
+
+        for parent_ref in self._cache_parents:
+            if parent_ref() is parent:
+                return
+
+        self._cache_parents.append(weakref.ref(parent))
+
+    def _cache_remove_parent(self, parent: BaseModel) -> None:
+        self._cache_parents = [parent_ref for parent_ref in self._cache_parents if parent_ref() is not None and parent_ref() is not parent]
+
+    def _cache_iter_child_models(self, value: Any):
+        if isinstance(value, BaseModel):
+            yield value
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                yield from self._cache_iter_child_models(item)
+
+    def _cache_link_value(self, value: Any) -> None:
+        if not self.cache_versioned:
+            return
+
+        for child in self._cache_iter_child_models(value):
+            child._cache_add_parent(self)
+
+    def _cache_unlink_value(self, value: Any) -> None:
+        if not self.cache_versioned:
+            return
+
+        for child in self._cache_iter_child_models(value):
+            child._cache_remove_parent(self)
+
     def __setattr__(self, name: str, value: Any) -> None:
+        old_value = self._cache_missing
+        if self._cache_ready and name in self.model_fields:
+            old_value = getattr(self, name, self._cache_missing)
         super().__setattr__(name, value)
 
         if self._cache_ready and self.cache_versioned and name in self.model_fields:
-            object.__setattr__(self, "_cache_version", self._cache_version + 1)
+            if old_value is not self._cache_missing:
+                self._cache_unlink_value(old_value)
+            self._cache_link_value(value)
+            self.touch(propagate=True)
 
     def __json__(self) -> dict[str, Any]:
         return self.model_dump()

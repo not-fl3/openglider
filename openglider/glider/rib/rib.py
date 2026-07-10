@@ -31,6 +31,7 @@ class RibBase(BaseModel):
         glide-wide rotation and glider ratio.
         optional: name, absolute aoa (bool), startposition
     """
+    cache_versioned: ClassVar[bool] = True
     material: Material | None = None
     profile_2d: Profile2D
     pos: openglider.rs.vector.Vector3D

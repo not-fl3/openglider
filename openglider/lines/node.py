@@ -19,6 +19,7 @@ class NODE_TYPE_ENUM(enum.Enum):
 
 
 class Node(BaseModel):
+    cache_versioned: ClassVar[bool] = True
     NODE_TYPE: ClassVar[type[NODE_TYPE_ENUM]] = NODE_TYPE_ENUM
 
     node_type: NODE_TYPE_ENUM

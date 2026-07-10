@@ -22,6 +22,7 @@ class RoundReinforcement(BaseModel):
     """
     A Reinforcement, in the shape of an arc, to reinforce attachment points
     """
+    cache_versioned: ClassVar[bool] = True
     position: Percentage
     size: Length | Percentage = Length("4cm")
     material_code: str = ""
@@ -54,6 +55,7 @@ class RoundReinforcement(BaseModel):
 
 # Node from lines
 class AttachmentPoint(Node):
+    cache_versioned: ClassVar[bool] = True
     rib_pos: Percentage
 
     node_type: NODE_TYPE_ENUM = Node.NODE_TYPE.UPPER

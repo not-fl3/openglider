@@ -1,4 +1,4 @@
-from typing import overload
+from typing import ClassVar, overload
 
 from openglider.airfoil.profile_2d import Profile2D
 import openglider.rs
@@ -7,6 +7,7 @@ from openglider.utils.cache import cached_property
 from openglider.utils.dataclass import BaseModel
 
 class Profile3D(BaseModel):
+    cache_versioned: ClassVar[bool] = True
     curve: openglider.rs.vector.PolyLine3D
     x_values: list[float]
 

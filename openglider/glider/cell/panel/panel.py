@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 import logging
 import math
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import openglider.rs
 import numpy as np
@@ -33,6 +33,7 @@ class PANELCUT_TYPES(Enum):
 
 
 class PanelCut(BaseModel):
+    cache_versioned: ClassVar[bool] = True
     x_left: Percentage
     x_right: Percentage
     cut_type: PANELCUT_TYPES
@@ -233,6 +234,7 @@ class Panel(BaseModel):
     Glider cell-panel
     :param cut_front {'left': 0.06, 'right': 0.06, 'type': 'orthogonal'}
     """
+    cache_versioned: ClassVar[bool] = True
     cut_front: PanelCut
     cut_back: PanelCut
     material: Material = cloth.get("porcher.skytex_32.white")

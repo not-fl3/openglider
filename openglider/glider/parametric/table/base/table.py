@@ -82,7 +82,7 @@ class ElementTable(Generic[ElementType]):
                 column += 1
 
         return columns
-    
+
     def get(self, row_no: int, keywords: list[str] | None=None, **kwargs: Any) -> list[ElementType]:
         row_no += 2  # skip header line
         elements: list[ElementType] = []
@@ -107,7 +107,6 @@ class ElementTable(Generic[ElementType]):
                         raise e
 
                     elements.append(element)
-        
         return elements
     
     @staticmethod

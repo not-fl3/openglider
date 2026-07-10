@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import openglider.rs
 from openglider.airfoil import Profile2D
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class RibHoleBase(BaseModel):
+    cache_versioned: ClassVar[bool] = True
     name: str = "unnamed"
     margin: Percentage | Length= Percentage("2%")
 
