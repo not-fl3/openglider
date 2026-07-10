@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 from collections.abc import Callable
 import openglider.rs
 
 import pydantic
-from pydantic import model_validator
+from pydantic import PrivateAttr, model_validator
 
 #from pydantic import Field as field
 from pydantic import ConfigDict, Field  # export Field
@@ -98,19 +98,39 @@ def get_validator(cls: type) -> Callable[[Any], Any]:
 #]
 
 class BaseModel(pydantic.BaseModel):
+    cache_versioned: ClassVar[bool] = False
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         ignored_types=(CachedProperty,),
         extra="forbid"
         )
+
+    _cache_version: int = PrivateAttr(default=0)
+    _cache_ready: bool = PrivateAttr(default=False)
     
     def __eq__(self, other: Any) -> bool:
         return other.__class__ == self.__class__ and self.__dict__ == other.__dict__
 
+    def model_post_init(self, __context: Any) -> None:
+        object.__setattr__(self, "_cache_ready", True)
+
+    def touch(self) -> None:
+        if self.cache_versioned:
+            object.__setattr__(self, "_cache_version", self._cache_version + 1)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
+
+        if self._cache_ready and self.cache_versioned and name in self.model_fields:
+            object.__setattr__(self, "_cache_version", self._cache_version + 1)
+
     def __json__(self) -> dict[str, Any]:
-        return dict(self._iter())
+        return self.model_dump()
 
     def __hash__(self) -> int:
+        if self.cache_versioned:
+            return hash((self.__class__, id(self), self._cache_version))
+
         return hash_list(*self.dict().values())
     
     @model_validator(mode="before")
