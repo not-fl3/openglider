@@ -19,7 +19,6 @@ dynamic = ["version"]
 
 dependencies = [
     "euklid",
-    "pyfoil",
     "pydantic",
     "svgwrite",
     "numpy",

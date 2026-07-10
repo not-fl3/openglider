@@ -250,7 +250,10 @@ class LineSet:
             lines = self.get_upper_lines(self.get_main_attachment_point())
         else:
             lines = self.lines
-        return sum([line.get_mesh(numpoints, segment_length=line_segment_length) for line in lines], Mesh())
+        mesh = Mesh()
+        for line in lines:
+            mesh += line.get_mesh(numpoints, segment_length=line_segment_length)
+        return mesh
 
     def get_upper_line_mesh(self, numpoints: int=1, breaks: bool=False) -> Mesh:
         mesh = Mesh()

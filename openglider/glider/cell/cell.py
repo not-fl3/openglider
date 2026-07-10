@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Sequence
+from openglider.airfoil import Profile3D, Profile2D
 from typing import Literal
 
 import openglider.rs
-import openglider.utils
-import pyfoil.airfoil
 from openglider.airfoil import Profile3D
 from openglider.glider.ballooning.base import BallooningBase
 from openglider.glider.cell.attachment_point import CellAttachmentPoint
@@ -415,7 +413,7 @@ class Cell(BaseModel):
         for cut in cuts:
             cut.mirror()
 
-    def mean_airfoil(self, num_midribs: int=8) -> pyfoil.airfoil.Airfoil:
+    def mean_airfoil(self, num_midribs: int=8) -> Profile2D:
         mean_rib = self.midrib(0).flatten().normalized()
 
         for i in range(1, num_midribs):

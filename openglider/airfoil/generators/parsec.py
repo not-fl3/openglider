@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import math
 
 import openglider.rs
-from pyfoil.airfoil import Airfoil
+from openglider.airfoil.profile_2d import Profile2D as Airfoil
 
 @dataclass
 class BezierParsecAirfoil:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import openglider.rs
 import logging
-import pyfoil
+from openglider.airfoil import Profile2D
 
 from openglider.airfoil import Profile3D
 from openglider.utils.dataclass import dataclass, Field
@@ -75,7 +75,7 @@ class MiniRib:
         
         return Percentage(value.si/self.rib_chord(cell))
     
-    def get_offset_outline(self, cell:Cell, margin: Percentage | Length) -> pyfoil.Airfoil:
+    def get_offset_outline(self, cell:Cell, margin: Percentage | Length) -> Profile2D:
         profile_3d = self.get_profile_3d(cell)
         self.profile_2d = profile_3d.flatten()
         if margin == 0.:
@@ -86,7 +86,7 @@ class MiniRib:
             
             envelope = self.profile_2d.curve.offset(-margin.si, simple=False).nodes
             
-            return pyfoil.Airfoil(envelope)
+            return Profile2D(envelope)
         
     def get_flattened(self, cell:Cell) -> openglider.rs.vector.PolyLine2D:
         profile_3d = self.get_profile_3d(cell)

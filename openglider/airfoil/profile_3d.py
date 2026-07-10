@@ -1,7 +1,7 @@
 from typing import overload
 
+from openglider.airfoil.profile_2d import Profile2D
 import openglider.rs
-import pyfoil
 
 from openglider.utils.cache import cached_property
 from openglider.utils.dataclass import BaseModel
@@ -81,10 +81,10 @@ class Profile3D(BaseModel):
 
         return openglider.rs.plane.Plane(self.curve.nodes[self.noseindex], xvect, yvect)
 
-    def flatten(self) -> pyfoil.Airfoil:
+    def flatten(self) -> Profile2D:
         """Flatten the airfoil and return a 2d-Representative"""
         layer = self.projection_layer
-        return pyfoil.Airfoil(
+        return Profile2D(
             layer.project(self.curve).nodes,
             name=self.name or 'profile' + "_flattened"
         )

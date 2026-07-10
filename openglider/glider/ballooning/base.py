@@ -10,7 +10,7 @@ import openglider.rs
 
 import openglider
 from openglider.config import config
-from pyfoil import Airfoil
+from openglider.airfoil import Profile2D
 
 class ArcSinc:
     def __init__(self) -> None:
@@ -114,16 +114,16 @@ class BallooningBase(ABC):
         return r_by_width * (1 - math.cos(phi))
     
     @classmethod
-    def apply_height_to_airfoil(cls, airfoil: Airfoil, amounts: list[float]) -> Airfoil:
-        normals = airfoil.normvectors
+    def apply_height_to_Profile2D(cls, Profile2D: Profile2D, amounts: list[float]) -> Profile2D:
+        normals = Profile2D.normvectors
 
-        assert len(normals.nodes) == len(airfoil.curve.nodes) == len(amounts)
+        assert len(normals.nodes) == len(Profile2D.curve.nodes) == len(amounts)
 
         new_points = [
-            p + n * amount for p, amount, n in zip(airfoil.curve.nodes, amounts, normals)
+            p + n * amount for p, amount, n in zip(Profile2D.curve.nodes, amounts, normals)
         ]
 
-        return Airfoil(new_points).normalized()
+        return Profile2D(new_points).normalized()
 
     @classmethod
     def phi(cls, baloon: float) -> float:

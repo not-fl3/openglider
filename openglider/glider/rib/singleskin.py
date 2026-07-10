@@ -6,7 +6,7 @@ import typing
 
 import openglider.rs
 import numpy as np
-import pyfoil
+from openglider.airfoil import Profile2D
 
 from openglider.glider.rib.attachment_point import AttachmentPoint
 from openglider.glider.rib.rib import Rib
@@ -69,7 +69,7 @@ class SingleSkinRib(Rib):
 
         data_new = np.array([x, new_y]).T.tolist()
 
-        new_profile = pyfoil.Airfoil(data_new)
+        new_profile = Profile2D(data_new)
         self.profile_2d = new_profile.set_x_values(self.profile_2d.x_values)
 
     @classmethod
@@ -86,7 +86,7 @@ class SingleSkinRib(Rib):
         return json_dict
 
     @cached_function("self", exclude=["attachment_points"], generator=lambda rib: [p.rib_pos for p in rib.attachment_points])
-    def get_hull(self, normalize_x_values: bool = False) -> pyfoil.Airfoil:
+    def get_hull(self, normalize_x_values: bool = False) -> Profile2D:
         if any([isinstance(p, SingleSkinAttachmentPoint) for p in self.attachment_points]):
             attachment_points = list(filter(lambda p: p.rib_pos < 0.9999, self.attachment_points))
             attachment_points.sort(key=lambda p: p.rib_pos)
@@ -127,7 +127,7 @@ class SingleSkinRib(Rib):
                         p1_top, spline_p1, spline_p2, p2_top
                     ]).get_sequence(self.single_skin_parameters.num_points).nodes
 
-                    airfoil = pyfoil.Airfoil(
+                    airfoil = Profile2D(
                         airfoil.curve.get(0, ik_start).nodes +
                         [p1_bottom] +
                         spline_curve +
@@ -139,7 +139,7 @@ class SingleSkinRib(Rib):
             if isinstance(last_point, SingleSkinAttachmentPoint):
                 ik_last = airfoil.get_ik(last_point.rib_pos)
 
-                airfoil = pyfoil.Airfoil(
+                airfoil = Profile2D(
                     airfoil.curve.get(0, ik_last).nodes +
                     [
                         airfoil.curve.get(ik_last) + openglider.rs.vector.Vector2D([last_point.width/2/self.chord, 0]),
@@ -231,7 +231,7 @@ class SingleSkinRib(Rib):
                     convert_point(p, upper=index < profile.noseindex) for index, p in enumerate(profile.curve)
                 ]
 
-                profile = pyfoil.Airfoil(new_data)
+                profile = Profile2D(new_data)
         
         if normalize_x_values:
             airfoil = airfoil.set_x_values(self.profile_2d.x_values)

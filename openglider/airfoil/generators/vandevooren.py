@@ -1,6 +1,6 @@
 import math
 
-from pyfoil.generators.joukowsy import JoukowskyAirfoil
+from openglider.airfoil.generators.joukowsy import JoukowskyAirfoil
 
 
 class VanDeVoorenAirfoil(JoukowskyAirfoil):

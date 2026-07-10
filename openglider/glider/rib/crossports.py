@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import openglider.rs
-import pyfoil
+from openglider.airfoil import Profile2D
 
 from openglider.mesh import Mesh
 from openglider.utils.cache import cached_function
@@ -25,7 +25,7 @@ class RibHoleBase(BaseModel):
     margin: Percentage | Length= Percentage("2%")
 
     @cached_function('margin')
-    def get_envelope_airfoil(self, rib: Rib) -> pyfoil.Airfoil:
+    def get_envelope_airfoil(self, rib: Rib) -> Profile2D:
         return rib.get_offset_outline(self.margin)
     
     @cached_function("margin")

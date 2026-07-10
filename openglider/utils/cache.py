@@ -173,7 +173,6 @@ def c_mul(a: float, b: int) -> int:
 
 def hash_value(value: Any) -> int:
     hash_func = getattr(value, "__hash__", None)
-    hash_func = None
     if hash_func is not None:
         thahash = value.__hash__()
     else:

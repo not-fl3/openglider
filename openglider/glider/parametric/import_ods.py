@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from packaging.version import Version
 
 import openglider.rs
-import pyfoil
+from openglider.airfoil import Profile2D
 
 from openglider.glider.parametric.arc import ArcCurve
 from openglider.glider.parametric.config import ParametricGliderConfig, SewingAllowanceConfig
@@ -71,7 +71,7 @@ def import_ods_glider(cls: type[ParametricGlider], tables: list[Table]) -> Param
     # ------------
 
     # profiles = [BezierProfile2D(profile) for profile in transpose_columns(sheets[3])]
-    profiles = [pyfoil.Airfoil(profile, name).normalized() for name, profile in transpose_columns(tables[3])]
+    profiles = [Profile2D(profile, name).normalized() for name, profile in transpose_columns(tables[3])]
 
     if config.version > Version("0.0.1"):
         has_center_cell = not tables[0]["C2"] == 0

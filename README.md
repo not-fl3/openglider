@@ -48,7 +48,5 @@ OpenGlider is built on top of these technologies:
 
 - **Python** ([link](http://docs.python.org/3/tutorial/))
 - Pydantic
-- [pyfoil](https://github.com/airgproducts/pyfoil)
-- [euklid](https://github.com/airgproducts/euklid)
 - **[VTK](https://www.vtk.org/)** - visual toolkit for 3d-output
 - Qt - Gui toolkit

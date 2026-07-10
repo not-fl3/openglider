@@ -5,7 +5,7 @@ import numpy as np
 import logging
 
 import openglider.rs
-import pyfoil
+from openglider.airfoil import Profile2D
 
 from openglider.airfoil import Profile3D
 from openglider.glider.rib.attachment_point import AttachmentPoint
@@ -32,7 +32,7 @@ class RibBase(BaseModel):
         optional: name, absolute aoa (bool), startposition
     """
     material: Material | None = None
-    profile_2d: pyfoil.Airfoil
+    profile_2d: Profile2D
     pos: openglider.rs.vector.Vector3D
 
     name: str = "unnamed rib"
@@ -60,7 +60,7 @@ class RibBase(BaseModel):
         ik = self.profile_2d(x_value)
         return self.profile_3d[ik]
     
-    def get_hull(self, normalize_x_values: bool = False) -> pyfoil.Airfoil:
+    def get_hull(self, normalize_x_values: bool = False) -> Profile2D:
         return self.profile_2d
     
     @cached_function("self")
@@ -192,7 +192,7 @@ class Rib(RibBase):
     def is_closed(self) -> bool:
         return self.profile_2d.thickness < 0.01
 
-    def get_hull(self, normalize_x_values: bool = False) -> pyfoil.Airfoil:
+    def get_hull(self, normalize_x_values: bool = False) -> Profile2D:
         """returns the outer contour of the normalized mesh in form
            of a Polyline"""
         result = self.profile_2d
@@ -271,7 +271,7 @@ class Rib(RibBase):
                 )
 
     @cached_function("self")
-    def get_offset_outline(self, margin: Percentage | Length) -> pyfoil.Airfoil:
+    def get_offset_outline(self, margin: Percentage | Length) -> Profile2D:
         if margin == 0.:
             return self.profile_2d
         else:
@@ -280,7 +280,7 @@ class Rib(RibBase):
             
             envelope = self.profile_2d.curve.offset(-margin.si, simple=False).nodes
             
-            return pyfoil.Airfoil(envelope)
+            return Profile2D(envelope)
         
     def get_rigidfoils(self) -> list[RigidFoilBase]:
         if self.sharknose is not None:

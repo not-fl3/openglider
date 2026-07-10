@@ -7,12 +7,11 @@ import random
 from typing import TYPE_CHECKING, Self
 from collections.abc import Callable
 
+from openglider.airfoil.profile_2d import Profile2D
 import openglider.rs
 from openglider.glider.parametric.config import ParametricGliderConfig, SewingAllowanceConfig
 from openglider.glider.parametric.table.base.parser import Parser
 from openglider.glider.parametric.table.cell.ballooning import BallooningData
-import openglider.materials
-import pyfoil
 from openglider.glider.ballooning.base import BallooningBase
 from openglider.glider.ballooning.new import BallooningBezierNeu
 from openglider.glider.cell import Cell
@@ -46,7 +45,7 @@ class ParametricGlider:
     shape: ParametricShape
     arc: ArcCurve
     aoa: SymmetricCurveType
-    profiles: list[pyfoil.Airfoil]
+    profiles: list[Profile2D]
     profile_merge_curve: CurveType
     balloonings: list[BallooningBase]
     ballooning_merge_curve: CurveType
@@ -168,7 +167,7 @@ class ParametricGlider:
 
         return result
 
-    def get_merge_profile(self, factor: float) -> pyfoil.Airfoil:
+    def get_merge_profile(self, factor: float) -> Profile2D:
         factor = max(0, min(len(self.profiles)-1, factor))
         k = factor % 1
         i = int(factor // 1)
@@ -354,7 +353,7 @@ class ParametricGlider:
         
         return parsers
     
-    def get_profiles(self, num_profile: int | None=None) -> list[pyfoil.Airfoil]:
+    def get_profiles(self, num_profile: int | None=None) -> list[Profile2D]:
         num_profile = num_profile or self.num_profile
 
         if num_profile is not None:
@@ -376,7 +375,7 @@ class ParametricGlider:
 
         profile_merge_curve = openglider.rs.vector.Interpolation(self.profile_merge_curve.get_sequence(self.num_interpolate).nodes)
         
-        result: list[pyfoil.Airfoil] = []
+        result: list[Profile2D] = []
 
         for rib_no, x_value in enumerate(x_values):
             merge_factor, scale_factor = self.tables.profile_modifiers.get_factors(rib_no)
