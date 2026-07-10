@@ -19,6 +19,7 @@ class Table:
     name: str=""
 
     dct: dict[str, Any]
+    coords: dict[str, tuple[int, int]]
 
     @classmethod
     def str_decrypt(cls, str: str) -> tuple[int, int]:
@@ -52,6 +53,7 @@ class Table:
 
     def __init__(self, rows: int=0, columns: int=0, name: str=None):
         self.dct = {}
+        self.coords = {}
         self.num_rows = rows
         self.num_columns = columns
         self.name=name or ""
@@ -65,9 +67,11 @@ class Table:
     def __from_json__(cls, dct: dict[str, Any]) -> Table:
         table = cls()
         table.dct = dct
+        table.coords = {}
 
         for key in dct:
             column, row = cls.str_decrypt(key)
+            table.coords[key] = (column, row)
 
             table.num_rows = max(table.num_rows, row+1)
             table.num_columns = max(table.num_columns, column+1)
@@ -92,11 +96,11 @@ class Table:
         if to_j is None:
             to_j = self.num_columns
         new_table = self.__class__(self.num_rows, to_j-from_i)
-        for i in range(from_i, to_j):
-            for row in range(self.num_rows):
-                item = self.str_encrypt(i, row)
-                if item in self.dct:
-                    new_table.set_value(i-from_i, row, self.dct[item])
+
+        for key, value in self.dct.items():
+            column, row = self.coords[key]
+            if from_i <= column < to_j and value is not None:
+                new_table.set_value(column-from_i, row, value)
         
         return new_table
     
@@ -106,11 +110,10 @@ class Table:
         row_count = to_row - from_row
         new_table = Table(row_count, self.num_columns, name=self.name)
 
-        for i in range(from_row, to_row):
-            for column in range(self.num_columns):
-                item = self.str_encrypt(column, i)
-                if item in self.dct:
-                    new_table.set_value(column, i-from_row, self.dct[item])
+        for key, value in self.dct.items():
+            column, row = self.coords[key]
+            if from_row <= row < to_row and value is not None:
+                new_table.set_value(column, row-from_row, value)
         
         return new_table
 
@@ -148,6 +151,7 @@ class Table:
         self.num_rows = max(row_no+1, self.num_rows)
         key = self.str_encrypt(column_no, row_no)
         self.dct[key] = value
+        self.coords[key] = (column_no, row_no)
 
     def insert_row(self, row: list[Any], row_no: int | None=None) -> None:
         if row_no is None:
@@ -161,23 +165,18 @@ class Table:
 
     def append_right(self, table: Table, space: int=0) -> None:
         old_column_no = self.num_columns
-        
-        columns_to_add = table.num_columns
-        rows_to_add = table.num_rows
 
-        for row_no in range(rows_to_add):
-            for column_no in range(columns_to_add):
-                value = table.get(column_no, row_no)
-                if value is not None:
-                    self.set_value(old_column_no+column_no+space, row_no, value)
+        for key, value in table.dct.items():
+            column_no, row_no = table.coords[key]
+            if value is not None:
+                self.set_value(old_column_no+column_no+space, row_no, value)
 
     def append_bottom(self, table: Table, space: int=0) -> None:
         total_rows = self.num_rows
-        for row_no in range(table.num_rows):
-            for column_no in range(table.num_columns):
-                value = table.get(column_no, row_no)
-                if value is not None:
-                    self.set_value(column_no, total_rows+row_no+space, value)
+        for key, value in table.dct.items():
+            column_no, row_no = table.coords[key]
+            if value is not None:
+                self.set_value(column_no, total_rows+row_no+space, value)
 
     def get_ods_sheet(self, name: str=None) -> ezodf.Table:
         rows = max(1, self.num_rows)
