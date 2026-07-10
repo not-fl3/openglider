@@ -69,7 +69,7 @@ class SingleSkinRib(Rib):
 
         data_new = np.array([x, new_y]).T.tolist()
 
-        new_profile = Profile2D(data_new)
+        new_profile = Profile2D(data_new, f"{self.profile_2d.name}:continued_min")
         self.profile_2d = new_profile.set_x_values(self.profile_2d.x_values)
 
     @classmethod
@@ -133,7 +133,7 @@ class SingleSkinRib(Rib):
                         spline_curve +
                         [p2_bottom] +
                         airfoil.curve.get(ik_end, len(airfoil.curve)-1).nodes
-                    )
+                    , f"{self.profile_2d.name}:singleskin_hull_segment({i})")
             
             last_point = attachment_points[-1]
             if isinstance(last_point, SingleSkinAttachmentPoint):
@@ -145,7 +145,7 @@ class SingleSkinRib(Rib):
                         airfoil.curve.get(ik_last) + openglider.rs.vector.Vector2D([last_point.width/2/self.chord, 0]),
                         airfoil.curve.get(0)
                     ]
-                )
+                , f"{self.profile_2d.name}:singleskin_hull_last")
             
             if normalize_x_values:
                 airfoil = airfoil.set_x_values(self.profile_2d.x_values)
@@ -231,7 +231,7 @@ class SingleSkinRib(Rib):
                     convert_point(p, upper=index < profile.noseindex) for index, p in enumerate(profile.curve)
                 ]
 
-                profile = Profile2D(new_data)
+                profile = Profile2D(new_data, f"{self.profile_2d.name}:singleskin_shape({i})")
         
         if normalize_x_values:
             airfoil = airfoil.set_x_values(self.profile_2d.x_values)

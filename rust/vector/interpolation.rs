@@ -98,15 +98,25 @@ pub struct Interpolation {
 #[pymethods]
 impl Interpolation {
     #[new]
-    #[pyo3(signature = (nodes, extrapolate = true))]
-    fn new(nodes: InterpolationNodesInput, extrapolate: bool, py: Python<'_>) -> PyResult<Self> {
+    #[pyo3(signature = (nodes, extrapolate = true, validate = true))]
+    fn new(nodes: InterpolationNodesInput, extrapolate: bool, validate: bool, py: Python<'_>) -> PyResult<Self> {
+        let validate_nodes = |nodes: &[Vector2D]| -> PyResult<()> {
+            if validate {
+                validate_monotonic_x(nodes).map_err(Into::into)
+            } else {
+                Ok(())
+            }
+        };
+
         match nodes {
             InterpolationNodesInput::Interpolation(interpolation) => {
                 let interpolation = interpolation.bind(py).borrow();
+                validate_nodes(&interpolation.curve.nodes)?;
                 Ok(Self { curve: interpolation.curve.clone(), extrapolate })
             }
             InterpolationNodesInput::PolyLine(polyline) => {
                 let polyline = polyline.bind(py).borrow();
+                validate_nodes(&polyline.nodes)?;
                 Ok(Self { curve: polyline.clone(), extrapolate })
             }
             InterpolationNodesInput::Points(points) => {
@@ -114,6 +124,7 @@ impl Interpolation {
                 for point in points {
                     parsed.push(point.into_vector()?);
                 }
+                validate_nodes(&parsed)?;
                 Ok(Self { curve: PolyLine2D { nodes: parsed }, extrapolate })
             }
         }

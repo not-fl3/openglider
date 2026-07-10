@@ -41,7 +41,9 @@ class Profile2D:
         # Create a mapping x -> ik value
         self._interpolation_x_values = openglider.rs.vector.Interpolation(
             [[-p[0], i] for i, p in enumerate(self.curve.nodes[:self.noseindex])] +
-            [[ p[0], i+self.noseindex] for i, p in enumerate(self.curve.nodes[self.noseindex:])]
+            [[ p[0], i+self.noseindex] for i, p in enumerate(self.curve.nodes[self.noseindex:])],
+            extrapolate=True,
+            validate=False
         )
 
     def _load_xfoil(self):
@@ -280,7 +282,7 @@ class Profile2D:
         if name is not None:
             name += "_" + str(newthick) + "%"
 
-        return Profile2D(self.curve * [1, factor])
+        return Profile2D(self.curve * [1, factor], name)
 
     @property
     def camber_line(self) -> openglider.rs.vector.Interpolation:

@@ -86,7 +86,7 @@ class Sharknose(BaseModel):
 
             data.append(openglider.rs.vector.Vector2D([x, y]))
         
-        return openglider.airfoil.Profile2D(data)
+        return openglider.airfoil.Profile2D(data, f"{rib.profile_2d.name}:sharknose")
 
     def update_rigidfoil(self, rib: Rib, rigidfoil: RigidFoilBase) -> tuple[RigidFoilCurved, RigidFoilCurved] | None:
         if rigidfoil.start < self.position and rigidfoil.end > self.position:
