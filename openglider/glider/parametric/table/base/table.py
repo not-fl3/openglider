@@ -25,6 +25,7 @@ class ElementTable(Generic[ElementType]):
     table_type: TableType = TableType.general
     keywords: dict[str, Keyword[Any]] = {}
     dtos: dict[str, type[DTO[Any]]] = {}
+    _dto_field_plan_cache: dict[type[DTO[Any]], list[tuple[str, tuple[int, int] | None, bool]]] = {}
 
     def __init__(self, table: Table | None=None, migrate_header: bool=False):
         self.table = Table()
@@ -152,22 +153,36 @@ class ElementTable(Generic[ElementType]):
         
         return None
 
+    @classmethod
+    def _get_dto_field_plan(cls, dto: type[DTO[Any]]) -> list[tuple[str, tuple[int, int] | None, bool]]:
+        if dto not in cls._dto_field_plan_cache:
+            plan: list[tuple[str, tuple[int, int] | None, bool]] = []
+
+            for field_name, field in dto.model_fields.items():
+                tuple_type = dto.check_is_cell_tuple(field.annotation)
+                if tuple_type is not None:
+                    plan.append((field_name, tuple_type.index_offset, False))
+                else:
+                    plan.append((field_name, None, field.annotation is str or typing.get_origin(field.annotation) == typing.Literal))
+
+            cls._dto_field_plan_cache[dto] = plan
+
+        return cls._dto_field_plan_cache[dto]
+
     def _prepare_dto_data(self, row: int, dto: type[DTO[Any]], data: list[Any], resolvers: list[Parser]) -> dict[str, Any]:
-        fields = dto.model_fields.items()
-        
         dct: dict[str, Any] = {}
         index = 0
 
-        for field_name, field in fields:
-            if tuple_type := dto.check_is_cell_tuple(field.annotation):
-                offset1, offset2 = tuple_type.index_offset
+        for field_name, tuple_offset, is_raw in self._get_dto_field_plan(dto):
+            if tuple_offset is not None:
+                offset1, offset2 = tuple_offset
                 dct[field_name] = (
                     resolvers[row].parse(data[index+offset1]),
                     resolvers[row+1].parse(data[index+offset2])
                 )
-                index = index + 1 + max(tuple_type.index_offset)
+                index = index + 1 + max(tuple_offset)
             else:
-                if field.annotation is str or typing.get_origin(field.annotation) == typing.Literal:
+                if is_raw:
                     dct[field_name] = data[index]
                 else:
                     dct[field_name] = resolvers[row].parse(data[index])
