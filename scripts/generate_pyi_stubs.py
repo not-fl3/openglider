@@ -6,6 +6,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -16,14 +17,52 @@ ROOT_STUB_PATH = SUBMODULE_STUB_ROOT / "__init__.pyi"
 
 
 def _find_extension_binary() -> Path:
-    extensions = []
-    for pattern in ("rs*.so", "rs*.pyd", "rs*.dylib"):
-        extensions.extend(sorted(PACKAGE_ROOT.glob(pattern)))
-    if not extensions:
+    explicit_binary = os.environ.get("OPENGLIDER_RS_BINARY")
+    if explicit_binary:
+        candidate = Path(explicit_binary)
+        if candidate.exists():
+            return candidate
+
+    # Prefer importable extension module filenames first, then rust dylibs as fallback.
+    search_patterns = (
+        "rs*.pyd",
+        "rs*.so",
+        "rs*.dylib",
+        "rs*.dll",
+    )
+
+    search_roots = [
+        PACKAGE_ROOT,
+        PROJECT_ROOT / "build",
+    ]
+
+    extensions: list[Path] = []
+    for search_root in search_roots:
+        if not search_root.exists():
+            continue
+        for pattern in search_patterns:
+            extensions.extend(search_root.rglob(pattern))
+
+    # Common direct build outputs in case recursive glob misses platform-specific naming.
+    fallback_candidates = [
+        PROJECT_ROOT / "build" / "lib" / "openglider" / "rs.so",
+        PROJECT_ROOT / "target" / "release" / "librs.so",
+        PROJECT_ROOT / "target" / "release" / "librs.dylib",
+        PROJECT_ROOT / "target" / "release" / "rs.dll",
+    ]
+
+    for fallback in fallback_candidates:
+        if fallback.exists():
+            extensions.append(fallback)
+
+    # Keep unique paths and prefer newest build output when multiple candidates exist.
+    unique_extensions = sorted(set(extensions), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not unique_extensions:
         raise FileNotFoundError(
-            "Could not find the compiled openglider.rs extension. Build the extension first."
+            "Could not find the compiled openglider.rs extension in source or build directories. "
+            "Build the extension first."
         )
-    return extensions[0]
+    return unique_extensions[0]
 
 
 def _run_introspection(binary_path: Path, output_dir: Path) -> None:
