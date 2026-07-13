@@ -216,8 +216,8 @@ class MiniRib:
 
         # add border on top / bottom
         offset = self.convert_to_chordlength(self.hole_border_panel, cell)
-        top_curve = nodes_top.reverse().offset(offset)
-        bottom_curve = nodes_bottom.offset(-offset)
+        top_curve = nodes_top.reverse().offset(offset.si)
+        bottom_curve = nodes_bottom.offset(-offset.si)
 
         # check for intersection between offset lines
         try:

@@ -147,8 +147,9 @@ class Patterns(PatternsNew):
     def prepare_glider_project(self, project: GliderProject) -> GliderProject:
         new_project = super().prepare_glider_project(project)
 
-        self.set_names_straps(new_project.glider_3d)
-        self.set_names_panels(new_project.glider_3d)
+        glider_3d = new_project.get_glider_3d()
+        self.set_names_straps(glider_3d)
+        self.set_names_panels(glider_3d)
 
         return new_project
 

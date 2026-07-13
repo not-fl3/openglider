@@ -75,15 +75,15 @@ class DiagonalSide(BaseModel):
                 
                 profile = rib.get_hull()
 
-                front_ik = profile.get_ik(self.start_x(rib))
-                back_ik = profile.get_ik(self.end_x(rib))
+                front_ik = profile.get_ik(self.start_x(rib).si)
+                back_ik = profile.get_ik(self.end_x(rib).si)
 
                 return rib.profile_3d.curve.get(front_ik, back_ik)
                 #return openglider.rs.vector.PolyLine3D(rib.profile_3d[front:back].data.tolist())
             else:
                 return openglider.rs.vector.PolyLine3D([
-                    rib.align(rib.profile_2d.align([self.start_x, self.height])),
-                    rib.align(rib.profile_2d.align([self.end_x, self.height]))
+                    rib.align(rib.profile_2d.align([self.start_x(rib).si, self.height])),
+                    rib.align(rib.profile_2d.align([self.end_x(rib).si, self.height]))
                 ])
 
 
@@ -409,8 +409,8 @@ class TensionLine(TensionStrap):
     def get_length(self, cell: Cell) -> float:
         rib1 = cell.rib1
         rib2 = cell.rib2
-        left = rib1.profile_3d[rib1.profile_2d(self.side1)]
-        right = rib2.profile_3d[rib2.profile_2d(self.side2)]
+        left = rib1.profile_3d[rib1.profile_2d(self.side1.center_x().si)]
+        right = rib2.profile_3d[rib2.profile_2d(self.side2.center_x().si)]
 
         return (left - right).length()
 
@@ -424,8 +424,8 @@ class TensionLine(TensionStrap):
         boundaries = {}
         rib1 = cell.rib1
         rib2 = cell.rib2
-        p1 = rib1.profile_3d[rib1.profile_2d(self.side1)]
-        p2 = rib2.profile_3d[rib2.profile_2d(self.side2)]
+        p1 = rib1.profile_3d[rib1.profile_2d(self.side1.center_x().si)]
+        p2 = rib2.profile_3d[rib2.profile_2d(self.side2.center_x().si)]
         boundaries[rib1.name] = [0]
         boundaries[rib2.name] = [1]
         return mesh.Mesh.from_indexed([p1, p2], {"tension_lines": [((0, 1), {})]}, boundaries=boundaries)

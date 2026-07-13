@@ -108,12 +108,12 @@ class SingleSkinRib(Rib):
 
                     y_vector = openglider.rs.vector.Vector2D([0,1])
 
-                    p1_bottom = airfoil.get(p1.rib_pos) + openglider.rs.vector.Vector2D([p1.width/2/self.chord, 0])
+                    p1_bottom = airfoil.get(p1.rib_pos) + openglider.rs.vector.Vector2D([p1.width.si/2/self.chord, 0])
                     p1_diff = openglider.rs.vector.Rotation2D(-p1.angle_back.si).apply(y_vector/self.chord)
                     p1_diff *= p1.height.si / p1_diff.dot(y_vector)
                     p1_top = p1_bottom + p1_diff
 
-                    p2_bottom = airfoil.get(p2.rib_pos) + openglider.rs.vector.Vector2D([-p2.width/2/self.chord, 0])
+                    p2_bottom = airfoil.get(p2.rib_pos) + openglider.rs.vector.Vector2D([-p2.width.si/2/self.chord, 0])
                     p2_diff = openglider.rs.vector.Rotation2D(p2.angle_front.si).apply(y_vector/self.chord)
                     p2_diff *= p2.height.si / p2_diff.dot(y_vector)
                     p2_top = p2_bottom + p2_diff
@@ -142,7 +142,7 @@ class SingleSkinRib(Rib):
                 airfoil = Profile2D(
                     airfoil.curve.get(0, ik_last).nodes +
                     [
-                        airfoil.curve.get(ik_last) + openglider.rs.vector.Vector2D([last_point.width/2/self.chord, 0]),
+                        airfoil.curve.get(ik_last) + openglider.rs.vector.Vector2D([last_point.width.si/2/self.chord, 0]),
                         airfoil.curve.get(0)
                     ]
                 , f"{self.profile_2d.name}:singleskin_hull_last")

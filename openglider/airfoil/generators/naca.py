@@ -1,6 +1,6 @@
 import math
 
-def compute_naca(naca: int, numpoints: int) -> list[list[float]]:
+def compute_naca(naca: int, numpoints: int) -> list[tuple[float, float]]:
 
     """Compute and return a four-digit naca-airfoil"""
     # See: http://people.clarkson.edu/~pmarzocc/AE429/The%20NACA%20airfoil%20series.pdf
@@ -31,9 +31,9 @@ def compute_naca(naca: int, numpoints: int) -> list[list[float]]:
         #theta = math.atan(gradient)
         costheta = (1 + gradient ** 2) ** (-0.5)
         sintheta = gradient * costheta
-        upper.append([x - thickness_this * sintheta,
-                        mean_camber + thickness_this * costheta])
-        lower.append([x + thickness_this * sintheta,
-                        mean_camber - thickness_this * costheta])
+        upper.append((x - thickness_this * sintheta,
+                        mean_camber + thickness_this * costheta))
+        lower.append((x + thickness_this * sintheta,
+                        mean_camber - thickness_this * costheta))
 
     return upper + lower[::-1][1:]

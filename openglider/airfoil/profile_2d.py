@@ -1,5 +1,5 @@
 from functools import cached_property as std_cached_property
-from typing import List, Self, Sequence
+from typing import Any, Callable, Iterable, List, Self, Sequence
 import os
 import re
 import math
@@ -10,6 +10,7 @@ import openglider.xfoil as xfoil
 import pandas
 
 from openglider.airfoil.generators import JoukowskyAirfoil, VanDeVoorenAirfoil, TrefftzKuttaAirfoil, compute_naca
+from openglider.vector.unit import Percentage
 
 
 logger = logging.getLogger(__name__)
@@ -25,13 +26,13 @@ class Profile2D:
     xtr_top = 0.5
     xtr_bottom = 0.5
 
-    def __init__(self, data: Sequence[openglider.rs.vector.Vector2D | tuple[float, float]], name="unnamed") -> None:
+    def __init__(self, data: Sequence[openglider.rs.vector.Vector2D | tuple[float, float]] | openglider.rs.vector.PolyLine2D, name: str="unnamed") -> None:
         self.name = name
         self.curve = openglider.rs.vector.PolyLine2D(data)
 
         self._setup()
 
-    def _setup(self):
+    def _setup(self) -> None:
         i = 0
         data = self.curve.nodes
         while data[i + 1][0] < data[i][0] and i < len(data) - 2:
@@ -46,7 +47,7 @@ class Profile2D:
             validate=False
         )
 
-    def _load_xfoil(self):
+    def _load_xfoil(self) -> None:
         solver.ncrit = self.ncrit
         solver.xtr_top = self.xtr_top
         solver.xtr_bottom = self.xtr_bottom
@@ -57,7 +58,7 @@ class Profile2D:
         solver.load(self.curve.tolist())
 
     
-    def xfoil_aoa(self, aoa: float, degree=True, load=True) -> xfoil.Result:
+    def xfoil_aoa(self, aoa: float, degree: bool=True, load: bool=True) -> xfoil.Result:
         # TODO: reynolds
         if degree:
             aoa = aoa * math.pi / 180
@@ -67,7 +68,7 @@ class Profile2D:
 
         return solver.run_aoa(aoa)
     
-    def xfoil_polar(self, aoa_start, aoa_end, steps=10, degree=True) -> pandas.DataFrame:
+    def xfoil_polar(self, aoa_start: float, aoa_end: float, steps: int=10, degree: bool=True) -> pandas.DataFrame:
         self._load_xfoil()
         delta = (aoa_end-aoa_start)/(steps-1)
         data = []
@@ -94,20 +95,20 @@ class Profile2D:
     def __mul__(self, value: float) -> Self:
         fakt = openglider.rs.vector.Vector2D([1, float(value)])
 
-        return Profile2D(self.curve * fakt)
+        return type(self)(self.curve * fakt)
 
-    def __call__(self, xval) -> float:
+    def __call__(self, xval: Percentage | float) -> float:
         return self.get_ik(xval)
 
-    def get_ik(self, x) -> float:
+    def get_ik(self, x: Percentage | float) -> float:
         xval = float(x)
         return self._interpolation_x_values.get_value(xval)
     
-    def get(self, x) -> openglider.rs.vector.Vector2D:
+    def get(self, x: Percentage | float) -> openglider.rs.vector.Vector2D:
         ik = self.get_ik(x)
         return self.curve.get(ik)
 
-    def align(self, p) -> openglider.rs.vector.Vector2D:
+    def align(self, p: Sequence[float] | openglider.rs.vector.Vector2D) -> openglider.rs.vector.Vector2D:
         """Align a point (x, y) on the airfoil. x: (0,1), y: (-1,1)"""
         x, y = p
 
@@ -116,7 +117,7 @@ class Profile2D:
 
         return lower + (upper-lower) * ((y + 1)/2)
 
-    def profilepoint(self, xval, h=-1.) -> openglider.rs.vector.Vector2D:
+    def profilepoint(self, xval: Percentage | float, h: float=-1.) -> openglider.rs.vector.Vector2D:
         """
         Get airfoil Point for x-value (<0:upper side)
         optional: height (-1:lower,1:upper)
@@ -124,9 +125,9 @@ class Profile2D:
         if h == -1:
             return self.get(xval)
         else:
-            return self.align([xval, h])
+            return self.align([float(xval), h])
 
-    def normalized(self, close=True) -> Self:
+    def normalized(self, close: bool=True) -> Self:
         """
         Normalize the airfoil.
         This routine does:
@@ -154,24 +155,24 @@ class Profile2D:
             new_nodes[0][1] = 0
             new_nodes[-1][1] = 0
         
-        return Profile2D(new_nodes)
+        return type(self)(new_nodes)
     
     @property
     def normvectors(self) -> openglider.rs.vector.PolyLine2D:
         return self.curve.normvectors()
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
         cpy = self.copy()
         memo[id(self)] = cpy
         return cpy
 
-    def __copy__(self):
+    def __copy__(self) -> Self:
         return self.copy()
 
     def copy(self) -> Self:
-        return Profile2D(self.curve.nodes, self.name)
+        return type(self)(self.curve.nodes, self.name)
 
-    def __add__(self, other, conservative=False) -> Self:
+    def __add__(self, other: Self, conservative: bool=False) -> Self:
         """
         Mix 2 Profiles
         """
@@ -184,9 +185,9 @@ class Profile2D:
             y2 = other.get(x)[1]
             new.append(point + openglider.rs.vector.Vector2D([0.0, y2]))
         
-        return Profile2D(new)
+        return type(self)(new)
 
-    def __json__(self):
+    def __json__(self) -> dict[str, Any]:
         return {
             "data": [list(p) for p in self.curve.nodes],
             "name": self.name
@@ -196,7 +197,7 @@ class Profile2D:
     _re_coord_line = re.compile(rf"\s*({_re_number})\s+({_re_number})\s*")
 
     @classmethod
-    def import_from_dat(cls, path) -> Self:
+    def import_from_dat(cls, path: str | os.PathLike[str]) -> Self:
         """
         Import an airfoil from a '.dat' file
         """
@@ -205,8 +206,8 @@ class Profile2D:
             return cls._import_dat(p_file, name=name)
     
     @classmethod
-    def _import_dat(cls, p_file, name="unnamed") -> Self:
-        profile = []
+    def _import_dat(cls, p_file: Iterable[str], name: str="unnamed") -> Self:
+        profile: list[list[float]] = []
         for i, line in enumerate(p_file):
             if line.endswith(","):
                 line = line[:-1]
@@ -214,7 +215,7 @@ class Profile2D:
             match = cls._re_coord_line.match(line)
 
             if match:
-                profile.append([float(i) for i in match.groups()])
+                profile.append([float(value) for value in match.groups()])
             elif i == 0:
                 name = line.strip()
             elif len(line) == 0:
@@ -225,7 +226,7 @@ class Profile2D:
         return cls(profile, name)
 
 
-    def export_dat(self, pfad) -> str:
+    def export_dat(self, pfad: str | os.PathLike[str]) -> str | os.PathLike[str]:
         """
         Export airfoil to .dat Format
         """
@@ -245,19 +246,19 @@ class Profile2D:
         x_values += [vector[0] for vector in self.curve.nodes[i:]]
         return x_values
 
-    def set_x_values(self, xval) -> Self:
+    def set_x_values(self, xval: Sequence[Percentage | float]) -> Self:
         """Set X-Values of airfoil to defined points."""
         new_nodes = [
             self.get(x) for x in xval
         ]
 
-        return Profile2D(new_nodes)
+        return type(self)(new_nodes)
 
     @property
     def numpoints(self) -> int:
         return len(self.curve.nodes)
 
-    def resample(self, numpoints) -> Self:
+    def resample(self, numpoints: int) -> Self:
         numpoints -= numpoints % 2  # brauchts?
 
         xtemp = lambda x: ((x > 0.5) - (x < 0.5)) * (1 - math.sin(math.pi * x))
@@ -267,7 +268,7 @@ class Profile2D:
         return self.set_x_values(x_values)
 
     @property
-    def thickness(self):
+    def thickness(self) -> float:
         """return the maximum sickness (Sic!) of an airfoil"""
         xvals = sorted(set(map(abs, self.x_values)))
 
@@ -275,14 +276,14 @@ class Profile2D:
             abs(self.get(-x)[1] - self.get(x)[1]) for x in xvals
         ])
 
-    def set_thickness(self, newthick):
+    def set_thickness(self, newthick: float) -> Self:
         factor = float(newthick / self.thickness)
 
         name = self.name
         if name is not None:
             name += "_" + str(newthick) + "%"
 
-        return Profile2D(self.curve * [1, factor], name)
+        return type(self)(self.curve * [1, factor], name)
 
     @property
     def camber_line(self) -> openglider.rs.vector.Interpolation:
@@ -291,11 +292,11 @@ class Profile2D:
 
     #@cached_property('self')
     @property
-    def camber(self):
+    def camber(self) -> float:
         """return the maximum camber of the airfoil"""
         return max([p[1] for p in self.camber_line])
 
-    def set_camber(self, newcamber) -> Self:
+    def set_camber(self, newcamber: float) -> Self:
         """Set maximal camber to the new value"""
         old_camber = self.camber
         factor = newcamber / old_camber - 1
@@ -306,21 +307,22 @@ class Profile2D:
             for p in self.curve.nodes
         ]
 
-        return Profile2D(data)
+        return type(self)(data)
 
-    def insert_point(self, pos, tolerance=1e-5) -> Self:
-        nearest_x_value = self.find_nearest_x_value(pos)
+    def insert_point(self, pos: Percentage | float, tolerance: float=1e-5) -> Self:
+        pos_float = float(pos)
+        nearest_x_value = self.find_nearest_x_value(pos_float)
         new_nodes = self.curve.nodes[:]
 
-        if abs(nearest_x_value - pos) > tolerance:
-            point = self.get(pos)
-            ik = self.get_ik(pos)
+        if abs(nearest_x_value - pos_float) > tolerance:
+            point = self.get(pos_float)
+            ik = self.get_ik(pos_float)
 
             new_nodes.insert(int(ik + 1), point)
 
-        return Profile2D(new_nodes)
+        return type(self)(new_nodes)
 
-    def remove_points(self, start, end, tolerance=0.) -> Self:
+    def remove_points(self, start: Percentage | float, end: Percentage | float, tolerance: float=0.) -> Self:
         new_data = []
 
         ik_start = self.get_ik(start)
@@ -336,10 +338,11 @@ class Profile2D:
 
         new_data = self.curve.nodes[:i_start+1] + self.curve.nodes[i_end:]
         
-        return Profile2D(new_data)
+        return type(self)(new_data)
 
-    def move_nearest_point(self, pos) -> Self:
-        ik = self(pos)
+    def move_nearest_point(self, pos: Percentage | float) -> Self:
+        pos_float = float(pos)
+        ik = self(pos_float)
         diff = ik % 1.
         if diff < 0.5:
             i = int(ik)
@@ -347,12 +350,12 @@ class Profile2D:
             i = int(ik)+1
 
         new_nodes = self.curve.nodes[:i-1]
-        new_nodes.append(self.profilepoint(pos))
+        new_nodes.append(self.profilepoint(pos_float))
         new_nodes += self.curve.nodes[i:]
 
-        return Profile2D(new_nodes)
+        return type(self)(new_nodes)
 
-    def find_nearest_x_value(self, x: float) -> float:
+    def find_nearest_x_value(self, x: Percentage | float) -> float:
         ik = self.get_ik(x)
 
         diff = ik % 1.
@@ -367,22 +370,22 @@ class Profile2D:
             result = -result
         return result
 
-    def apply_function(self, foo):
+    def apply_function(self, foo: Callable[..., openglider.rs.vector.Vector2D]) -> None:
         self.curve = openglider.rs.vector.PolyLine2D(
             [foo(p, upper=i<self.noseindex) for i, p in enumerate(self.curve.nodes)]
         )
 
     @classmethod
-    def fetch(cls, name='atr72sm', base_url='http://m-selig.ae.illinois.edu/ads/coord/{name}.dat') -> Self:
+    def fetch(cls, name: str='atr72sm', base_url: str='http://m-selig.ae.illinois.edu/ads/coord/{name}.dat') -> Self:
         import urllib.request
         
         with urllib.request.urlopen(base_url.format(name=name)) as data_file:
             dat_str = data_file.read().decode('utf8')
             return cls._import_dat(dat_str.split("\n"))
 
-    def add_flap(self, begin, amount) -> Self:
+    def add_flap(self, begin: float, amount: float) -> Self:
         
-        def f(x, a, b):
+        def f(x: float, a: float, b: float) -> float:
             c1, c2, c3 = -a**2*b/(a**2 - 2*a + 1), 2*a*b/(a**2 - 2*a + 1), -b/(a**2 - 2*a + 1)
             if x < a:
                 return 0.
@@ -396,15 +399,15 @@ class Profile2D:
             dy = f(abs(p[0]), begin, amount)
             new_nodes.append(openglider.rs.vector.Vector2D([p[0], p[1]+dy]))
         
-        return Profile2D(new_nodes, self.name+"_flap")
+        return type(self)(new_nodes, self.name+"_flap")
 
     @classmethod
-    def compute_naca(cls, naca=1234, numpoints=100) -> Self:
+    def compute_naca(cls, naca: int=1234, numpoints: int=100) -> Self:
         nodes = compute_naca(naca, numpoints)
         return cls(nodes, name=f"NACA_{naca:04d}").normalized()
 
     @classmethod
-    def compute_trefftz(cls, m=-0.1+0.1j, tau=0.05, numpoints=100) -> Self:
+    def compute_trefftz(cls, m: complex=-0.1+0.1j, tau: float=0.05, numpoints: int=100) -> Self:
         airfoil = TrefftzKuttaAirfoil(midpoint=m, tau=tau)
 
         # find the smallest xvalue to reset the nose
@@ -412,14 +415,14 @@ class Profile2D:
         return profile.normalized()
 
     @classmethod
-    def compute_joukowsky(cls, m=-0.1+0.1j, numpoints=100) -> Self:
+    def compute_joukowsky(cls, m: complex=-0.1+0.1j, numpoints: int=100) -> Self:
         airfoil = JoukowskyAirfoil(m)
 
         profile = cls(airfoil.coordinates(numpoints), f"joukowsky_{m}")
         return profile.normalized().resample(numpoints)
 
     @classmethod
-    def compute_vandevooren(cls, tau=0.05, epsilon=0.05, numpoints=100) -> Self:
+    def compute_vandevooren(cls, tau: float=0.05, epsilon: float=0.05, numpoints: int=100) -> Self:
         airfoil = VanDeVoorenAirfoil(tau=tau, epsilon=epsilon)
 
         profile = cls(airfoil.coordinates(numpoints), f"VanDeVooren_tau={tau}_epsilon={epsilon}")        

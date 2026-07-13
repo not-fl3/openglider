@@ -103,9 +103,6 @@ class BallooningBezierNeu(BallooningNew):
         else:
             raise ValueError(f"Value {xval} not between -1 and 1")
 
-    def copy(self) -> BallooningBezierNeu:
-        return BallooningBezierNeu(self.spline_curve.copy().controlpoints.nodes, name=self.name)
-
     @classmethod
     def from_classic(cls, ballooning: Ballooning, numpoints: int=12) -> BallooningBezierNeu:
         upper = ballooning.upper * openglider.rs.vector.Vector2D([-1, 1])

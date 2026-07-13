@@ -112,7 +112,7 @@ class LineSetTable(BaseModel):
     
     @staticmethod
     def parse_correction(value: str) -> tuple[str, str | None]:
-        trim_correction: Length | None = None
+        trim_correction: str | None = None
         name_or_length = str(value)
 
         if match := isinstance(value, str) and re.match(r"(.*)([+-].*)", value):
@@ -169,11 +169,11 @@ class LineSetTable(BaseModel):
         offset_upper_level: list[Length] = []
         offset_table = Table()
 
-        def set_offset(level: int, offset: Length):
+        def set_offset(level: int, offset: Length) -> None:
             nonlocal offset_upper_level
             offset_upper_level = offset_upper_level[:level]
             if len(offset_upper_level) < level:
-                offset_upper_level += [0] * (level - len(offset_upper_level))
+                offset_upper_level += [Length(0)] * (level - len(offset_upper_level))
             
             offset_upper_level.append(offset)
 

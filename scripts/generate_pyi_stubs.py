@@ -100,6 +100,29 @@ def _install_generated_files(output_dir: Path) -> None:
             continue
         shutil.copy2(stub_file, SUBMODULE_STUB_ROOT / stub_file.name)
 
+    _ensure_root_exports_submodules()
+
+
+def _ensure_root_exports_submodules() -> None:
+    existing_text = ROOT_STUB_PATH.read_text(encoding="utf-8")
+    submodules = sorted(
+        stub_path.stem
+        for stub_path in SUBMODULE_STUB_ROOT.glob("*.pyi")
+        if stub_path.name != "__init__.pyi"
+    )
+
+    if not submodules:
+        return
+
+    export_lines = [f"from . import {name} as {name}" for name in submodules]
+    missing_lines = [line for line in export_lines if line not in existing_text]
+
+    if not missing_lines:
+        return
+
+    new_text = "\n".join(missing_lines) + "\n" + existing_text
+    ROOT_STUB_PATH.write_text(new_text, encoding="utf-8")
+
 
 def generate_pyi_stubs() -> None:
     binary_path = _find_extension_binary()

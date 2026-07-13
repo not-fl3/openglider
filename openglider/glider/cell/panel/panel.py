@@ -110,12 +110,12 @@ class PanelCut(BaseModel):
         ik_right = get_x_value(x_values_right, self.x_right)
 
         points_2d = [
-            openglider.rs.vector.Vector2D([0, self.x_left]),
-            openglider.rs.vector.Vector2D([1, self.x_right])
+            openglider.rs.vector.Vector2D([0, self.x_left.si]),
+            openglider.rs.vector.Vector2D([1, self.x_right.si])
         ]
 
         if self.x_center is not None:
-            points_2d.insert(1, openglider.rs.vector.Vector2D([0.5, self.x_center]))
+            points_2d.insert(1, openglider.rs.vector.Vector2D([0.5, self.x_center.si]))
             bspline = openglider.rs.spline.BSplineCurve(points_2d).get_sequence(50)
             curve = openglider.rs.vector.Interpolation(bspline.nodes)
         else:
@@ -147,13 +147,13 @@ class PanelCut(BaseModel):
             inner[-1].get(ik_right)
         ]
 
-        if self.x_center:
+        if self.x_center is not None:
             p1 = inner[0].get(get_x_value(x_values_left, self.x_center.si))
-            p2 = inner[-1].get(get_x_value(x_values_left, self.x_center.si))
+            p2 = inner[-1].get(get_x_value(x_values_right, self.x_center.si))
 
             points_2d.insert(1, p1+(p2-p1)*0.5)
         
-        if self.x_center:
+        if self.x_center is not None:
             curve_exact = openglider.rs.spline.BSplineCurve(points_2d).get_sequence(50)
         else:
             curve_exact = openglider.rs.vector.PolyLine2D(points_2d)

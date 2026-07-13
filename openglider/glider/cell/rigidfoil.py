@@ -40,7 +40,7 @@ class EntryStrap:
             
         raise ValueError(f"invalid opening index {self.opening_index} for EntryStrap on cell {cell.name}: not enough openings in cell (only {entry_count})")
 
-    def get_data(self, cell: Cell, midribs: int):
+    def get_data(self, cell: Cell, midribs: int) -> tuple[int, float, float, float]:
         profile_3d = cell.midrib(self.position.si)
         panel_1_index = self._get_entry_index(cell, midribs)
 
@@ -50,8 +50,8 @@ class EntryStrap:
         ik1 = cut_front.get_ik_values(cell, [self.position.si], False)[0]
         ik2 = cut_back.get_ik_values(cell, [self.position.si], False)[0]
 
-        p1 = profile_3d.curve.get(ik1)
-        p2 = profile_3d.curve.get(ik2)
+        p1: openglider.rs.vector.Vector3D = profile_3d.curve.get(ik1)
+        p2: openglider.rs.vector.Vector3D = profile_3d.curve.get(ik2)
 
         length = (p2 - p1).length() + self.extra_material.si
 
@@ -79,8 +79,8 @@ class EntryStrap:
             curve = flattended.flattened_cell.at_position(self.position)
             index = cut_result.get_inner_index(self.position.si)
 
-            p1 = curve.get(curve.walk(index, offset * 0.25))
-            p2 = curve.get(curve.walk(index, offset * 0.75))
+            p1 = curve.get(curve.walk(index, offset.si * 0.25))
+            p2 = curve.get(curve.walk(index, offset.si * 0.75))
 
             return [openglider.rs.vector.PolyLine2D([p1]), openglider.rs.vector.PolyLine2D([p2])]      
 
@@ -164,8 +164,8 @@ class PanelRigidFoil:
                 x = current_section_offset + sum(lengths[:i])
                 dwg.layers["marks"].append(
                     openglider.rs.vector.PolyLine2D([
-                        openglider.rs.vector.Vector2D([x, -self.channel_width/2]),
-                        openglider.rs.vector.Vector2D([x, self.channel_width/2]),
+                        openglider.rs.vector.Vector2D([x, -self.channel_width.si/2]),
+                        openglider.rs.vector.Vector2D([x, self.channel_width.si/2]),
                     ])
                 )
             
@@ -230,10 +230,10 @@ class PanelRigidFoil:
 
         # draw outline
         outline = openglider.rs.vector.PolyLine2D([
-            openglider.rs.vector.Vector2D([-self.pocket_length.si, -self.channel_width/2]),
-            openglider.rs.vector.Vector2D([current_section_offset + self.pocket_length.si, -self.channel_width/2]),
-            openglider.rs.vector.Vector2D([current_section_offset + self.pocket_length.si, self.channel_width/2]),
-            openglider.rs.vector.Vector2D([-self.pocket_length.si, self.channel_width/2]),
+            openglider.rs.vector.Vector2D([-self.pocket_length.si, -self.channel_width.si/2]),
+            openglider.rs.vector.Vector2D([current_section_offset + self.pocket_length.si, -self.channel_width.si/2]),
+            openglider.rs.vector.Vector2D([current_section_offset + self.pocket_length.si, self.channel_width.si/2]),
+            openglider.rs.vector.Vector2D([-self.pocket_length.si, self.channel_width.si/2]),
         ]).close()
 
         dwg.layers["cuts"].append(outline)

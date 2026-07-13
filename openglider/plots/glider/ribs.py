@@ -410,7 +410,7 @@ class RibPlot:
 
         return curves
     
-    def get_outside_ik(self, x: float):
+    def get_outside_ik(self, x: float) -> float:
         ik_inner = get_x_value(self.x_values, x)
         inner_point = self.inner.get(ik_inner)
         outer_point = inner_point + self.inner_normals.get(ik_inner)#
@@ -487,8 +487,8 @@ class RibPlot:
                 x1 = max(self.rib.sharknose.start, x1)
                 x2 = min(self.rib.sharknose.end, x2)
                 
-                sharknose_start = self.get_outside_ik(x1)
-                sharknose_end = self.get_outside_ik(x2)
+                sharknose_start = self.get_outside_ik(x1.si)
+                sharknose_end = self.get_outside_ik(x2.si)
 
                 line1 = self.outer.get(start, sharknose_start).nodes
                 line2 = self.outer.get(sharknose_end, stop).nodes

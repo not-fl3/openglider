@@ -49,12 +49,12 @@ class JoukowskyAirfoil:
             z = (zeta - cmath.sqrt(zeta ** 2 - 4)) / 2
         return z
 
-    def coordinates(self, num: int=100) -> list[list[float]]:
+    def coordinates(self, num: int=100) -> list[tuple[float, float]]:
         '''maps the z-circle to the zeta-plane which results in a joukowsky airfoil'''
 
         complex_coords = list(map(self.zeta, self.circle(num)))
 
-        return [[c.real, c.imag] for c in complex_coords]
+        return [(c.real, c.imag) for c in complex_coords]
 
     def gamma(self, alpha: float) -> float:
         '''return the strength of the circulation to satisfy the kutta-condition

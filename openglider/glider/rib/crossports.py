@@ -185,7 +185,7 @@ class RibSquareHole(RibHoleBase):
         if x1 < xmin or x2 > xmax:
             return []
         
-        centers = [rib.profile_2d.align([self.x, 0])]
+        centers = [rib.profile_2d.align([self.x.si, 0])]
         
         if scale:
             return [p * rib.chord for p in centers]
@@ -202,10 +202,10 @@ class RibSquareHole(RibHoleBase):
             return []
         
         p1, p2, p3, p4 = self.align_contolpoints([
-            openglider.rs.vector.Vector2D([x1, -self.height]),
-            openglider.rs.vector.Vector2D([x2, -self.height]),
-            openglider.rs.vector.Vector2D([x2, self.height]),
-            openglider.rs.vector.Vector2D([x1, self.height])
+            openglider.rs.vector.Vector2D([x1.si, -self.height.si]),
+            openglider.rs.vector.Vector2D([x2.si, -self.height.si]),
+            openglider.rs.vector.Vector2D([x2.si, self.height.si]),
+            openglider.rs.vector.Vector2D([x1.si, self.height.si])
         ], rib)
 
         return PolygonHole(points=[p1, p2, p3, p4]).get_curves(rib, num)
