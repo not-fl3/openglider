@@ -24,6 +24,7 @@ dynamic = ["version"]
 
 dependencies = [
     "euklid",
+    "pandas",
     "pydantic",
     "svgwrite",
     "numpy",
@@ -33,6 +34,7 @@ dependencies = [
     "lxml",
     "pyexcel-ods",
     "packaging",
+    "reportlab",
     "svglib",
 ]
 
