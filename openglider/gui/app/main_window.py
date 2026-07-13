@@ -9,12 +9,11 @@ import tempfile
 from typing import TYPE_CHECKING, Any
 from collections.abc import Callable, Iterator
 
-import openglider
 from openglider.glider.project import GliderProject
 from openglider.gui.qt import QtCore, QtWidgets, QtGui, QAction
 from openglider.gui.icons import icon
 from openglider.gui.views.compare import GliderPreview
-from openglider.gui.views.console import ConsoleHandler, ConsoleWidget
+from openglider.gui.views.console import ConsoleHandler, ConsoleWidget, LogFilterPanel
 from openglider.gui.views.glider_list import GliderListWidget
 from openglider.gui.views.tasks import QTaskQueue
 from openglider.gui.views.window import Window
@@ -122,10 +121,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.help = HelpView()
         self.top_panel.addTab(self.help, "Help")
 
+        self.log_filter_panel = LogFilterPanel(self.bottom_panel)
+        bottom_panel_layout.addWidget(self.log_filter_panel, 0)
+
         self.console = ConsoleWidget(self)
         bottom_panel_layout.addWidget(self.console, 75)
 
-        self.signal_handler = ConsoleHandler(self.console)
+        self.signal_handler = ConsoleHandler(self.console, self.log_filter_panel)
 
         self.setAcceptDrops(True)
         self.current_glider_changed()
