@@ -30,6 +30,17 @@ pip install -e .
 Every module inside openglider *should* have a README where the functionality is documented.  
 Please have a look at the [base module](./openglider/README.md).
 
+## Build Desktop Apps
+
+Helper scripts are available to package OpenGlider with PyInstaller:
+
+- Windows `.exe`: `./scripts/build_windows_exe.sh` (run on Windows)
+- macOS `.app`: `./scripts/build_macos_app.sh` (run on macOS)
+
+The scripts use `uv` when available and automatically fall back to `pip`.
+
+See [INSTALL.md](./INSTALL.md) for details.
+
 ### Unittests and Visual Tests
 
 To run all unittests, run this from the main directory:

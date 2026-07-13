@@ -1,0 +1,55 @@
+name: Build Desktop Artifacts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.target_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target_name: windows-exe
+            build_script: ./scripts/build_windows_exe.sh
+            artifact_name: OpenGlider-windows-exe
+            artifact_path: dist/OpenGlider.exe
+          - os: macos-13
+            target_name: macos-app-x64
+            build_script: ./scripts/build_macos_app.sh
+            artifact_name: OpenGlider-macos-app-x64
+            artifact_path: dist/OpenGlider.app
+          - os: macos-14
+            target_name: macos-app-arm64
+            build_script: ./scripts/build_macos_app.sh
+            artifact_name: OpenGlider-macos-app-arm64
+            artifact_path: dist/OpenGlider.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Build desktop artifact
+        shell: bash
+        run: ${{ matrix.build_script }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+          retention-days: 14

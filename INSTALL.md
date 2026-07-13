@@ -117,3 +117,41 @@ mypy openglider
 - Automate stub generation in CI/CD
 - Generate more detailed stubs with type information
 - Consider using `stubgen` from mypy for comparison
+
+## Build Desktop Distributables
+
+OpenGlider can be packaged as:
+
+- Windows executable (`OpenGlider.exe`)
+- macOS application bundle (`OpenGlider.app`)
+
+The repository provides helper scripts in `scripts/` using PyInstaller.
+
+### 1. Build Windows `.exe`
+
+Run this on a Windows machine with Python installed:
+
+```bash
+./scripts/build_windows_exe.sh
+```
+
+Output:
+
+- `dist/OpenGlider.exe`
+
+### 2. Build macOS `.app`
+
+Run this on macOS:
+
+```bash
+./scripts/build_macos_app.sh
+```
+
+Output:
+
+- `dist/OpenGlider.app`
+
+### Notes
+
+- Cross-building is not supported here. Build on the target OS (Windows for `.exe`, macOS for `.app`).
+- The scripts prefer `uv` when available (`uv pip install`, `uv run pyinstaller`) and fall back to standard `pip` if `uv` is not installed.
