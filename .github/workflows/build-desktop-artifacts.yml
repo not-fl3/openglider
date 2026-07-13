@@ -2,6 +2,17 @@ name: Build Desktop Artifacts
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: "Build target"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - windows-exe
+          - macos-app-x64
+          - macos-app-arm64
 
 permissions:
   contents: read
@@ -9,6 +20,7 @@ permissions:
 jobs:
   build:
     name: Build ${{ matrix.target_name }}
+    if: ${{ github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -18,18 +30,23 @@ jobs:
             target_name: windows-exe
             build_script: ./scripts/build_windows_exe.sh
             artifact_name: OpenGlider-windows-exe
-            artifact_path: dist/OpenGlider.exe
+            artifact_path: dist/OpenGlider-windows-exe.tar.gz
+            archive_app: false
+            archive_windows: true
           - os: macos-13
             target_name: macos-app-x64
             build_script: ./scripts/build_macos_app.sh
             artifact_name: OpenGlider-macos-app-x64
-            artifact_path: dist/OpenGlider.app
+            artifact_path: dist/OpenGlider-macos-app-x64.tar.gz
+            archive_app: true
+            archive_windows: false
           - os: macos-14
             target_name: macos-app-arm64
             build_script: ./scripts/build_macos_app.sh
             artifact_name: OpenGlider-macos-app-arm64
-            artifact_path: dist/OpenGlider.app
-
+            artifact_path: dist/OpenGlider-macos-app-arm64.tar.gz
+            archive_app: true
+            archive_windows: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,6 +63,16 @@ jobs:
         shell: bash
         run: ${{ matrix.build_script }}
 
+      - name: Archive macOS app bundle
+        if: ${{ matrix.archive_app }}
+        shell: bash
+        run: tar -czf "${{ matrix.artifact_path }}" -C dist OpenGlider.app
+
+      - name: Archive Windows executable
+        if: ${{ matrix.archive_windows }}
+        shell: bash
+        run: tar -czf "${{ matrix.artifact_path }}" -C dist OpenGlider.exe
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -53,3 +80,4 @@ jobs:
           path: ${{ matrix.artifact_path }}
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0

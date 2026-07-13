@@ -156,3 +156,20 @@ Output:
 - Cross-building is not supported here. Build on the target OS (Windows for `.exe`, macOS for `.app`).
 - The scripts prefer `uv` when available. In CI they use `uv pip install --system`; locally they use the active venv, or create/use `.venv` automatically.
 - The C++ `fmt` dependency is bootstrapped automatically by `setup.py` via `scripts/fetch_cpp_deps.py` into `src_cpp/fmt` when missing.
+
+### GitHub Actions (Manual)
+
+Use the `target` dropdown in **Build Desktop Artifacts** to build only one artifact when needed.
+
+Available targets:
+
+- `all`
+- `windows-exe`
+- `macos-app-x64`
+- `macos-app-arm64`
+
+Artifact names:
+
+- `OpenGlider-windows-exe` (`dist/OpenGlider-windows-exe.tar.gz`)
+- `OpenGlider-macos-app-x64` (`dist/OpenGlider-macos-app-x64.tar.gz`)
+- `OpenGlider-macos-app-arm64` (`dist/OpenGlider-macos-app-arm64.tar.gz`)

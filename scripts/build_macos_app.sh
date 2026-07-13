@@ -39,9 +39,12 @@ fi
     --windowed \
     --name OpenGlider \
     --osx-bundle-identifier org.openglider.app \
-    --collect-all openglider \
-    --collect-all qtawesome \
-    --collect-all pyqtgraph \
+    --collect-submodules openglider \
+    --collect-data openglider \
+    --collect-data qtawesome \
+    --collect-data pyqtgraph \
+    --hidden-import qtawesome \
+    --hidden-import pyqtgraph \
     --hidden-import PySide6 \
     scripts/launch_gui.py
 
