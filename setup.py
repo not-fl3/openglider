@@ -39,11 +39,16 @@ HEADER_FILES = [
     "version.hpp",
 ]
 
+extra_compile_args = []
+if sys.platform == "win32":
+    extra_compile_args.append("/utf-8")
+
 xfoil_extension = Pybind11Extension(
     "openglider.xfoil",
     [f"{SRC_CPP}/{file_name}" for file_name in CPP_FILES],
     include_dirs=[SRC_CPP, "src_cpp/fmt/include"],
     define_macros=[("FMT_HEADER_ONLY", "1")],
+    extra_compile_args=extra_compile_args,
     cxx_std=17,
     depends=[f"{SRC_CPP}/{file_name}" for file_name in HEADER_FILES],
 )
