@@ -1,6 +1,6 @@
 import math
 
-def compute_naca(naca: int, numpoints: int):
+def compute_naca(naca: int, numpoints: int) -> list[list[float]]:
 
     """Compute and return a four-digit naca-airfoil"""
     # See: http://people.clarkson.edu/~pmarzocc/AE429/The%20NACA%20airfoil%20series.pdf

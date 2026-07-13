@@ -1,18 +1,38 @@
-from typing import Union
-import openglider.rs
+from typing import TYPE_CHECKING, Any, TypeAlias
 
-AsymmetricCurveType = Union[
-    openglider.rs.spline.BSplineCurve,
-    openglider.rs.spline.BezierCurve,
-    openglider.rs.spline.CubicBSplineCurve,
-    openglider.rs.spline.QuadBSplineCurve
-    ]
+if TYPE_CHECKING:
+    from openglider.rs.spline import (
+        BSplineCurve,
+        BezierCurve,
+        CubicBSplineCurve,
+        QuadBSplineCurve,
+        SymmetricBSplineCurve,
+        SymmetricBezierCurve,
+        SymmetricCubicBSplineCurve,
+        SymmetricQuadBSplineCurve,
+    )
+else:
+    BSplineCurve = Any
+    BezierCurve = Any
+    CubicBSplineCurve = Any
+    QuadBSplineCurve = Any
+    SymmetricBSplineCurve = Any
+    SymmetricBezierCurve = Any
+    SymmetricCubicBSplineCurve = Any
+    SymmetricQuadBSplineCurve = Any
 
-SymmetricCurveType = Union[
-    openglider.rs.spline.SymmetricBSplineCurve,
-    openglider.rs.spline.SymmetricBezierCurve,
-    openglider.rs.spline.SymmetricCubicBSplineCurve,
-    openglider.rs.spline.SymmetricQuadBSplineCurve
-    ]
-    
-CurveType = Union[AsymmetricCurveType, SymmetricCurveType]
+AsymmetricCurveType: TypeAlias = (
+    BSplineCurve
+    | BezierCurve
+    | CubicBSplineCurve
+    | QuadBSplineCurve
+)
+
+SymmetricCurveType: TypeAlias = (
+    SymmetricBSplineCurve
+    | SymmetricBezierCurve
+    | SymmetricCubicBSplineCurve
+    | SymmetricQuadBSplineCurve
+)
+
+CurveType: TypeAlias = AsymmetricCurveType | SymmetricCurveType
