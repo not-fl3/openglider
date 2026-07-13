@@ -20,7 +20,6 @@ permissions:
 jobs:
   build:
     name: Build ${{ matrix.target_name }}
-    if: ${{ github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -31,22 +30,16 @@ jobs:
             build_script: ./scripts/build_windows_exe.sh
             artifact_name: OpenGlider-windows-exe
             artifact_path: dist/OpenGlider-windows-exe.tar.gz
-            archive_app: false
-            archive_windows: true
           - os: macos-13
             target_name: macos-app-x64
             build_script: ./scripts/build_macos_app.sh
             artifact_name: OpenGlider-macos-app-x64
             artifact_path: dist/OpenGlider-macos-app-x64.tar.gz
-            archive_app: true
-            archive_windows: false
           - os: macos-14
             target_name: macos-app-arm64
             build_script: ./scripts/build_macos_app.sh
             artifact_name: OpenGlider-macos-app-arm64
             artifact_path: dist/OpenGlider-macos-app-arm64.tar.gz
-            archive_app: true
-            archive_windows: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,12 +57,12 @@ jobs:
         run: ${{ matrix.build_script }}
 
       - name: Archive macOS app bundle
-        if: ${{ matrix.archive_app }}
+        if: ${{ (github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target_name) && startsWith(matrix.os, 'macos') }}
         shell: bash
         run: tar -czf "${{ matrix.artifact_path }}" -C dist OpenGlider.app
 
       - name: Archive Windows executable
-        if: ${{ matrix.archive_windows }}
+        if: ${{ (github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target_name) && startsWith(matrix.os, 'windows') }}
         shell: bash
         run: tar -czf "${{ matrix.artifact_path }}" -C dist OpenGlider.exe
 
