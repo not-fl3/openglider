@@ -321,18 +321,32 @@ class ShapePlot:
             material_code="cell_numbers")
         )
 
+    def _get_font_size(self) -> float:
+        cell_range = self._get_cell_range(False)
+        min_cell_width = min(
+            abs(self.shapes[0].get_point(cell_no+1, 0)[0] - self.shapes[0].get_point(cell_no, 0)[0])
+            for cell_no in cell_range
+        )
+        return min_cell_width * 0.8 / len(str(max(cell_range)))
+
     def draw_cell_names(self, left: bool=False) -> None:
         shapes = self._get_shapes()
         shape = shapes[left]
         names = []
-        
-        for cell_no in self._get_cell_range(left):
-            cell = self.glider_3d.cells[cell_no]
-            p1 = shape.get_point(cell_no+0.5, 0)
-            p2 = shape.get_point(cell_no+0.5, 1)
-            width = shape.get_point(cell_no+1, 0)[0] - p1[0]
 
-            text = Text(cell.name, p1, p2, size=width*0.8, valign=0, align="center")
+        cell_range = self._get_cell_range(left)
+        if not cell_range:
+            return
+
+        size = self._get_font_size()
+
+        for cell_no in cell_range:
+            cell = self.glider_3d.cells[cell_no]
+            center = shape.get_point(cell_no + 0.5, 0.5)
+            p1 = openglider.rs.vector.Vector2D([center[0] - 0.5, center[1]])
+            p2 = openglider.rs.vector.Vector2D([center[0] + 0.5, center[1]])
+
+            text = Text(cell.name, p1, p2, size=size, valign=0, align="center")
             names += text.get_vectors()
 
         self.drawing.parts.append(PlotPart(
@@ -345,19 +359,21 @@ class ShapePlot:
         shape = shapes[left]
         names = []
 
+        cell_range = self._get_cell_range(left)
+        if not cell_range:
+            return self
+
+        size = self._get_font_size()
+
         for rib_no in self._get_rib_range(left):
             rib = self.glider_3d.ribs[rib_no]
-            rib_no = max(0, rib_no)
-            p1 = shape.get_point(rib_no, -0.05)
-            try:
-                p2 = shape.get_point(rib_no + 1, 0)
-            except IndexError:
-                p2 = shape.get_point(rib_no - 1, 0)
-            diff = abs(p1[0]- p2[0]) # cell distance
-            p2[0] = p1[0]
-            p2[1] = p1[1] + diff
+            rib_back = shape.get_point(rib_no, 1.)
+            y = rib_back[1]
 
-            text = Text(rib.name, p1, p2, valign=0)
+            p1 = openglider.rs.vector.Vector2D([rib_back[0] - 0.5, y])
+            p2 = openglider.rs.vector.Vector2D([rib_back[0] + 0.5, y])
+
+            text = Text(rib.name, p1, p2, size=size, valign=-1.5, align="center")
             names += text.get_vectors()
 
         self.drawing.parts.append(PlotPart(
