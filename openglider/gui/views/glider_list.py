@@ -6,6 +6,7 @@ import pathlib
 import subprocess
 import tempfile
 from typing import Any
+import logging
 
 import openglider
 from openglider.gui.icons import icon
@@ -14,6 +15,8 @@ from openglider.gui.state.glider_list import GliderListItem, GliderList
 from openglider.gui.qt import QtWidgets
 from openglider.gui.widgets.list_select.item import ListWidgetItem, ListItemWidget
 from openglider.gui.widgets.list_select.list import GenericListWidget
+
+logger = logging.getLogger(__name__)
 
 class GliderListWidgetItemWidget(ListItemWidget[GliderProject]):
     list_item: GliderListItem
@@ -94,6 +97,10 @@ class GliderListWidgetItem(ListWidgetItem[GliderProject, GliderListWidgetItemWid
         #widget.button_reload.clicked.connect(lambda: self.parent)
 
         return widget
+
+    def _remove(self) -> None:
+        logger.info(f"remove glider: {self.item.name}")
+        super()._remove()
 
 class GliderListWidget(GenericListWidget[GliderProject, GliderListWidgetItemWidget]):
     WidgetType = GliderListWidgetItem

@@ -16,11 +16,15 @@ class KnotCorrections:
         ("liros.ltc65", "liros.ltc65", 2, 2.0, 2.0)
     ]
     knots_dict: dict[str, tuple[float, float]]
+    missing_knots_cache: dict[str, tuple[float, float]]
+    warned_missing_keys: set[str]
 
     def __init__(self, knots: list[knots_table_line_type] | None=None):
         if knots:
             self.knots_table = knots
         self.knots_dict = {}
+        self.missing_knots_cache = {}
+        self.warned_missing_keys = set()
         
         self.update()
     
@@ -60,6 +64,8 @@ class KnotCorrections:
 
     def update(self) -> None:
         self.knots_dict.clear()
+        self.missing_knots_cache.clear()
+        self.warned_missing_keys.clear()
         self.knots_table.sort(key=lambda x: self._knot_key(*x[:3]))
         for knot in self.knots_table:
             key = self._knot_key(*knot[:3])
@@ -96,15 +102,24 @@ class KnotCorrections:
 
         key = self._knot_key(lower_type, upper_type, upper_num)
 
-        if key not in self.knots_dict:
-            first, last = self.predict(lower_type, upper_type, upper_num)
-            logger.warning(f"no shortening values for {lower_type} and {upper_type} with {upper_num} top lines. predicted: {first:.1f} -> {last:.1f}")
-        else:
+        if key in self.knots_dict:
             try:
                 first = self.knots_dict[key][0]
                 last = self.knots_dict[key][1]
             except:
                 raise Exception(f"whooot {lower_type} and {upper_type} with {upper_num} top")
+        else:
+            if key not in self.missing_knots_cache:
+                self.missing_knots_cache[key] = self.predict(lower_type, upper_type, upper_num)
+
+            first, last = self.missing_knots_cache[key]
+
+            if key not in self.warned_missing_keys:
+                logger.warning(
+                    f"no shortening values for {lower_type} and {upper_type} with {upper_num} top lines. "
+                    f"predicted: {first:.1f}mm -> {last:.1f}mm"
+                )
+                self.warned_missing_keys.add(key)
         
         if upper_num == 1:
             return [first*0.001]

@@ -337,7 +337,6 @@ class MainWindow(QtWidgets.QMainWindow):
     async def load_glider(self, filename: str) -> None:
         project = await self.execute(self.glider_list.import_glider, filename)
 
-        logger.info(f"add glider: {project.name}")
         self.add_glider(project)
     
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
