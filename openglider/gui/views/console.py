@@ -57,18 +57,25 @@ class ConsoleWidget(RichJupyterWidget):
     OUT_PROMPT_COLOR = "\x1b[91m"  # bright red
     IO_RESET = "\x1b[0m"
 
+    DEBUGPY_MISSING_MESSAGE = (
+        "Console kernel could not be started because 'debugpy' is missing.\n"
+        "Install it in the active environment and restart OpenGlider:\n"
+        "    pip install debugpy\n"
+    )
+
     def __init__(self, app: MainWindow, customBanner: Any=None, *args: Any, **kwargs: Any):
 
         super().__init__(*args, **kwargs)
         self.app = app
         self.kernel_manager = OpenGliderKernelManager()
-        self.kernel_manager.start_kernel()
+        self.kernel_client: QtInProcessKernelClient | None = None
 
-        self.kernel_manager.kernel.gui = 'qt'
-        self.kernel_client = kernel_client = self.kernel_manager.client()
-        kernel_client.loop = app.app.loop
-        #kernel_client.start_channels(shell=False, iopub=False, stdin=False, hb=False)
-        kernel_client.start_channels()
+        if self._start_kernel():
+            self.kernel_manager.kernel.gui = 'qt'
+            self.kernel_client = kernel_client = self.kernel_manager.client()
+            kernel_client.loop = app.app.loop
+            #kernel_client.start_channels(shell=False, iopub=False, stdin=False, hb=False)
+            kernel_client.start_channels()
 
         self.set_default_style("linux")
         self.font_size = 6
@@ -96,8 +103,23 @@ class ConsoleWidget(RichJupyterWidget):
         # replaying them back-to-back produces correctly separated blocks.
         self._io_records: list[tuple[int, str]] = []
 
-        self.push_local_ns("app", self.app)
-        self.push_local_ns("openglider", openglider)
+        if self.kernel_manager.kernel is not None:
+            self.push_local_ns("app", self.app)
+            self.push_local_ns("openglider", openglider)
+
+    def _start_kernel(self) -> bool:
+        try:
+            self.kernel_manager.start_kernel()
+            return True
+        except ModuleNotFoundError as exc:
+            if exc.name != "debugpy":
+                raise
+
+            logging.getLogger(__name__).warning(
+                "debugpy is missing; console kernel disabled until dependency is installed."
+            )
+            self.append_stream(self.DEBUGPY_MISSING_MESSAGE)
+            return False
 
     def next_seq(self) -> int:
         """
@@ -202,6 +224,9 @@ class ConsoleWidget(RichJupyterWidget):
         self._scroll_to_end()
 
     def _complete(self) -> None:
+        if self.kernel_client is None:
+            return
+
         code = self.input_buffer
 
         # TODO: check what happens on autocompletion
@@ -248,6 +273,10 @@ class ConsoleWidget(RichJupyterWidget):
         """
         Execute a command in the frame of the console widget
         """
+        if self.kernel_manager.kernel is None:
+            self.print_text(self.DEBUGPY_MISSING_MESSAGE)
+            return
+
         self._execute(command, False)
     
     def log_message(self, message: str) -> None:

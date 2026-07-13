@@ -23,7 +23,6 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
-    "euklid",
     "pandas",
     "pydantic",
     "svgwrite",
@@ -46,6 +45,7 @@ gui = [
     "qasync",
     "qtmodern",
     "qtconsole",
+    "debugpy",
     "pyqtgraph",
     "matplotlib",
     "vtk",
