@@ -40,6 +40,7 @@ fi
     --windowed \
     --name OpenGlider \
     --collect-all openglider \
+    --collect-all debugpy \
     --collect-all qtawesome \
     --collect-all pyqtgraph \
     --hidden-import PySide6 \

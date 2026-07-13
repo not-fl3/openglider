@@ -11,8 +11,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_ROOT = PROJECT_ROOT / "openglider"
-MODULE_NAME = "rs"
-SUBMODULE_STUB_ROOT = PACKAGE_ROOT / MODULE_NAME
+MODULE_NAME = "openglider.rs"
+SUBMODULE_NAME = "rs"
+SUBMODULE_STUB_ROOT = PACKAGE_ROOT / SUBMODULE_NAME
 ROOT_STUB_PATH = SUBMODULE_STUB_ROOT / "__init__.pyi"
 
 
