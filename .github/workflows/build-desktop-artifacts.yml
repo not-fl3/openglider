@@ -55,17 +55,6 @@ jobs:
       - name: Build desktop artifact
         shell: bash
         run: ${{ matrix.build_script }}
-
-      - name: Archive macOS app bundle
-        if: ${{ (github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target_name) && startsWith(matrix.os, 'macos') }}
-        shell: bash
-        run: tar -czf "${{ matrix.artifact_path }}" -C dist OpenGlider.app
-
-      - name: Archive Windows executable
-        if: ${{ (github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target_name) && startsWith(matrix.os, 'windows') }}
-        shell: bash
-        run: tar -czf "${{ matrix.artifact_path }}" -C dist OpenGlider.exe
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
