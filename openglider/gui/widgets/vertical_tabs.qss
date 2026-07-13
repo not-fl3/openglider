@@ -1,0 +1,24 @@
+QListWidget {
+    outline: none;
+    border: none;
+    border-right: 1px solid palette(mid);
+    background: palette(window);
+    padding-top: 20px;
+}
+
+QListWidget::item {
+    padding: 10px 12px;
+    border-left: 4px solid transparent;
+    color: palette(window-text);
+}
+
+QListWidget::item:hover {
+    background: palette(midlight);
+}
+
+QListWidget::item:selected {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+    border-left: 4px solid palette(dark);
+    font-weight: bold;
+}
