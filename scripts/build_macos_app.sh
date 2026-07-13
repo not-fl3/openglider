@@ -10,17 +10,30 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 if command -v uv >/dev/null 2>&1; then
-    uv pip install -e ".[gui]"
-    uv pip install pyinstaller
-    PYINSTALLER_CMD=(uv run pyinstaller)
+    if [[ "${CI:-}" == "true" ]]; then
+        uv pip install --system -e ".[gui]"
+        uv pip install --system pyinstaller
+        PYTHON_FOR_PYINSTALLER=(python3)
+    elif [[ -n "${VIRTUAL_ENV:-}" ]]; then
+        uv pip install -e ".[gui]"
+        uv pip install pyinstaller
+        PYTHON_FOR_PYINSTALLER=(python3)
+    else
+        if [[ ! -d ".venv" ]]; then
+            uv venv .venv
+        fi
+        uv pip install --python .venv/bin/python -e ".[gui]"
+        uv pip install --python .venv/bin/python pyinstaller
+        PYTHON_FOR_PYINSTALLER=(.venv/bin/python)
+    fi
 else
     python3 -m pip install --upgrade pip
     python3 -m pip install -e ".[gui]"
     python3 -m pip install pyinstaller
-    PYINSTALLER_CMD=(python3 -m PyInstaller)
+    PYTHON_FOR_PYINSTALLER=(python3)
 fi
 
-"${PYINSTALLER_CMD[@]}" \
+"${PYTHON_FOR_PYINSTALLER[@]}" -m PyInstaller \
     --noconfirm \
     --clean \
     --windowed \

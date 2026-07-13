@@ -154,4 +154,4 @@ Output:
 ### Notes
 
 - Cross-building is not supported here. Build on the target OS (Windows for `.exe`, macOS for `.app`).
-- The scripts prefer `uv` when available (`uv pip install`, `uv run pyinstaller`) and fall back to standard `pip` if `uv` is not installed.
+- The scripts prefer `uv` when available. In CI they use `uv pip install --system`; locally they use the active venv, or create/use `.venv` automatically.
