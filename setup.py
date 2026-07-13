@@ -16,7 +16,15 @@ def generate_stubs_after_build():
     subprocess.run([sys.executable, str(script_path)], check=True)
 
 
+def ensure_cpp_deps() -> None:
+    """Fetch required C++ headers for extension builds."""
+    script_path = Path(__file__).parent / "scripts" / "fetch_cpp_deps.py"
+    subprocess.run([sys.executable, str(script_path)], check=True)
+
+
 SRC_CPP = "src_cpp"
+
+ensure_cpp_deps()
 
 CPP_FILES = [
     "solver.cpp",
@@ -34,8 +42,8 @@ HEADER_FILES = [
 xfoil_extension = Pybind11Extension(
     "openglider.xfoil",
     [f"{SRC_CPP}/{file_name}" for file_name in CPP_FILES],
-    include_dirs=[SRC_CPP],
-    libraries=["fmt"],
+    include_dirs=[SRC_CPP, "src_cpp/fmt/include"],
+    define_macros=[("FMT_HEADER_ONLY", "1")],
     cxx_std=17,
     depends=[f"{SRC_CPP}/{file_name}" for file_name in HEADER_FILES],
 )

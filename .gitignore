@@ -57,3 +57,5 @@ docs/sphinx/build/*
 examples
 #scripts
 __pycache__*
+
+src_cpp/fmt
