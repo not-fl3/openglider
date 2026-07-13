@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import ClassVar
 
 from abc import ABC
 import logging

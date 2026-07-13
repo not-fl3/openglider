@@ -10,7 +10,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openglider"
 description = "OpenGlider"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "GPL-3.0-or-later"
 authors = [
@@ -84,6 +84,6 @@ dev = [
 ]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true

@@ -1,6 +1,5 @@
 from __future__ import annotations
-from typing_extensions import Self
-from typing import Any, TYPE_CHECKING, ClassVar
+from typing import Any, TYPE_CHECKING, ClassVar, Self
 import numpy as np
 import logging
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, dataclass_transform
 from collections.abc import Callable
 import openglider.rs
 import weakref
@@ -11,7 +11,6 @@ from pydantic import PrivateAttr, model_validator
 #from pydantic import Field as field
 from pydantic import ConfigDict, Field  # export Field
 
-from typing_extensions import dataclass_transform
 from dataclasses import dataclass as dc, replace
 
 from openglider.utils.cache import CachedProperty, hash_list

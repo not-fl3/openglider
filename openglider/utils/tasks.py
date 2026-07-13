@@ -5,10 +5,8 @@ import functools
 import logging
 import sys
 import time
-from typing import Any, TypeVar, ParamSpec
+from typing import Any, TypeVar, ParamSpec, Self
 from collections.abc import Callable
-
-from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
 

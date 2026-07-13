@@ -1,3 +1,4 @@
+from typing import ClassVar
 from typing import Any
 
 import openglider.rs
