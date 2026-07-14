@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyAny};
+use pyo3::types::{PyAny, PyDict, PyType};
 use nalgebra::{DMatrix, DVector};
 
 use crate::vector::{Interpolation, PolyLine2D, Vector2D};
@@ -535,6 +535,40 @@ macro_rules! define_curve_type {
 
             fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> Self {
                 self.clone()
+            }
+
+            fn __json__(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+                let controlpoints: Vec<Vec<f64>> = self
+                    .controlpoints
+                    .nodes
+                    .iter()
+                    .map(|point| vec![point.x, point.y])
+                    .collect();
+
+                let data = PyDict::new(py);
+                data.set_item("controlpoints", controlpoints)?;
+                data.set_item("numpoints", self.numpoints)?;
+
+                let result = PyDict::new(py);
+                result.set_item("_type", concat!("spline.", stringify!($name)))?;
+                result.set_item("_module", "openglider.rs")?;
+                result.set_item("data", data)?;
+
+                Ok(result.unbind())
+            }
+
+            #[classmethod]
+            #[pyo3(signature = (controlpoints, numpoints=None))]
+            fn __from_json__(
+                _cls: &Bound<'_, PyType>,
+                controlpoints: Vec<SplinePointInput>,
+                numpoints: Option<usize>,
+            ) -> PyResult<Self> {
+                let mut curve = Self::new(controlpoints)?;
+                if let Some(value) = numpoints {
+                    curve.numpoints = value;
+                }
+                Ok(curve)
             }
         }
     };

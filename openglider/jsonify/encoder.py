@@ -2,6 +2,7 @@ import inspect
 import json
 import re
 import datetime
+import enum
 from typing import Any
 
 
@@ -16,6 +17,8 @@ class Encoder(json.JSONEncoder):
     def default(self, obj: Any) -> dict[str, Any] | str | list[Any]:
         if obj.__class__.__module__ == 'numpy':
             return obj.tolist()
+        elif isinstance(obj, enum.Enum):
+            return obj.value
         elif isinstance(obj, datetime.datetime):
             return str(obj)
         elif hasattr(obj, "__json__"):
@@ -30,6 +33,9 @@ class Encoder(json.JSONEncoder):
             except Exception as e:
                 print(e)
                 raise ValueError(f"could not convert object: {obj}")
+
+            if isinstance(result, dict) and "_type" in result and "_module" in result:
+                return result
 
             if type(result) == dict:
                 type_str = str(obj.__class__)

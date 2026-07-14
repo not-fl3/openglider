@@ -11,7 +11,6 @@ import openglider.rs
 import openglider
 from openglider.config import config
 from openglider.airfoil import Profile2D
-from openglider.rs.vector import PolyLine2D
 
 class ArcSinc:
     def __init__(self) -> None:
@@ -120,7 +119,7 @@ class BallooningBase(ABC):
 
         assert len(normals.nodes) == len(profile_2d.curve.nodes) == len(amounts)
 
-        new_points = PolyLine2D([
+        new_points = openglider.rs.vector.PolyLine2D([
             p + n * amount for p, amount, n in zip(profile_2d.curve.nodes, amounts, normals.nodes)
         ])
 

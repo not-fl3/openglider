@@ -12,6 +12,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_ROOT = PROJECT_ROOT / "openglider"
 MODULE_NAME = "openglider.rs"
+FALLBACK_MODULE_NAME = "rs"
 SUBMODULE_NAME = "rs"
 SUBMODULE_STUB_ROOT = PACKAGE_ROOT / SUBMODULE_NAME
 ROOT_STUB_PATH = SUBMODULE_STUB_ROOT / "__init__.pyi"
@@ -67,21 +68,32 @@ def _find_extension_binary() -> Path:
 
 
 def _run_introspection(binary_path: Path, output_dir: Path) -> None:
-    subprocess.run(
-        [
-            "cargo",
-            "run",
-            "--quiet",
-            "--bin",
-            "pyo3_stub_gen",
-            "--",
-            str(binary_path),
-            MODULE_NAME,
-            str(output_dir),
-        ],
-        cwd=PROJECT_ROOT,
-        check=True,
-    )
+    module_names = [MODULE_NAME, FALLBACK_MODULE_NAME]
+    last_error: subprocess.CalledProcessError | None = None
+
+    for module_name in module_names:
+        try:
+            subprocess.run(
+                [
+                    "cargo",
+                    "run",
+                    "--quiet",
+                    "--bin",
+                    "pyo3_stub_gen",
+                    "--",
+                    str(binary_path),
+                    module_name,
+                    str(output_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=True,
+            )
+            return
+        except subprocess.CalledProcessError as exc:
+            last_error = exc
+
+    if last_error is not None:
+        raise last_error
 
 
 def _install_generated_files(output_dir: Path) -> None:

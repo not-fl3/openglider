@@ -86,11 +86,15 @@ class LineSet:
                    self.total_length)
 
     def __json__(self) -> dict[str, Any]:
-        lines = [l.__json__() for l in self.lines]
         nodes = list(self.nodes)
-        for line in lines:
-            line["upper_node"] = nodes.index(line["upper_node"])
-            line["lower_node"] = nodes.index(line["lower_node"])
+        node_indices = {id(node): index for index, node in enumerate(nodes)}
+
+        lines: list[dict[str, Any]] = []
+        for line_obj in self.lines:
+            line = line_obj.__json__()
+            line["upper_node"] = node_indices[id(line_obj.upper_node)]
+            line["lower_node"] = node_indices[id(line_obj.lower_node)]
+            lines.append(line)
 
         return {
             'lines': lines,
@@ -100,6 +104,9 @@ class LineSet:
 
     @classmethod
     def __from_json__(cls, lines: list[dict[str, Any]], nodes: list[Node], v_inf: openglider.rs.vector.Vector3D) -> LineSet:
+        if isinstance(v_inf, list):
+            v_inf = openglider.rs.vector.Vector3D(v_inf)
+
         lines_new: list[Line] = []
         for line in lines:
             if isinstance(line["upper_node"], int):

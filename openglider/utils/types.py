@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING, Any, TypeAlias
 
 if TYPE_CHECKING:
-    from openglider.rs.spline import (
+    import openglider.rs as rs
+    from rs.spline import (
         BSplineCurve,
         BezierCurve,
         CubicBSplineCurve,

@@ -54,6 +54,11 @@ class Cell(BaseModel):
     miniribs: list[MiniRib] = Field(default_factory=lambda: [])
 
     name: str = "unnamed"
+
+    def __json__(self) -> dict[str, object]:
+        data = self.model_dump(exclude={"straps"})
+        data["straps"] = self.straps
+        return data
     
     def __hash__(self) -> int:
         return hash_list(self.rib1, self.rib2, *self.miniribs, *self.diagonals)

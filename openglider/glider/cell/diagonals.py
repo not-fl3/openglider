@@ -381,10 +381,12 @@ class TensionStrap(DiagonalRib):
     
     def __json__(self) -> dict[str, Any]:
         return {
-            "left": self.side1.center,
-            "right": self.side2.center,
+            "side1": self.side1.center,
+            "side2": self.side2.center,
             "width": (self.side1.width + self.side2.width)/2,
-            "height": self.side1.height
+            "height": self.side1.height,
+            "material_code": self.material_code,
+            "name": self.name,
         }
 
 class TensionLine(TensionStrap):

@@ -51,12 +51,11 @@ class GliderList(SelectionList[GliderProject, GliderListItem]):
                         except Exception as e:
                             project.failed = True
                             logger.info(str(e))
-                    
 
                         changed = True
                 else:
                     logger.warning(f"no mtime set: {project.name} {mtime}")
-                
+
                 project.mtime = mtime
 
         return changed
