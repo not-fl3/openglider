@@ -19,7 +19,7 @@ ROOT_STUB_PATH = SUBMODULE_STUB_ROOT / "__init__.pyi"
 
 
 def _build_debug_extension() -> None:
-    subprocess.run(["cargo", "build", "--quiet", "--lib"], cwd=PROJECT_ROOT, check=True)
+    subprocess.run(["cargo", "build", "--quiet", "--lib", "--features", "inspect"], cwd=PROJECT_ROOT, check=True)
 
 
 def _find_extension_binary() -> Path:
@@ -29,10 +29,22 @@ def _find_extension_binary() -> Path:
         if candidate.exists():
             return candidate
 
-    search_roots = [
-        PACKAGE_ROOT,
-        PROJECT_ROOT / "target" / "debug",
+    _build_debug_extension()
+
+    debug_candidates = [
+        PROJECT_ROOT / "target" / "debug" / "librs.so",
+        PROJECT_ROOT / "target" / "debug" / "deps" / "librs.so",
     ]
+
+    for candidate in debug_candidates:
+        if candidate.exists():
+            return candidate
+
+    for candidate in debug_candidates:
+        if candidate.exists():
+            return candidate
+
+    search_roots = [PROJECT_ROOT / "target" / "debug"]
 
     def search_candidates() -> list[Path]:
         extensions: list[Path] = []
@@ -59,17 +71,13 @@ def _find_extension_binary() -> Path:
     if unique_extensions:
         return unique_extensions[0]
 
-    # Prefer importable extension module filenames first, then rust dylibs as fallback.
+    # Keep unique paths and prefer newest debug build output when multiple candidates exist.
     search_patterns = (
         "rs*.pyd",
         "rs*.so",
         "rs*.dylib",
         "rs*.dll",
     )
-
-    search_roots = [
-        PROJECT_ROOT / "build",
-    ]
 
     extensions: list[Path] = []
     for search_root in search_roots:
@@ -78,23 +86,10 @@ def _find_extension_binary() -> Path:
         for pattern in search_patterns:
             extensions.extend(search_root.rglob(pattern))
 
-    # Common direct build outputs in case recursive glob misses platform-specific naming.
-    fallback_candidates = [
-        PROJECT_ROOT / "build" / "lib" / "openglider" / "rs.so",
-        PROJECT_ROOT / "target" / "release" / "librs.so",
-        PROJECT_ROOT / "target" / "release" / "librs.dylib",
-        PROJECT_ROOT / "target" / "release" / "rs.dll",
-    ]
-
-    for fallback in fallback_candidates:
-        if fallback.exists():
-            extensions.append(fallback)
-
-    # Keep unique paths and prefer newest build output when multiple candidates exist.
     unique_extensions = sorted(set(extensions), key=lambda p: p.stat().st_mtime, reverse=True)
     if not unique_extensions:
         raise FileNotFoundError(
-            "Could not find the compiled openglider.rs extension in source or build directories. "
+            "Could not find the compiled openglider.rs extension in source or debug build directories. "
             "Build the extension first."
         )
     return unique_extensions[0]
@@ -111,6 +106,8 @@ def _run_introspection(binary_path: Path, output_dir: Path) -> None:
                     "cargo",
                     "run",
                     "--quiet",
+                    "--features",
+                    "inspect",
                     "--bin",
                     "pyo3_stub_gen",
                     "--",
