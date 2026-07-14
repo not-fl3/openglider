@@ -4,7 +4,7 @@ import collections
 import copy
 import functools
 import logging
-from typing import Generic, TypeVar, Any
+from typing import Generic, TypeVar, Any, overload
 from collections.abc import Callable, Iterator, Sequence
 
 from typing import TYPE_CHECKING
@@ -15,7 +15,7 @@ from openglider.config import config
 
 logger = logging.getLogger(__name__)
 
-cache_instances: list[CachedProperty] = []
+cache_instances: list[Any] = []
 
 def clear() -> None:
     for instance in cache_instances:
@@ -47,14 +47,15 @@ class CachedObject:
 
 
 CLS = TypeVar("CLS")
-Result = TypeVar("Result")
+SelfT = TypeVar("SelfT")
+ResultT = TypeVar("ResultT")
 
-class LruCache(Generic[Result]):
+class LruCache(Generic[ResultT]):
     NotFound = object()
     
     def __init__(self, maxsize: int=128) -> None:
         self.maxsize = maxsize
-        self.cache: collections.OrderedDict[int, Result] = collections.OrderedDict()
+        self.cache: collections.OrderedDict[int, ResultT] = collections.OrderedDict()
 
         self.hits = 0
         self.misses = 0
@@ -63,7 +64,7 @@ class LruCache(Generic[Result]):
     def cache_full(self) -> bool:
         return len(self.cache) > self.maxsize
     
-    def get(self, key: int) -> Result | None:
+    def get(self, key: int) -> ResultT | None:
         try:
             value = self.cache.pop(key)
             self.cache[key] = value
@@ -73,7 +74,7 @@ class LruCache(Generic[Result]):
             self.misses += 1
             return None
     
-    def set(self, key: int, value: Result) -> None:
+    def set(self, key: int, value: ResultT) -> None:
         try:
             self.cache.pop(key)
         except KeyError:
@@ -85,10 +86,10 @@ class LruCache(Generic[Result]):
         self.cache[key] = value
             
 
-class CachedProperty(Generic[Result]):
+class CachedProperty(Generic[SelfT, ResultT]):
     hashlist: list[str]
 
-    def __init__(self, fget: Callable[[CLS], Result], hashlist: list[str], maxsize: int):
+    def __init__(self, fget: Callable[[SelfT], ResultT], hashlist: Sequence[str], maxsize: int):
         super().__init__()
         self.function = fget
         self.__doc__ = fget.__doc__
@@ -96,8 +97,8 @@ class CachedProperty(Generic[Result]):
         self.__name__ = fget.__name__
         self.__qualname__ = fget.__qualname__
 
-        self.hashlist = hashlist
-        self.cache: LruCache[Result] = LruCache(maxsize)
+        self.hashlist = list(hashlist)
+        self.cache: LruCache[ResultT] = LruCache(maxsize)
 
         global cache_instances
         cache_instances.append(self)
@@ -105,7 +106,18 @@ class CachedProperty(Generic[Result]):
     def __repr__(self) -> str:
         return f"<CachedProperty {self.function.__qualname__}>"
 
-    def __get__(self, parentclass: CLS, type: Any=None) -> Result:
+    @overload
+    def __get__(self, parentclass: None, type: type[SelfT] | None=None) -> CachedProperty[SelfT, ResultT]:
+        pass
+
+    @overload
+    def __get__(self, parentclass: SelfT, type: type[SelfT] | None=None) -> ResultT:
+        pass
+
+    def __get__(self, parentclass: SelfT | None, type: type[SelfT] | None=None) -> ResultT | CachedProperty[SelfT, ResultT]:
+        if parentclass is None:
+            return self
+
         if not config["caching"]:
             return self.function(parentclass)
         
@@ -119,11 +131,8 @@ class CachedProperty(Generic[Result]):
         return value
 
 
-def cached_property(*hashlist: str, max_size: int=1024) -> type[property]:
-    if TYPE_CHECKING:
-        return property
-
-    def property_decorator(fget):
+def cached_property(*hashlist: str, max_size: int=1024) -> Callable[[Callable[[SelfT], ResultT]], CachedProperty[SelfT, ResultT]]:
+    def property_decorator(fget: Callable[[SelfT], ResultT]) -> CachedProperty[SelfT, ResultT]:
         return CachedProperty(fget, hashlist, max_size)
     
     return property_decorator

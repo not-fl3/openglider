@@ -103,7 +103,7 @@ class BallooningInput(Canvas):
             curve.data["pos"][node_index][0] = -1.
             curve.data["pos"][-1][1] = curve.data["pos"][node_index][1]
 
-        self.ballooning.controlpoints = openglider.rs.vector.PolyLine2D(self.ballooning_curve.controlpoints)
+        self.ballooning.controlpoints = self.ballooning_curve.controlpoints
 
         self.update()
 

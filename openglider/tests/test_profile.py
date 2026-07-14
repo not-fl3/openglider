@@ -66,7 +66,7 @@ class TestProfile(unittest.TestCase):
     @unittest.skip("whatsoever!")
     def test_camber(self) -> None:
         val = random.random()
-        camber = max(self.prof.camber[:, 1])
+        camber = self.prof.camber
 
         new = self.prof.set_camber(camber*val)
 

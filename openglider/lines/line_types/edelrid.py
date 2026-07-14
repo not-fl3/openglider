@@ -1,6 +1,7 @@
 from openglider.lines.line_types.linetype import LineType
 from openglider.utils.colors import Color
 
+
 def A8001(strength: int, diameter: float, weight: float) -> None:
     LineType(
         f"edelrid.A-8001-{strength:03d}",
@@ -17,7 +18,7 @@ def A8001(strength: int, diameter: float, weight: float) -> None:
         }
     )
 
-edelrid_colors = {
+edelrid_colors: dict[str, Color | None] = {
     "sky": Color.parse_hex("0095D8"),
     "yellow": Color.parse_hex("FFDD00"),
     "green": Color.parse_hex("009037"),

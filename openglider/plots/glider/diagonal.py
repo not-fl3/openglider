@@ -53,9 +53,9 @@ class DribPlot:
         
         self.front = self.back = None
         if front is not None:
-            self.front = openglider.rs.vector.PolyLine2D(front).rotate(-self.angle, rotation_center)
+            self.front = front.rotate(-self.angle, rotation_center)
         if back is not None:
-            self.back = openglider.rs.vector.PolyLine2D(back).rotate(-self.angle, rotation_center)
+            self.back = back.rotate(-self.angle, rotation_center)
 
 
     def get_left(self, x: float) -> tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Callable
 from typing import TYPE_CHECKING, Any
 from collections.abc import Callable
 import logging
@@ -26,27 +27,27 @@ logger = logging.getLogger(__name__)
 
 class PanelPlot:
     DefaultConf = PatternConfig
-    plotpart: PlotPart
+    plotpart: PlotPart | None = None
     config: PatternConfig
+    flattened_panel: FlattenedPanel | None = None
+    flattened_cell: FlattenedCellWithAllowance
 
     panel: Panel
     cell: Cell
 
-    def __init__(self, panel: Panel, cell: Cell, flattended_cell: FlattenedCellWithAllowance, config: Config | None=None):
+    def __init__(self, panel: Panel, cell: Cell, flattened_cell: FlattenedCellWithAllowance, config: Config | None=None):
         self.panel = panel
         self.cell = cell
         self.config = self.DefaultConf(config)
 
-        self._flattened_cell = flattended_cell.copy()
+        self._flattened_cell = flattened_cell.copy()
 
-        self.inner = flattended_cell.inner
-        self.ballooned = flattended_cell.ballooned
-        self.outer = flattended_cell
-        self.outer_orig = flattended_cell.outer_orig
+        self.inner = flattened_cell.inner
+        self.ballooned = flattened_cell.ballooned
+        self.outer = flattened_cell
+        self.outer_orig = flattened_cell.outer_orig
 
         self.x_values = self.cell.rib1.profile_2d.x_values
-        self.flattened_panel: FlattenedPanel | None = None
-        self.plotpart: PlotPart | None = None
 
     def prepare(self) -> None:
         cut_types = self.config.get_cut_types()

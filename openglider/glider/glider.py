@@ -445,14 +445,14 @@ class Glider:
 
     def get_attachment_point_layers(self) -> dict[str, openglider.rs.vector.Interpolation]:
         regex = re.compile(r"([a-zA-Z]+)([0-9]+)")
-        attachment_point_per_group: dict[str, list[tuple[int, Percentage]]] = {}
+        attachment_point_per_group: dict[str, list[tuple[int, float]]] = {}
 
         for rib_no, rib in enumerate(self.ribs):
             for point in rib.attachment_points:
                 if match := regex.match(point.name):
                     layer = match.group(1)
                     attachment_point_per_group.setdefault(layer, [])
-                    attachment_point_per_group[layer].append((rib_no, point.rib_pos))
+                    attachment_point_per_group[layer].append((rib_no, point.rib_pos.si))
         
         curves = {}
         for name, group in attachment_point_per_group.items():

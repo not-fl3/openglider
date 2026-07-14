@@ -76,7 +76,7 @@ class RibBase(BaseModel):
 
     @cached_property('profile_3d')
     def normvectors(self) -> list[openglider.rs.vector.Vector3D]:
-        return [self.rotation_matrix.apply(openglider.rs.vector.Vector2D(p)) for p in self.profile_2d.normvectors.nodes]
+        return [self.rotation_matrix.apply(p) for p in self.profile_2d.normvectors.nodes]
     
     @cached_property('profile_2d', 'transformation')
     def profile_3d(self) -> Profile3D:
@@ -120,7 +120,7 @@ class Rib(RibBase):
     arcang: float = 0.
     zrot: Angle | None = None
     xrot: Angle | None = None
-    offset: list[Length | Percentage] = Field(default_factory=list)
+    offset: list[Length | Percentage] | None = None
 
     seam_allowance: Length
     trailing_edge_extra: Length | None
@@ -162,11 +162,14 @@ class Rib(RibBase):
 
     @cached_property('arcang', 'glide', 'zrot', 'xrot', 'aoa_absolute', 'chord', 'pos', 'offset')
     def transformation(self) -> openglider.rs.vector.Transformation:  # type: ignore
-        xoffset = self.convert_to_chordlength(self.offset[0]).si
-        yoffset = self.convert_to_chordlength(self.offset[1]).si
-        zoffset = self.convert_to_chordlength(self.offset[2]).si
+        if self.offset is None:
+            offset = openglider.rs.vector.Vector3D([0, 0, 0])
+        else:
+            xoffset = self.convert_to_chordlength(self.offset[0]).si
+            yoffset = self.convert_to_chordlength(self.offset[1]).si
+            zoffset = self.convert_to_chordlength(self.offset[2]).si
 
-        offset = openglider.rs.vector.Vector3D([xoffset, yoffset, zoffset])
+            offset = openglider.rs.vector.Vector3D([xoffset, yoffset, zoffset])
         return rib_transformation(self.aoa_absolute, self.arcang, self.zrot, self.xrot, self.chord, self.pos, offset)
     
     def rename_parts(self) -> None:
@@ -204,7 +207,10 @@ class Rib(RibBase):
         
         return result
     
-    def get_weight(self):
+    def get_weight(self) -> float:
+        if self.material is None:
+            raise ValueError(f"Rib {self.name} has no material assigned")
+
         outline = self.get_hull().curve * self.chord
         crossports = [hole.get_flattened(self, layer_name="cuts") for hole in self.holes]
 

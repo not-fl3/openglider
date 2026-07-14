@@ -327,9 +327,9 @@ class AttachmentPointHole(RibHoleBase):
         diagonal_border = rib.convert_to_percentage(self.border_diagonal).si
         side_border_pct = rib.convert_to_percentage(self.border_side)
 
-        upper_1 = rib.profile_2d.align([self.start, -1])
-        upper_2 = rib.profile_2d.align([(self.start+self.end)/2, 1])
-        upper_3 = rib.profile_2d.align([self.end, -1])
+        upper_1 = rib.profile_2d.align([self.start.si, -1])
+        upper_2 = rib.profile_2d.align([(self.start.si+self.end.si)/2, 1])
+        upper_3 = rib.profile_2d.align([self.end.si, -1])
 
         start_ik = envelope.get_ik(self.start) - envelope.noseindex
         end_ik = envelope.get_ik(self.end) - envelope.noseindex
@@ -378,9 +378,9 @@ class AttachmentPointHole(RibHoleBase):
 
         upper_curve = openglider.rs.vector.PolyLine2D(envelope.curve.nodes[:envelope.noseindex][::-1])
 
-        top_center = rib.profile_2d.align([(self.start+self.end)/2, 1])
-        bottom_start = rib.profile_2d.align([self.start, -1])
-        bottom_end = rib.profile_2d.align([self.end, -1])
+        top_center = rib.profile_2d.align([(self.start.si+self.end.si)/2, 1])
+        bottom_start = rib.profile_2d.align([self.start.si, -1])
+        bottom_end = rib.profile_2d.align([self.end.si, -1])
 
         def get_ik_x(polyline: openglider.rs.vector.PolyLine2D, x: float) -> float:
             return polyline.cut(

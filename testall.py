@@ -40,7 +40,8 @@ def test_typings() -> int:
     return return_value
     
 if __name__ == "__main__":
-    if test_typings():
+    typing_result = test_typings()
+    test_result = test()
+
+    if typing_result != 0 or test_result != 0:
         sys.exit(1)
-    
-    test()

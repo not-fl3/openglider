@@ -77,7 +77,7 @@ VecType: TypeAlias = openglider.rs.vector.Vector2D | tuple[float, float]
 class BallooningBezierNeu(BallooningNew):
     spline_curve: openglider.rs.spline.BSplineCurve
 
-    def __init__(self, spline: list[openglider.rs.vector.Vector2D] | list[tuple[float, float]] | openglider.rs.vector.PolyLine2D, name: str="ballooning_new") -> None:
+    def __init__(self, spline: list[openglider.rs.vector.Vector2D] | list[tuple[float, float]], name: str="ballooning_new") -> None:
         super().__init__(None, None)  # type: ignore
         self.spline_curve = openglider.rs.spline.BSplineCurve(spline)
         self.name = name
@@ -132,7 +132,7 @@ class BallooningBezierNeu(BallooningNew):
         self.interpolation = openglider.rs.vector.Interpolation(self.get_points(), extrapolate=True)
 
     def __mul__(self, factor: float) -> BallooningBezierNeu:
-        return BallooningBezierNeu(self.controlpoints.scale(openglider.rs.vector.Vector2D([1, factor])))
+        return BallooningBezierNeu(self.controlpoints.scale(openglider.rs.vector.Vector2D([1, factor])).nodes)
 
     def __imul__(self, factor: float) -> BallooningBezierNeu:  # TODO: Check consistency
         """Multiplication of BezierBallooning"""

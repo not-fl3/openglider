@@ -134,7 +134,7 @@ class Curve(CurveBase):
     @property
     def controlpoints_2d(self) -> list[openglider.rs.vector.Vector2D]:
         return [
-            openglider.rs.vector.Vector2D(self.shape.get_point(*p)) for p in self.controlpoints
+            self.shape.get_point(*p) for p in self.controlpoints
         ]
     
     def set_controlpoints_2d(self, points: list[openglider.rs.vector.Vector2D]) -> None:
@@ -245,7 +245,7 @@ class ShapeBSplineCurve(ShapeCurve):
     @cached_property('shape', 'interpolation')
     def points_2d(self) -> openglider.rs.vector.PolyLine2D:
         return openglider.rs.spline.BSplineCurve([
-            openglider.rs.vector.Vector2D(self.shape.get_point(*p)) for p in self.controlpoints
+            self.shape.get_point(*p) for p in self.controlpoints
         ]).get_sequence(100)
 
 

@@ -110,7 +110,7 @@ class ArcInput(Canvas):
         node_index = curve.drag_node_index
         curve.data["pos"][node_index][0] = max(0, curve.data["pos"][node_index][0])
 
-        self.project.glider.arc.curve.controlpoints = openglider.rs.vector.PolyLine2D(curve.controlpoints)
+        self.project.glider.arc.curve.controlpoints = curve.controlpoints
         self.arc_2d.update_arc()
 
         self.update()

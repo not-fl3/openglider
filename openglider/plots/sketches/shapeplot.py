@@ -322,6 +322,8 @@ class ShapePlot:
         )
 
     def _get_font_size(self) -> float:
+        assert self.shapes is not None
+        
         cell_range = self._get_cell_range(False)
         min_cell_width = min(
             abs(self.shapes[0].get_point(cell_no+1, 0)[0] - self.shapes[0].get_point(cell_no, 0)[0])

@@ -57,7 +57,7 @@ class ElementTable(Generic[ElementType]):
     def get_columns(cls, table: Table, keyword: str, data_length: int) -> list[Table]:
         columns: list[Table] = []
         cache_key = (cls.__name__, keyword, data_length, table._version)
-        cached_columns = table._element_table_cache.get(cache_key)
+        cached_columns: tuple[tuple[int, tuple[tuple[int, int, Any], ...]], ...] | None = table._element_table_cache.get(cache_key)
 
         if keyword in cls.keywords:
             keyword_instance = cls.keywords[keyword]
@@ -76,24 +76,25 @@ class ElementTable(Generic[ElementType]):
             header_starts = [column for key, (column, row) in table.coords.items() if row == 0 and table.dct.get(key) == keyword]
             header_starts.sort()
 
-            cached_columns = []
+            built_columns: list[tuple[int, tuple[tuple[int, int, Any], ...]]] = []
             for column in header_starts:
-                cells: list[tuple[int, int, Any]] = []
+                cell_entries: list[tuple[int, int, Any]] = []
 
                 for key, value in table.dct.items():
                     source_column, source_row = table.coords[key]
                     if source_row >= 2 and column <= source_column < column + data_length and value is not None:
-                        cells.append((source_column - column, source_row - 2, value))
+                        cell_entries.append((source_column - column, source_row - 2, value))
 
-                cached_columns.append((column, tuple(cells)))
+                built_columns.append((column, tuple(cell_entries)))
 
-            table._element_table_cache[cache_key] = tuple(cached_columns)
+            cached_columns = tuple(built_columns)
+            table._element_table_cache[cache_key] = cached_columns
 
-        for column, cells in cached_columns:
+        for column, cached_cells in cached_columns:
             columns_part_header = header.copy()
             columns_part = Table()
 
-            for source_column, source_row, value in cells:
+            for source_column, source_row, value in cached_cells:
                 columns_part.set_value(source_column, source_row, value)
 
             columns_part_header.append_bottom(columns_part)

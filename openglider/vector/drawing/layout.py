@@ -351,7 +351,7 @@ class Layout:
             part.move(vector)
 
     def move_to(self, vector: openglider.rs.vector.Vector2D) -> None:
-        diff = (openglider.rs.vector.Vector2D(self.bbox[0]) - vector) * -1
+        diff = (self.bbox[0] - vector) * -1
         self.move(diff)
 
     def append_top(self, other: Layout, distance: float=0.) -> Layout:
@@ -639,7 +639,7 @@ class Layout:
     def export_pdf(self, path: str | os.PathLike, fill: bool=False) -> None:
         dwg = self.get_svg_drawing(fill=fill).tostring().encode("utf-8")
         with io.BytesIO(dwg) as fp:
-            report = svglib.svglib.svg2rlg(fp)
+            report = svglib.svglib.svg2rlg(fp)  # type: ignore[arg-type]
             renderPDF.drawToFile(report, str(path))
 
     def scale_a4(self) -> Layout:

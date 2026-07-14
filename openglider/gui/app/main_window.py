@@ -249,7 +249,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return self.app.loop
 
     async def execute(self, function: Callable[[Any], Any], *args: Any, **kwargs: Any) -> Any:
-        logger.warning(f"use main application to execute function: {function}")
+        logger.info(f"use main application to execute function: {function}")
         result = await self.app.execute(function, *args, **kwargs)
         return result
     

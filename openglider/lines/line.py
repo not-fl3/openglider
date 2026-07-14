@@ -163,6 +163,8 @@ class Line(BaseModel):
     @cached_property('force', 'lower_node.vec_proj', 'lower_node.position', 'upper_node.vec_proj', 'upper_node.position')
     def force_projected(self) -> float:
         try:
+            if self.force is None:
+                raise ValueError(f"force is None: {self.name}")
             return self.force * self.length_projected / self.length_no_sag
         except Exception as e:
             logger.error(f"invalid force: {self.name}, {self.force} {self.length_no_sag}")
@@ -186,6 +188,9 @@ class Line(BaseModel):
 
     def get_sag(self, x: float) -> float:
         """sag u(x) [m], x: [0,1]"""
+        if self.sag_par_1 is None or self.sag_par_2 is None:
+            raise ValueError(f"No sag calculated: {self.name}")
+
         xi = x * self.length_projected
         u = (- xi ** 2 / 2 * self.ortho_pressure /
              self.force_projected + xi *

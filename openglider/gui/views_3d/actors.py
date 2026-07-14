@@ -59,8 +59,8 @@ class Arrow(vtkmodules.vtkRenderingCore.vtkActor):
         self.arrow.SetTipResolution(10)
 
 
-        start = openglider.rs.vector.Vector3D(p1)
-        end = openglider.rs.vector.Vector3D(p2)
+        start = p1
+        end = p2
 
         diff = end - start
         length = diff.length()

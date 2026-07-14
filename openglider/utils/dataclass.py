@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, dataclass_transform
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 import openglider.rs
 import weakref
 
@@ -143,7 +143,7 @@ class BaseModel(pydantic.BaseModel):
     def _cache_remove_parent(self, parent: BaseModel) -> None:
         self._cache_parents = [parent_ref for parent_ref in self._cache_parents if parent_ref() is not None and parent_ref() is not parent]
 
-    def _cache_iter_child_models(self, value: Any):
+    def _cache_iter_child_models(self, value: Any) -> Iterator[BaseModel]:
         if isinstance(value, BaseModel):
             yield value
         elif isinstance(value, (list, tuple)):

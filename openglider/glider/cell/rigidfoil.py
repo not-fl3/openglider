@@ -99,7 +99,7 @@ class EntryStrap:
         ]
         print((nodes[1] - nodes[0]).length())
 
-        return Mesh.from_indexed(nodes, {"EntryStrap": [([0, 1], {})]}, name="EntryStrap")
+        return Mesh.from_indexed(nodes, {"EntryStrap": [((0, 1), {})]}, name="EntryStrap")
 
 @dataclass
 class PanelRigidFoil:
@@ -118,7 +118,7 @@ class PanelRigidFoil:
             cell.rib1.profile_2d.get_ik(self.x_end.si)
         ).nodes
 
-        return Mesh.from_indexed(nodes, {"PanelRigidFoil": [([i, i+1], {}) for i in range(len(nodes)-1)]}, name="PanelRigidFoil")
+        return Mesh.from_indexed(nodes, {"PanelRigidFoil": [((i, i+1), {}) for i in range(len(nodes)-1)]}, name="PanelRigidFoil")
 
     def get_flattened(self, cell: Cell, midribs: int, cut_types: dict[PANELCUT_TYPES, type[cuts.Cut]] | None) -> tuple[openglider.vector.drawing.PlotPart, dict[Panel, list[openglider.rs.vector.PolyLine2D]]]:
         dwg = openglider.vector.drawing.PlotPart(material_code="rigidfoil")

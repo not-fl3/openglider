@@ -47,7 +47,7 @@ class Node(BaseModel):
         )
 
     def calc_force_infl(self, vec: openglider.rs.vector.Vector3D) -> openglider.rs.vector.Vector3D:
-        v = openglider.rs.vector.Vector3D(vec)
+        v = vec
 
         direction = self.position - v
         if self.node_type == self.NODE_TYPE.UPPER:

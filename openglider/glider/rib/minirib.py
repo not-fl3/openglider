@@ -129,6 +129,8 @@ class MiniRib:
 
         cutback = self.convert_to_chordlength(self.trailing_edge_cut, cell).si
 
+        assert self.back_cut is not None, "back_cut must be set to get nodes"
+
         start_bottom = profile_2d.get_ik(self.front_cut*profile_2d.curve.nodes[0][0])
         end_bottom = profile_2d.get_ik(self.back_cut*profile_2d.curve.nodes[0][0]-cutback)
         start_top = profile_2d.get_ik(-self.front_cut*profile_2d.curve.nodes[0][0])
@@ -140,8 +142,10 @@ class MiniRib:
         return nodes_top, nodes_bottom
 
     def rename_parts(self) -> None:
-        for hole_no, hole in enumerate(self.holes):
-            hole.name = self.hole_naming_scheme.format(hole_no, rib=self)
+        # TODO Niki
+        #for hole_no, hole in enumerate(self.holes):
+        #    hole.name = self.hole_naming_scheme.format(hole_no, rib=self)
+        pass
 
 
     def get_hull(self, cell: Cell) -> openglider.rs.vector.PolyLine2D:
@@ -192,7 +196,7 @@ class MiniRib:
             boundary = [list(range(len(vertices))) + [0]]
             for curve in holes:
                 start_index = len(vertices)
-                hole_vertices = curve.tolist()[:-1]
+                hole_vertices = [(n.x, n.y) for n in curve.nodes[:-1]]
                 hole_indices = list(range(len(hole_vertices))) + [0]
                 vertices+= hole_vertices
                 boundary.append([start_index + i for i in hole_indices])
@@ -231,7 +235,7 @@ class MiniRib:
         len_top=top_curve.get_length()
         len_bot=bottom_curve.get_length()
 
-        def to_percentage(length: Length | Percentage):
+        def to_percentage(length: Length | Percentage) -> Percentage:
             if isinstance(length, Percentage):
                 return length
 

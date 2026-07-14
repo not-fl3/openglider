@@ -111,7 +111,6 @@ class LineSet:
             
             lines_new.append(Line(**line))
         
-        v_inf = openglider.rs.vector.Vector3D(v_inf)
         obj = cls(lines_new, v_inf)
         obj.recalc()
         return obj
@@ -122,7 +121,7 @@ class LineSet:
     
     @v_inf.setter
     def v_inf(self, v_inf: openglider.rs.vector.Vector3D) -> None:
-        self._v_inf = openglider.rs.vector.Vector3D(v_inf)
+        self._v_inf = v_inf
         for line in self.lines:
             line.v_inf = self._v_inf
 
@@ -567,7 +566,7 @@ class LineSet:
             nodes = self.get_upper_influence_nodes(line)
             layers: dict[str, int] = {}
             min_idx = float("inf")
-            max_idx = -1
+            max_idx = float("-inf")
 
             for node in nodes:
                 layer, idx = parse_node_name(getattr(node, "name", "") or "")
@@ -584,7 +583,7 @@ class LineSet:
             else:
                 min_idx_val = int(min_idx)
 
-            if max_idx == -1:
+            if max_idx == float("-inf"):
                 max_idx_val = 10 ** 9
             else:
                 max_idx_val = int(max_idx)

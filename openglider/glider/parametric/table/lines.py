@@ -105,7 +105,7 @@ class LineSetTable(BaseModel):
                         line_type=line_types.LineType.get(line_type_name),
                         target_length=line_length,
                         color=color,
-                        trim_correction=trim_correction
+                        trim_correction=Length(trim_correction) if trim_correction is not None else None
                     ))
 
         return LineSet(lines, v_inf=v_inf)
@@ -166,10 +166,17 @@ class LineSetTable(BaseModel):
         return cls(table=table, lower_attachment_points=lower_points)
     
     def scale(self, factor: float, scale_lower_floor: bool) -> Self:
-        offset_upper_level: list[Length] = []
+        """Scale stored line lengths and propagate fixed-floor offsets upward.
+
+        Fixed lengths marked with ``!`` are kept unchanged and their theoretical
+        scale delta is carried to the next upper floor. Non-fixed lengths are
+        scaled directly and absorb any offset propagated from the floor below.
+        """
+        offset_upper_level: list[Length | None] = []
         offset_table = Table()
 
-        def set_offset(level: int, offset: Length) -> None:
+        def set_offset(level: int, offset: Length | None) -> None:
+            """Store the carry-over offset for a floor, or ``None`` to clear it."""
             nonlocal offset_upper_level
             offset_upper_level = offset_upper_level[:level]
             if len(offset_upper_level) < level:
@@ -206,11 +213,11 @@ class LineSetTable(BaseModel):
                             set_offset(column // 2, offset)
                         else:
                             target_length = scaled_length
-                            offset = offset_upper_level[column//2-1]
-                            if offset:
-                                target_length += offset
+                            propagated_offset = offset_upper_level[column//2-1]
+                            if propagated_offset:
+                                target_length += propagated_offset
                             
-                            offset_table[row, column] = offset
+                            offset_table[row, column] = propagated_offset
 
                             set_offset(column // 2, None)
 

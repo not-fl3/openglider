@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Callable
 
 import openglider.materials
 from openglider.materials.material import Material
@@ -10,7 +10,7 @@ from openglider.gui.qt import QtWidgets, QtCore
 logger = logging.getLogger(__name__)
 
 
-def _make_copy_handler(text: str):
+def _make_copy_handler(text: str) -> Callable[[bool], None]:
     def handler(checked: bool = False) -> None:
         QtWidgets.QApplication.clipboard().setText(text)
     return handler

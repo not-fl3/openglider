@@ -28,7 +28,10 @@ class Profile2D:
 
     def __init__(self, data: Sequence[openglider.rs.vector.Vector2D | tuple[float, float]] | openglider.rs.vector.PolyLine2D, name: str="unnamed") -> None:
         self.name = name
-        self.curve = openglider.rs.vector.PolyLine2D(data)
+        if isinstance(data, openglider.rs.vector.PolyLine2D):
+            self.curve = data
+        else:
+            self.curve = openglider.rs.vector.PolyLine2D(data)
 
         self._setup()
 
@@ -207,7 +210,7 @@ class Profile2D:
     
     @classmethod
     def _import_dat(cls, p_file: Iterable[str], name: str="unnamed") -> Self:
-        profile: list[list[float]] = []
+        profile: list[tuple[float, float]] = []
         for i, line in enumerate(p_file):
             if line.endswith(","):
                 line = line[:-1]
@@ -215,7 +218,7 @@ class Profile2D:
             match = cls._re_coord_line.match(line)
 
             if match:
-                profile.append([float(value) for value in match.groups()])
+                profile.append((float(match.group(1)), float(match.group(2))))
             elif i == 0:
                 name = line.strip()
             elif len(line) == 0:

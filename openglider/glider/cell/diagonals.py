@@ -256,8 +256,7 @@ class DiagonalRib(BaseModel):
         points_3d: list[openglider.rs.vector.Vector3D] = []
 
         for point_3d, point_2d in zip(envelope_3d, tri_mesh.points[:len(envelope_2d)]):
-            vector_3d = openglider.rs.vector.Vector3D(point_3d)
-            points_3d.append(vector_3d)
+            points_3d.append(point_3d)
 
         for point in tri_mesh.points[len(envelope_2d):]:
             ik = mapping_2d.get_iks(point)
@@ -505,8 +504,7 @@ class FingerDiagonal(BaseModel):
         points_3d: list[openglider.rs.vector.Vector3D] = []
 
         for point_3d, point_2d in zip(envelope_3d, tri_mesh.points[:len(envelope_2d)]):
-            vector_3d = openglider.rs.vector.Vector3D(point_3d)
-            points_3d.append(vector_3d)
+            points_3d.append(point_3d)
 
         for point in tri_mesh.points[len(envelope_2d):]:
             ik = mapping_2d.get_iks(point)

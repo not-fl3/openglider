@@ -4,6 +4,7 @@ import logging
 import math
 from openglider.airfoil import Profile3D, Profile2D
 from typing import Literal
+from collections.abc import Sequence
 
 import openglider.rs
 from openglider.airfoil import Profile3D

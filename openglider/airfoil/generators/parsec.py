@@ -24,7 +24,7 @@ class BezierParsecAirfoil:
     trailing_edge_offset: float = 0
 
     def b9(self) -> float:
-        def y(x: float):
+        def y(x: float) -> float:
             return (
                 27 * self.big_radius**2 * x ** 4 / 4 -
                 27 * self.big_radius**2*self.thickness_x*x**3 +
@@ -34,6 +34,7 @@ class BezierParsecAirfoil:
             )
         
         
+        return y(0)
 
     def build(self, x_values: list[float]) -> Airfoil:
         y1 = 3*self.big_radius * (self.thickness_x - self.nose_radius)**2 / 2 + self.thickness_y
@@ -85,15 +86,15 @@ class BezierParsecAirfoil:
                 trailing_edge_camber,
             )
 
-        result = []
+        result: list[tuple[float, float]] = []
 
         for x in x_values:
             x_abs = abs(x)
             thickness = thickness_interpolation.get_value(x_abs)/2
             camber = camber_interpolation.get_value(x_abs)
             if x < 0:
-                result.append([x_abs, camber + thickness])
+                result.append((x_abs, camber + thickness))
             else:
-                result.append([x_abs, camber - thickness])
+                result.append((x_abs, camber - thickness))
 
         return Airfoil(result)

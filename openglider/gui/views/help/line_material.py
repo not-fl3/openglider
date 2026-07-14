@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 
 import openglider.lines.line_types  # ensure all line types are registered
@@ -10,7 +11,7 @@ from openglider.gui.qt import QtWidgets, QtCore
 logger = logging.getLogger(__name__)
 
 
-def _make_copy_handler(text: str):
+def _make_copy_handler(text: str) -> Callable[[bool], None]:
     def handler(checked: bool = False) -> None:
         QtWidgets.QApplication.clipboard().setText(text)
     return handler
