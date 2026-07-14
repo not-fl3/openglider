@@ -2,16 +2,15 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 
 if TYPE_CHECKING:
     import openglider.rs as rs
-    from rs.spline import (
-        BSplineCurve,
-        BezierCurve,
-        CubicBSplineCurve,
-        QuadBSplineCurve,
-        SymmetricBSplineCurve,
-        SymmetricBezierCurve,
-        SymmetricCubicBSplineCurve,
-        SymmetricQuadBSplineCurve,
-    )
+    BSplineCurve = rs.spline.BSplineCurve
+    BezierCurve = rs.spline.BezierCurve
+    CubicBSplineCurve = rs.spline.CubicBSplineCurve
+    QuadBSplineCurve = rs.spline.QuadBSplineCurve
+    SymmetricBSplineCurve = rs.spline.SymmetricBSplineCurve
+    SymmetricBezierCurve = rs.spline.SymmetricBezierCurve
+    SymmetricCubicBSplineCurve = rs.spline.SymmetricCubicBSplineCurve
+    SymmetricQuadBSplineCurve = rs.spline.SymmetricQuadBSplineCurve
+    
 else:
     BSplineCurve = Any
     BezierCurve = Any
