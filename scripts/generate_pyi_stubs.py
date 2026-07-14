@@ -18,12 +18,46 @@ SUBMODULE_STUB_ROOT = PACKAGE_ROOT / SUBMODULE_NAME
 ROOT_STUB_PATH = SUBMODULE_STUB_ROOT / "__init__.pyi"
 
 
+def _build_debug_extension() -> None:
+    subprocess.run(["cargo", "build", "--quiet", "--lib"], cwd=PROJECT_ROOT, check=True)
+
+
 def _find_extension_binary() -> Path:
     explicit_binary = os.environ.get("OPENGLIDER_RS_BINARY")
     if explicit_binary:
         candidate = Path(explicit_binary)
         if candidate.exists():
             return candidate
+
+    search_roots = [
+        PACKAGE_ROOT,
+        PROJECT_ROOT / "target" / "debug",
+    ]
+
+    def search_candidates() -> list[Path]:
+        extensions: list[Path] = []
+
+        for search_root in search_roots:
+            if not search_root.exists():
+                continue
+            for pattern in (
+                "rs*.pyd",
+                "rs*.so",
+                "rs*.dylib",
+                "rs*.dll",
+            ):
+                extensions.extend(search_root.rglob(pattern))
+
+        return sorted(set(extensions), key=lambda p: p.stat().st_mtime, reverse=True)
+
+    unique_extensions = search_candidates()
+    if unique_extensions:
+        return unique_extensions[0]
+
+    _build_debug_extension()
+    unique_extensions = search_candidates()
+    if unique_extensions:
+        return unique_extensions[0]
 
     # Prefer importable extension module filenames first, then rust dylibs as fallback.
     search_patterns = (
@@ -34,7 +68,6 @@ def _find_extension_binary() -> Path:
     )
 
     search_roots = [
-        PACKAGE_ROOT,
         PROJECT_ROOT / "build",
     ]
 
@@ -68,7 +101,7 @@ def _find_extension_binary() -> Path:
 
 
 def _run_introspection(binary_path: Path, output_dir: Path) -> None:
-    module_names = [MODULE_NAME, FALLBACK_MODULE_NAME]
+    module_names = [FALLBACK_MODULE_NAME, MODULE_NAME]
     last_error: subprocess.CalledProcessError | None = None
 
     for module_name in module_names:
