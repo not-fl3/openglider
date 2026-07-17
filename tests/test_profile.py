@@ -3,7 +3,7 @@ import tempfile
 import unittest
 import random
 
-from openglider.tests.common import import_dir
+from tests.helpers import import_dir
 from openglider.airfoil import Profile2D
 
 TEMPDIR =  tempfile.gettempdir()

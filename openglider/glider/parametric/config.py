@@ -132,7 +132,7 @@ class ParametricGliderConfig(ConfigTable):
     last_profile_height: float = 0
     
     use_sag: bool = True
-    baseline_pct: Percentage = Percentage(0.)
+    baseline_pct: Percentage | None = None
 
     version: VersionType = Version(__version__)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 import logging
 import math
 import numbers
@@ -219,8 +220,10 @@ def get_geometry_parametric(table: Table, cell_num: int, config: ParametricGlide
         key = table[0, column]
         if key not in curve_types:
             if key == "zrot":
+                warnings.warn("zrot is deprecated, use aoa instead", DeprecationWarning)
                 continue
-            raise ValueError(f"Invalid curve: {key}")
+            else:
+                raise ValueError(f"Invalid curve: {key}")
         points = []
         
         if table[0, column+1] is not None:

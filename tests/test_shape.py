@@ -1,5 +1,5 @@
 import unittest
-from openglider.tests.common import GliderTestCase
+from tests.helpers import GliderTestCase
 
 
 class GliderTestCase2D(GliderTestCase):

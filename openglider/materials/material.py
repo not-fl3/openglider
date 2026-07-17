@@ -12,7 +12,7 @@ class Material:
     color: str = ""
     color_code: str = "FFFFFF"
 
-    _regex_color = re.compile(r".*#([A-F0-9a-f]{6})")
+    _regex_color = re.compile(r"(.*)#([A-F0-9a-f]{6})")
 
     def __init__(self, **kwargs: Any):
         if "color_code" in kwargs:
@@ -23,8 +23,8 @@ class Material:
             match = self._regex_color.match(kwargs.get("name", ""))
 
             if match:
-                self._set_color_code(match.group(1))
-                
+                self._set_color_code(match.group(2))
+                kwargs["name"] = match.group(1)
         
         for arg, value in kwargs.items():
             if not hasattr(self, arg):

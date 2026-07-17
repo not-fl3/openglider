@@ -39,9 +39,9 @@ class ClothMaterialRow(QtWidgets.QWidget):
         copy_btn.clicked.connect(_make_copy_handler(copy_text))
 
         layout.addWidget(swatch)
+        layout.addWidget(copy_btn)
         layout.addWidget(name_label)
         layout.addStretch()
-        layout.addWidget(copy_btn)
 
 
 class ClothMaterialView(QtWidgets.QWidget):

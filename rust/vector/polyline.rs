@@ -316,6 +316,59 @@ pub(crate) fn polyline2d_cut_line(nodes: &[Vector2D], p1: Vector2D, p2: Vector2D
     intersections
 }
 
+fn polyline2d_cut_polyline(line1_nodes: &[Vector2D], line2_nodes: &[Vector2D]) -> Vec<(f64, f64)> {
+    let tolerance = 1e-5;
+    let mut intersections = Vec::new();
+
+    if line2_nodes.len() < 2 {
+        return intersections;
+    }
+
+    for index in 0..line2_nodes.len().saturating_sub(1) {
+        let cuts = polyline2d_cut_line(line1_nodes, line2_nodes[index], line2_nodes[index + 1]);
+        for cut in cuts {
+            if -tolerance < cut.1
+                && cut.1 < 1.0 + tolerance
+                && -tolerance < cut.0
+                && cut.0 < line1_nodes.len() as f64 - 1.0 + tolerance
+            {
+                intersections.push((cut.0, index as f64 + cut.1));
+            }
+        }
+    }
+
+    intersections
+}
+
+fn polyline2d_contains(nodes: &[Vector2D], point: Vector2D) -> bool {
+    if nodes.len() < 3 {
+        return false;
+    }
+
+    let mut inside = false;
+    let mut previous = *nodes.last().unwrap();
+    for current in nodes {
+        let intersects = ((current.y > point.y) != (previous.y > point.y))
+            && (point.x
+                < (previous.x - current.x) * (point.y - current.y)
+                    / (previous.y - current.y + 1e-18)
+                    + current.x);
+        if intersects {
+            inside = !inside;
+        }
+        previous = *current;
+    }
+
+    inside
+}
+
+fn polyline2d_subcurve(nodes: &[Vector2D], start: f64, end: f64) -> Vec<Vector2D> {
+    polyline_get_positions(nodes.len(), start, end)
+        .into_iter()
+        .map(|position| polyline_get(nodes, position))
+        .collect()
+}
+
 fn polyline_get_positions(node_count: usize, ik_start: f64, ik_end: f64) -> Vec<f64> {
     if node_count < 2 {
         return vec![ik_start, ik_end];
@@ -730,7 +783,103 @@ impl PolyLine2D {
         }
     }
 
-    fn bool_union(&self, other: &PolyLine2D) -> Vec<PolyLine2D> { vec![self.clone(), other.clone()] }
+    fn bool_intersection(&self, other: &PolyLine2D) -> Vec<PolyLine2D> {
+        type Cut = (f64, f64);
+
+        let mut result: Vec<PolyLine2D> = Vec::new();
+
+        let first = self.close();
+        let second = other.close();
+
+        let mut cuts = polyline2d_cut_polyline(&first.nodes, &second.nodes);
+
+        if cuts.is_empty() {
+            if !second.nodes.is_empty() && polyline2d_contains(&first.nodes, second.nodes[0]) {
+                result.push(second);
+            } else if !first.nodes.is_empty() && polyline2d_contains(&second.nodes, first.nodes[0]) {
+                result.push(first);
+            }
+
+            return result;
+        }
+
+        cuts.sort_by(|left, right| {
+            left.0
+                .partial_cmp(&right.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let mut start: Cut = (0.0, 0.0);
+        let mut end: Cut = (
+            first.nodes.len().saturating_sub(1) as f64,
+            second.nodes.len().saturating_sub(1) as f64,
+        );
+
+        if cuts.len() > 1 {
+            if cuts[0].1 > cuts[1].1 {
+                start.1 = second.nodes.len().saturating_sub(1) as f64;
+            }
+
+            let n = cuts.len();
+            if cuts[n - 1].1 < cuts[n - 2].1 {
+                end.1 = 0.0;
+            }
+        }
+
+        cuts.insert(0, start);
+        cuts.push(end);
+
+        let mut new_nodes: Vec<Vector2D> = Vec::new();
+
+        for index in 0..cuts.len().saturating_sub(1) {
+            let start_positions = cuts[index];
+            let end_positions = cuts[index + 1];
+
+            let mut ik_middle = (start_positions.0 + end_positions.0) / 2.0;
+            let first_inside_second =
+                polyline2d_contains(&second.nodes, polyline_get(&first.nodes, ik_middle));
+
+            ik_middle = (start_positions.1 + end_positions.1) / 2.0;
+            let second_inside_first =
+                polyline2d_contains(&first.nodes, polyline_get(&second.nodes, ik_middle));
+
+            let node_offset = if new_nodes.is_empty() { 0 } else { 1 };
+
+            if index > 0 && first_inside_second && second_inside_first {
+                let to_insert = polyline2d_subcurve(&first.nodes, start_positions.0, end_positions.0);
+                new_nodes.extend(to_insert);
+
+                let to_insert = polyline2d_subcurve(&second.nodes, end_positions.1, start_positions.1);
+                if to_insert.len() > 1 {
+                    new_nodes.extend_from_slice(&to_insert[1..]);
+                }
+
+                result.push(PolyLine2D { nodes: new_nodes }.close());
+                new_nodes = Vec::new();
+            } else if first_inside_second {
+                let to_insert = polyline2d_subcurve(&first.nodes, start_positions.0, end_positions.0);
+                if to_insert.len() > node_offset {
+                    new_nodes.extend_from_slice(&to_insert[node_offset..]);
+                }
+            } else if second_inside_first {
+                let to_insert = polyline2d_subcurve(&second.nodes, start_positions.1, end_positions.1);
+                if to_insert.len() > node_offset {
+                    new_nodes.extend_from_slice(&to_insert[node_offset..]);
+                }
+            }
+        }
+
+        if !new_nodes.is_empty() {
+            result.push(PolyLine2D { nodes: new_nodes });
+        }
+
+        result
+    }
+
+    fn bool_union(&self, other: &PolyLine2D) -> Vec<PolyLine2D> {
+        // TODO: apply real name
+        self.bool_intersection(other)
+    }
     fn fix_errors(&self) -> Self {
         Self {
             nodes: polyline2d_fix_errors(&self.nodes),
@@ -753,7 +902,7 @@ impl PolyLine2D {
             let next = (index + 1) % self.nodes.len();
             area += self.nodes[index].x * self.nodes[next].y - self.nodes[next].x * self.nodes[index].y;
         }
-        0.5 * area
+        0.5 * area.abs()
     }
 
     fn boundary(&self) -> Vec<Vector2D> { self.nodes.clone() }

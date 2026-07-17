@@ -408,6 +408,10 @@ class LineSet:
 
         return lines
 
+    def get_upper_nodes(self, node: Node) -> list[Node]:
+        """Return all reachable upper attachment nodes above a start node."""
+        return [line.upper_node for line in self.get_upper_lines(node) if line.upper_node.node_type == Node.NODE_TYPE.UPPER]
+
     def get_lower_connected_lines(self, node: Node) -> list[Line]:
         return [line for line in self.lines if line.upper_node is node]
 

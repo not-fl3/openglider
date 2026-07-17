@@ -1,2 +1,3 @@
 include Cargo.toml
+recursive-include openglider *.svg *.png *.qss *.ods *.dat *.json
 recursive-include rust *.rs

@@ -321,8 +321,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.top_panel.setCurrentIndex(0)
 
     def load_demokite(self) -> None:
-        import openglider.tests
-        filename = openglider.tests.get_demokite_path()
+        import openglider
+        filename = openglider.get_demokite_path()
         asyncio.ensure_future(self.load_glider(filename))
 
 

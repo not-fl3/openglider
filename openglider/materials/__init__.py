@@ -42,11 +42,15 @@ class MaterialRegistry:
         return out
     
     def get(self, name: str) -> Material:
-        name = name.lower()
-        if name in self.materials:
-            return self.materials[name]
+        name_clean = name.lower()
+
+        if match := self.base_type._regex_color.match(name_clean):
+            name_clean = match.group(1)
+
+        if name_clean in self.materials:
+            return self.materials[name_clean]
         
-        name_parts = name.split(".")
+        name_parts = name_clean.split(".")
         name_parts_len = len(name_parts)
         for material in self.materials:
             short_name = material.split(".")[:name_parts_len]

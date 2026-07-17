@@ -1,0 +1,3 @@
+from .vector import PolyLine2D, Vector2D
+from collections.abc import Sequence
+def voronoi_areas(outline: PolyLine2D, inside: Sequence[Vector2D]) -> list[PolyLine2D |None]: ...

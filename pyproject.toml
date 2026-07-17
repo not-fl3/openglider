@@ -65,7 +65,18 @@ include-package-data = false
 version = {attr = "openglider.version.__version__"}
 
 [tool.setuptools.package-data]
-"*" = ["py.typed", "*.pyi", "rs/*.pyi", "*.csv", "*.svg", "tests/common/*.ods"]
+openglider = [
+    "py.typed",
+    "*.pyi",
+    "rs/*.pyi",
+    "*.csv",
+    "**/*.svg",
+    "**/*.png",
+    "**/*.qss",
+    "**/*.ods",
+    "**/*.dat",
+    "**/*.json",
+]
 
 [tool.setuptools.packages.find]
 include = ["openglider*"]

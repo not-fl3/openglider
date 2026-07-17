@@ -54,7 +54,7 @@ class ParametricShape:
 
     @property
     def baseline(self) -> openglider.rs.vector.PolyLine2D:
-        return self.get_baseline(self.config.baseline_pct)
+        return self.get_baseline(self.config.baseline_pct or Percentage(0.))
 
     def get_baseline(self, pct: Percentage) -> openglider.rs.vector.PolyLine2D:
         shape = self.get_half_shape()
@@ -165,12 +165,15 @@ class ParametricShape:
             p2[0] = - p2[0]
             back.insert(0, p2)
 
-        base_shape = Shape(openglider.rs.vector.PolyLine2D(front), openglider.rs.vector.PolyLine2D(back))
+        base_shape = Shape(
+            front=openglider.rs.vector.PolyLine2D(front),
+            back=openglider.rs.vector.PolyLine2D(back)
+        )
 
         if zrot is None:
             return base_shape
         
-        baseline = base_shape.get_baseline(self.config.baseline_pct).nodes
+        baseline = base_shape.get_baseline(self.config.baseline_pct or Percentage(0.)).nodes
         front_new: list[openglider.rs.vector.Vector2D] = []
         back_new: list[openglider.rs.vector.Vector2D] = []
 
@@ -188,8 +191,8 @@ class ParametricShape:
                 )
         
         return Shape(
-            openglider.rs.vector.PolyLine2D(front_new),
-            openglider.rs.vector.PolyLine2D(back_new)
+            front=openglider.rs.vector.PolyLine2D(front_new),
+            back=openglider.rs.vector.PolyLine2D(back_new)
         )
 
 

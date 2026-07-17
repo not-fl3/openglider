@@ -210,7 +210,10 @@ class ShapePlot:
         shape = shapes[left]
 
         if pct is None:
-            pct = self.glider_2d.config.baseline_pct.si
+            if self.glider_2d.config.baseline_pct is None:
+                pct = 0
+            else:
+                pct = self.glider_2d.config.baseline_pct.si
 
         part = PlotPart()
         

@@ -1,8 +1,18 @@
 #!/bin/env python
 
 from optparse import OptionParser
+from pathlib import Path
 import sys
 import unittest
+
+
+SCRIPT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_ROOT.parent
+
+import openglider
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 def test() -> None:
@@ -10,7 +20,7 @@ def test() -> None:
     parser.add_option("-n", "--num", default=1, help="Number of loops")
     parser.add_option("-a", "--run_all", action='store_true', help="Run all tests (including visual)")
     parser.add_option("-p", "--pattern", help="Run a custom Pattern to find")
-    parser.add_option("-f", "--folder", default="openglider/tests")
+    parser.add_option("-f", "--folder", default=".")
     parser.add_option("-v", "--verbose", default=0)
 
     args = parser.parse_args()[0]
@@ -22,7 +32,8 @@ def test() -> None:
     else:
         pattern = "test*.py"
 
-    loader = unittest.TestLoader().discover(args.folder, pattern)
+    start_dir = SCRIPT_ROOT / args.folder
+    loader = unittest.TestLoader().discover(str(start_dir), pattern)
 
     for i in range(int(args.num)):
         print("\n\n>>> Running ("+str(i+1)+"/"+str(args.num)+")")
@@ -35,7 +46,11 @@ def test() -> None:
 
 def test_typings() -> int:
     import mypy.api
-    stdout, _, return_value = mypy.api.run(["--config-file", "mypy.ini", "openglider"])
+    stdout, _, return_value = mypy.api.run([
+        "--config-file",
+        str(PROJECT_ROOT / "mypy.ini"),
+        str(PROJECT_ROOT / "openglider"),
+    ])
     print(stdout)
     return return_value
     

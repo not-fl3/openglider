@@ -6,7 +6,7 @@ import openglider
 import openglider.plots
 import openglider.plots.glider
 from openglider.vector.drawing import Layout
-from openglider.tests.common import GliderTestCase
+from tests.helpers import GliderTestCase
 
 
 TEMPDIR =  tempfile.gettempdir()

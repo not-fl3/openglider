@@ -1,7 +1,7 @@
 import unittest
 
 import tempfile
-from openglider.tests.common import GliderTestCase
+from tests.helpers import GliderTestCase
 from openglider import jsonify
 
 TEMPDIR =  tempfile.gettempdir()

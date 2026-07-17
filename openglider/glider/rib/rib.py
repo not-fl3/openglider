@@ -37,6 +37,10 @@ class RibBase(BaseModel):
 
     name: str = "unnamed rib"
 
+    @property
+    def nose(self) -> openglider.rs.vector.Vector3D:
+        raise NotImplementedError()
+
     def align_all(self, data: openglider.rs.vector.PolyLine2D, scale: bool=True) -> openglider.rs.vector.PolyLine3D:
         """align 2d coordinates to the 3d pos of the rib"""
         if not isinstance(data, openglider.rs.vector.PolyLine2D):
@@ -45,7 +49,7 @@ class RibBase(BaseModel):
         if scale:
             return self.transformation.apply_polyline(data)
         else:
-            return self.rotation_matrix.apply_polyline(data).move(self.pos)
+            return self.rotation_matrix.apply_polyline(data).move(self.nose)
 
     def align(self, point: openglider.rs.vector.Vector2D, scale: bool=True) -> openglider.rs.vector.Vector3D:
         if not isinstance(point, openglider.rs.vector.Vector2D):
@@ -54,7 +58,7 @@ class RibBase(BaseModel):
         if scale:
             return self.transformation.apply(point)
         else:
-            return self.rotation_matrix.apply(point) + self.pos
+            return self.rotation_matrix.apply(point) + self.nose
 
     def align_x(self, x_value: float) -> openglider.rs.vector.Vector3D:
         ik = self.profile_2d(x_value)
@@ -133,6 +137,15 @@ class Rib(RibBase):
     hole_naming_scheme: ClassVar[str] = "{rib.name}h{}"
     rigid_naming_scheme: ClassVar[str] = "{rib.name}r{}"
 
+    rotation_position: Percentage | None = None
+
+    @property
+    def nose(self) -> openglider.rs.vector.Vector3D:
+        if self.rotation_position is not None:
+            return self.pos + self.rotation_matrix.apply(openglider.rs.vector.Vector3D([-self.rotation_position.si * self.chord, 0, 0]))
+        else:
+            return self.pos
+
     def convert_to_percentage(self, value: Percentage | Length) -> Percentage:
         if isinstance(value, Percentage):
             return value
@@ -160,7 +173,7 @@ class Rib(RibBase):
     def rotation_matrix(self) -> openglider.rs.vector.Transformation:  # type: ignore
         return rib_rotation(self.aoa_absolute, self.arcang, self.zrot, self.xrot)
 
-    @cached_property('arcang', 'glide', 'zrot', 'xrot', 'aoa_absolute', 'chord', 'pos', 'offset')
+    @cached_property('arcang', 'glide', 'zrot', 'xrot', 'aoa_absolute', 'chord', 'pos', 'offset', 'rotation_position')
     def transformation(self) -> openglider.rs.vector.Transformation:  # type: ignore
         if self.offset is None:
             offset = openglider.rs.vector.Vector3D([0, 0, 0])
@@ -170,6 +183,11 @@ class Rib(RibBase):
             zoffset = self.convert_to_chordlength(self.offset[2]).si
 
             offset = openglider.rs.vector.Vector3D([xoffset, yoffset, zoffset])
+
+        if self.rotation_position is not None:
+            offset += openglider.rs.vector.Vector3D([-self.rotation_position.si * self.chord, 0, 0])
+            #offset = openglider.rs.vector.Vector3D([0, 0.1, 0])
+
         return rib_transformation(self.aoa_absolute, self.arcang, self.zrot, self.xrot, self.chord, self.pos, offset)
     
     def rename_parts(self) -> None:

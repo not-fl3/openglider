@@ -5,6 +5,7 @@ import math
 from typing import TYPE_CHECKING, TypeAlias
 
 import openglider.rs
+from openglider.utils.dataclass import BaseModel
 from openglider.vector.drawing import Layout, PlotPart
 from openglider.vector.unit import Percentage
 
@@ -16,15 +17,9 @@ logger = logging.getLogger(__name__)
 
 V2: TypeAlias = openglider.rs.vector.Vector2D
 
-class Shape:
-    def __init__(self, front: openglider.rs.vector.PolyLine2D, back: openglider.rs.vector.PolyLine2D) -> None:
-        # TODO: REMOVE
-        if not isinstance(front, openglider.rs.vector.PolyLine2D):
-            front = openglider.rs.vector.PolyLine2D(list(front))
-        if not isinstance(back, openglider.rs.vector.PolyLine2D):
-            back = openglider.rs.vector.PolyLine2D(list(back))
-        self.front = front
-        self.back = back
+class Shape(BaseModel):
+    front: openglider.rs.vector.PolyLine2D
+    back: openglider.rs.vector.PolyLine2D
 
     @property
     def has_center_cell(self) -> bool:
@@ -113,7 +108,10 @@ class Shape:
         return self
     
     def copy(self) -> Shape:
-        return Shape(self.front.copy(), self.back.copy())
+        return Shape(
+            front=self.front.copy(),
+            back=self.back.copy()
+        )
 
     def copy_complete(self) -> Shape:
         front = self.front.mirror().reverse()
@@ -127,7 +125,62 @@ class Shape:
         front_nodes = front.nodes + self.front.copy().nodes[start:]
         back_nodes = back.nodes + self.back.copy().nodes[start:]
 
-        return Shape(openglider.rs.vector.PolyLine2D(front_nodes), openglider.rs.vector.PolyLine2D(back_nodes))
+        return Shape(
+            front=openglider.rs.vector.PolyLine2D(front_nodes),
+            back=openglider.rs.vector.PolyLine2D(back_nodes)
+        )
+
+    @staticmethod
+    def _close_polyline(polyline: openglider.rs.vector.PolyLine2D) -> openglider.rs.vector.PolyLine2D:
+        nodes = list(polyline.nodes)
+        if nodes and nodes[0] != nodes[-1]:
+            nodes.append(nodes[0])
+        return openglider.rs.vector.PolyLine2D(nodes)
+
+    def _get_symmetric_outline(self) -> openglider.rs.vector.PolyLine2D:
+        front_nodes = list(self.front.nodes)
+        back_nodes = list(self.back.nodes)
+
+        if front_nodes and abs(float(front_nodes[0][0])) > 1e-12:
+            front_nodes[0] = openglider.rs.vector.Vector2D([0.0, float(front_nodes[0][1])])
+        if back_nodes and abs(float(back_nodes[0][0])) > 1e-12:
+            back_nodes[0] = openglider.rs.vector.Vector2D([0.0, float(back_nodes[0][1])])
+
+        outline_nodes = front_nodes + back_nodes[::-1]
+        return self._close_polyline(openglider.rs.vector.PolyLine2D(outline_nodes))
+
+    def get_attachment_point_areas(
+        self,
+        attachment_points: list[tuple[str, openglider.rs.vector.Vector2D]],
+    ) -> dict[str, openglider.rs.vector.PolyLine2D | None]:
+        if not attachment_points:
+            return {}
+
+        outline = self._get_symmetric_outline()
+        names_by_position: dict[tuple[float, float], list[str]] = {}
+        unique_points: list[openglider.rs.vector.Vector2D] = []
+
+        for name, point in attachment_points:
+            key = (float(point[0]), float(point[1]))
+            if key not in names_by_position:
+                unique_points.append(openglider.rs.vector.Vector2D([key[0], key[1]]))
+                names_by_position[key] = []
+            names_by_position[key].append(name)
+
+        voronoi_areas = openglider.rs.voronoi.voronoi_areas(outline, unique_points)
+
+        result: dict[str, openglider.rs.vector.PolyLine2D | None] = {}
+        for point, area in zip(unique_points, voronoi_areas):
+            key = (float(point[0]), float(point[1]))
+
+            closed_area: openglider.rs.vector.PolyLine2D | None = None
+            if area is not None:
+                closed_area = self._close_polyline(area)
+
+            for name in names_by_position.get(key, []):
+                result[name] = closed_area.copy() if closed_area is not None else None
+
+        return result
 
     def _repr_svg_(self) -> str:
         da = Layout()

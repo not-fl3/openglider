@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 mod mesh;
 mod plane;
 mod spline;
+mod voronoi;
 mod vector;
 mod cell;
 
@@ -46,6 +47,8 @@ mod rs {
     use crate::plane::plane_mod as plane;
     #[pymodule_export]
     use crate::spline::spline_mod as spline;
+    #[pymodule_export]
+    use crate::voronoi::voronoi_mod as voronoi;
     #[pymodule_export]
     use crate::vector::vector_mod as vector;
 }

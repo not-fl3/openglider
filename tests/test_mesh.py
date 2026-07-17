@@ -1,7 +1,7 @@
 import unittest
 
 
-from openglider.tests.common import GliderTestCase
+from tests.helpers import GliderTestCase
 
 from openglider.mesh import Mesh, Vertex, Polygon
 from openglider.utils.distribution import Distribution

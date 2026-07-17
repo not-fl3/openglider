@@ -1,7 +1,8 @@
-from typing import Any
+from typing import Any, Self
 import logging
 from openglider.glider.parametric.table.base.dto import DTO
 
+from openglider.glider.parametric.table.base.parser import Parser
 from openglider.glider.rib.sharknose import Sharknose
 from openglider.glider.parametric.table.base import RibTable, Keyword
 from openglider.vector.unit import Angle, Length, Percentage
@@ -34,6 +35,13 @@ class Sharknose8(SharknoseDTO):
 class SharknoseWithWebbing(Sharknose8):
     straight_reinforcement_allowance: Length
 
+class ProfileModifierDTO(DTO):
+    thickness_factor: float
+    merge_factor: float | None
+
+    def get_object(self) -> Self:
+        return self
+
 class ProfileModifierTable(RibTable):
     keywords = {
         "ProfileFactor": Keyword(attributes=["thickness_factor"], target_cls=FloatDict),
@@ -45,6 +53,7 @@ class ProfileModifierTable(RibTable):
         "Sharknose": SharknoseDTO,
         "Sharknose8": Sharknose8,
         "SharknoseWithWebbing": SharknoseWithWebbing,
+        "ProfileModifier": ProfileModifierDTO
     }
 
     def get_sharknose(self, row_no: int, **kwargs: Any) -> Sharknose | None:
@@ -62,9 +71,10 @@ class ProfileModifierTable(RibTable):
         
         return None
     
-    def get_factors(self, row_no: int) -> tuple[float | None, float | None]:
+    def get_factors(self, row_no: int, resolvers: list[Parser]) -> tuple[float | None, float | None]:
         merge_factors = self.get(row_no, keywords=["ProfileMerge"])
         scale_factors = self.get(row_no, keywords=["ProfileFactor"])
+        modifier: ProfileModifierDTO | None = self.get_one(row_no, keywords=["ProfileModifier"], resolvers=resolvers)
 
         merge = None
         scale = None
@@ -74,6 +84,10 @@ class ProfileModifierTable(RibTable):
         
         if len(scale_factors):
             scale = scale_factors[-1]["thickness_factor"]
+        
+        if modifier is not None:
+            merge = modifier.merge_factor
+            scale = modifier.thickness_factor
 
         return merge, scale
 

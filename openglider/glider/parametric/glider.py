@@ -354,16 +354,13 @@ class ParametricGlider:
         return parsers
     
     def get_profiles(self, num_profile: int | None=None) -> list[Profile2D]:
+        resolvers = self.resolvers
         num_profile = num_profile or self.num_profile
 
         if num_profile is not None:
             airfoil_distribution = list(Distribution.from_cos_distribution(num_profile))
         else:
-            airfoil_distribution = self.profiles[0].x_values
-
-        balloonings = None
-        if self.config.use_mean_profile:
-            balloonings = self.apply_ballooning()
+            airfoil_distribution = self.profiles[0].x_values            
 
         x_values = self.shape.rib_x_values
         cell_widths = [x2-x1 for x2, x1 in zip(x_values[:-1], x_values[1:])]
@@ -378,7 +375,7 @@ class ParametricGlider:
         result: list[Profile2D] = []
 
         for rib_no, x_value in enumerate(x_values):
-            merge_factor, scale_factor = self.tables.profile_modifiers.get_factors(rib_no)
+            merge_factor, scale_factor = self.tables.profile_modifiers.get_factors(rib_no, resolvers=resolvers)
 
             if merge_factor is not None:
                 factor = merge_factor
@@ -392,7 +389,7 @@ class ParametricGlider:
                 profile = profile.set_thickness(profile.thickness * scale_factor)
             
             if self.config.use_mean_profile:
-                assert balloonings is not None  # satisfy type-checker
+                balloonings = self.apply_ballooning()
 
                 if rib_no == 0 and not self.shape.has_center_cell:
                     # center rib => use only the ballooning from the outside
@@ -424,7 +421,6 @@ class ParametricGlider:
             mirrored_profile = result[0].copy()
             result.insert(0, mirrored_profile)
 
-
         return result
 
     def get_glider_3d(self, glider: Glider=None, num: int=50, num_profile: int | None=None) -> Glider:
@@ -440,6 +436,7 @@ class ParametricGlider:
 
         x_values = self.shape.rib_x_values
         shape_ribs = self.shape.ribs
+        rib_positions = self.shape.baseline
 
         aoa_values = self.get_aoa()
 
@@ -447,16 +444,19 @@ class ParametricGlider:
         rib_angles = self.arc.get_rib_angles(x_values)
         profiles = self.get_profiles(num_profile=num_profile)
 
+        # set front to 0,0,0
         offset_x = shape_ribs[0][0][1]
 
         logger.info("create ribs")
 
         for rib_no, x_value in enumerate(x_values):
             front, back = shape_ribs[rib_no]
+            shape_pos = rib_positions[rib_no]
             arc = arc_pos[rib_no]
             profile = profiles[rib_no]
 
-            startpoint = openglider.rs.vector.Vector3D([-front[1] + offset_x, arc[0], arc[1]])
+            #startpoint = openglider.rs.vector.Vector3D([-front[1] + offset_x, arc[0], arc[1]])
+            startpoint = openglider.rs.vector.Vector3D([-shape_pos[1] + offset_x, arc[0], arc[1]])
 
             try:
                 material = self.tables.material_ribs.get(rib_no)[0]
@@ -481,6 +481,7 @@ class ParametricGlider:
             rib = Rib(
                 profile_2d=profile,
                 pos=startpoint,
+                rotation_position=self.config.baseline_pct,
                 chord=chord,
                 arcang=rib_angles[rib_no],
                 xrot=rotation.x,

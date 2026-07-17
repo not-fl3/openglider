@@ -1,6 +1,6 @@
 import tempfile
 
-from openglider.tests.common import GliderTestCase, os, unittest
+from tests.helpers import GliderTestCase, os, unittest
 from openglider.plots import PlotMaker
 from openglider import jsonify
 

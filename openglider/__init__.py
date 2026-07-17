@@ -1,12 +1,15 @@
 import os
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from openglider.version import __version__
 from openglider.config import config
 import openglider.jsonify
 import openglider.glider
+
+if TYPE_CHECKING:
+    import openglider.glider
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +32,17 @@ def load(filename: str) -> Any:
     return res
 
 
+def get_demokite_path() -> str:
+    import os
+    filename = os.path.join(os.path.dirname(__file__), "demokite.ods")
+
+    return filename
+
 def load_demokite() -> openglider.glider.GliderProject:
-    import openglider.tests
-    filename =  openglider.tests.get_demokite_path()
+    filename =  get_demokite_path()
 
     if not os.path.isfile(filename):
-        raise FileNotFoundError()
+        raise FileNotFoundError(f"Demokite file not found: {filename}")
 
     return load(filename)
 

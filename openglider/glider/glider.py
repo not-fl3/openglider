@@ -327,7 +327,10 @@ class Glider:
             front.append(openglider.rs.vector.Vector2D([x, y_front]))
             back.append(openglider.rs.vector.Vector2D([x, y_back]))
 
-        return Shape(openglider.rs.vector.PolyLine2D(front), openglider.rs.vector.PolyLine2D(back))
+        return Shape(
+            front=openglider.rs.vector.PolyLine2D(front),
+            back=openglider.rs.vector.PolyLine2D(back)
+        )
 
     @property
     def shape_flattened(self) -> Shape:
@@ -337,7 +340,10 @@ class Glider:
         front, back = flatten_list(self.get_spanwise(0), self.get_spanwise(1))
         zero = openglider.rs.vector.Vector2D([0,0])
 
-        return Shape(front.rotate(-math.pi/2, zero), back.rotate(-math.pi/2, zero))
+        return Shape(
+            front=front.rotate(-math.pi/2, zero),
+            back=back.rotate(-math.pi/2, zero)
+        )
 
     @property
     def ribs(self) -> list[Rib]:

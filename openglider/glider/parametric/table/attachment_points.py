@@ -63,6 +63,9 @@ class ATPPROTO5(ATP):
     protoloop_distance: Percentage | Length
     protoloops: int
 
+class ATPPROTO6(ATPPROTO5):
+    type_name: str
+
 class ATPSingleSkin(ATP):
     angle_front: Angle
     angle_back: Angle
@@ -84,8 +87,6 @@ class ATPSingleSkin(ATP):
                 force=force
             )
 
-# TODO: add DTO*s and ATPPROTO5 (with protoloop count)
-
 class AttachmentPointTable(RibTable):
     regex_node_layer = re.compile(r"([a-zA-Z]*)([0-9]*)")
 
@@ -97,6 +98,7 @@ class AttachmentPointTable(RibTable):
         "ATP4": ATP4,
         "ATPPROTO": ATPPROTO,
         "ATPPROTO5": ATPPROTO5,
+        "ATPPROTO6": ATPPROTO6,
         "ATPSingleSkin": ATPSingleSkin
         #"AHP": ATP,
     }

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
+from importlib import resources
 
 from openglider.gui.qt import QtWidgets, QtCore
 
-_SIDEBAR_STYLE = (Path(__file__).parent / "vertical_tabs.qss").read_text()
+_SIDEBAR_STYLE = resources.files(__package__).joinpath("vertical_tabs.qss").read_text()
 
 
 class VerticalTabs(QtWidgets.QWidget):
