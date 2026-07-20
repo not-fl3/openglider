@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, dataclass_transform
 from collections.abc import Callable, Iterator
+from itertools import count
 import openglider.rs
 import weakref
 
@@ -14,6 +15,9 @@ from pydantic import ConfigDict, Field  # export Field
 from dataclasses import dataclass as dc, replace
 
 from openglider.utils.cache import CachedProperty, hash_list
+
+
+_cache_uid_counter = count()
 
 if TYPE_CHECKING:
     from pydantic.dataclasses import Dataclass
@@ -105,6 +109,7 @@ class BaseModel(pydantic.BaseModel):
         extra="forbid"
         )
 
+    _cache_uid: int = PrivateAttr(default_factory=lambda: next(_cache_uid_counter))
     _cache_version: int = PrivateAttr(default=0)
     _cache_ready: bool = PrivateAttr(default=False)
     _cache_parents: list[weakref.ReferenceType[BaseModel]] = PrivateAttr(default_factory=list)
@@ -181,7 +186,7 @@ class BaseModel(pydantic.BaseModel):
 
     def __hash__(self) -> int:
         if self.cache_versioned:
-            return hash((self.__class__, id(self), self._cache_version))
+            return hash((self.__class__, self._cache_uid, self._cache_version))
 
         return hash_list(*self.dict().values())
     

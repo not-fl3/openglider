@@ -196,7 +196,8 @@ def hash_attributes(class_instance: CLS, hashlist: list[str], exclude: list[str]
     """
     http://effbot.org/zone/python-hash.htm
     """
-    value_lst: tuple[int,...] = (id(class_instance), )
+    cache_uid = getattr(class_instance, "_cache_uid", None)
+    value_lst: tuple[int,...] = (cache_uid if cache_uid is not None else id(class_instance), )
 
     if len(hashlist) == 1 and hashlist[0] in ("self", "*") and exclude is not None:
         for key, value in class_instance.__dict__.items():

@@ -37,8 +37,8 @@ class CellAttachmentPoint(Node):
     
     @classmethod
     def __from_json__(cls, **kwargs: Any) -> CellAttachmentPoint:
-        force = openglider.rs.vector.Vector3D(kwargs.pop("force"))
-        return cls(**kwargs, force=force)
+        kwargs["force"] = openglider.rs.vector.Vector3D(kwargs["force"])
+        return super().__from_json__(**kwargs)
 
     @classmethod
     def calculate_force_cell_aligned(cls, cell: Cell, force: float) -> openglider.rs.vector.Vector3D:

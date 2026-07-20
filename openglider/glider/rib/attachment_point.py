@@ -82,7 +82,7 @@ class AttachmentPoint(Node):
     @classmethod
     def __from_json__(cls, **data: Any) -> AttachmentPoint:
         data["force"] = openglider.rs.vector.Vector3D(data["force"])
-        return AttachmentPoint(**data)
+        return super().__from_json__(**data)
     
     def cache_hash(self) -> int:
         return hash(self.rib_pos)
