@@ -312,7 +312,7 @@ class Cell(BaseModel):
         
         return ballooning
 
-    @cached_property('ballooning_modified')
+    @cached_property('ballooning_modified', 'rib1.profile_2d.x_values', 'rib2.profile_2d.x_values')
     def ballooning_phi(self) -> HashedList[float]:
         # get ballooning arc angles for each x value of the profiles
 

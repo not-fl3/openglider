@@ -20,7 +20,7 @@ solver = xfoil.Solver()
 class Profile2D:
     noseindex: int
     name: str
-    curve: openglider.rs.vector.PolyLine2D
+    _curve: openglider.rs.vector.PolyLine2D
     
     ncrit = 4
     xtr_top = 0.5
@@ -29,11 +29,15 @@ class Profile2D:
     def __init__(self, data: Sequence[openglider.rs.vector.Vector2D | tuple[float, float]] | openglider.rs.vector.PolyLine2D, name: str="unnamed") -> None:
         self.name = name
         if isinstance(data, openglider.rs.vector.PolyLine2D):
-            self.curve = data
+            self._curve = data
         else:
-            self.curve = openglider.rs.vector.PolyLine2D(data)
+            self._curve = openglider.rs.vector.PolyLine2D(data)
 
         self._setup()
+
+    @property
+    def curve(self) -> openglider.rs.vector.PolyLine2D:
+        return self._curve
 
     def _setup(self) -> None:
         i = 0
@@ -373,10 +377,8 @@ class Profile2D:
             result = -result
         return result
 
-    def apply_function(self, foo: Callable[..., openglider.rs.vector.Vector2D]) -> None:
-        self.curve = openglider.rs.vector.PolyLine2D(
-            [foo(p, upper=i<self.noseindex) for i, p in enumerate(self.curve.nodes)]
-        )
+    def apply_function(self, fn: Callable[[openglider.rs.vector.Vector2D, bool], openglider.rs.vector.Vector2D]) -> Self:
+        return type(self)([fn(p, upper=i<self.noseindex) for i, p in enumerate(self.curve.nodes)])
 
     @classmethod
     def fetch(cls, name: str='atr72sm', base_url: str='http://m-selig.ae.illinois.edu/ads/coord/{name}.dat') -> Self:
