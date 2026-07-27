@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, Any, Self, TypeAlias
 
 import openglider.rs
 from openglider.utils.dataclass import BaseModel
@@ -107,8 +107,8 @@ class Shape(BaseModel):
 
         return self
     
-    def copy(self) -> Shape:
-        return Shape(
+    def copy(self, *args: Any, **kwargs: Any) -> Self:
+        return self.__class__(
             front=self.front.copy(),
             back=self.back.copy()
         )

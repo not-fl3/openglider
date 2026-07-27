@@ -3,7 +3,6 @@ import asyncio
 
 import os
 import pathlib
-import subprocess
 import tempfile
 from typing import Any
 import logging
@@ -12,7 +11,7 @@ import openglider
 from openglider.gui.icons import icon
 from openglider.glider.project import GliderProject
 from openglider.gui.state.glider_list import GliderListItem, GliderList
-from openglider.gui.qt import QtWidgets
+from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.gui.widgets.list_select.item import ListWidgetItem, ListItemWidget
 from openglider.gui.widgets.list_select.list import GenericListWidget
 
@@ -56,7 +55,7 @@ class GliderListWidgetItemWidget(ListItemWidget[GliderProject]):
         else:
             filename = self.list_item.element.filename
 
-        subprocess.call(["xdg-open", filename])
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(filename))
 
 
     def save(self) -> str | None:

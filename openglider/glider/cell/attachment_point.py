@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import openglider.rs
 from pydantic import Field
@@ -36,7 +36,7 @@ class CellAttachmentPoint(Node):
         }
     
     @classmethod
-    def __from_json__(cls, **kwargs: Any) -> CellAttachmentPoint:
+    def __from_json__(cls, **kwargs: Any) -> Self:
         kwargs["force"] = openglider.rs.vector.Vector3D(kwargs["force"])
         return super().__from_json__(**kwargs)
 

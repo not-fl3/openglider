@@ -57,7 +57,7 @@ def _discover_plugins() -> list[str]:
 
     try:
         for dist in importlib.metadata.distributions():
-            name = dist.metadata.get("Name") or dist.name
+            name = dist.metadata.get("Name", dist.name)
             if not name:
                 continue
 

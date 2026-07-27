@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from collections.abc import Callable
 
 from openglider.mesh.mesh import Mesh
 from openglider.gui.app.app import GliderApp
@@ -25,7 +26,7 @@ class Glider3DCache(GliderCache[GliderActors]):
 
 
 class DropView3D(View3D):
-    def __init__(self, parent: QtWidgets.QWidget, on_obj_drop) -> None:
+    def __init__(self, parent: QtWidgets.QWidget, on_obj_drop: Callable[[str], None]) -> None:
         super().__init__(parent)
         self.on_obj_drop = on_obj_drop
         self.setAcceptDrops(True)

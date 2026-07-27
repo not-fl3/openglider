@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, TypeAlias
 
 from openglider.glider.project import GliderProject
 from openglider.glider.rib import SingleSkinRib
-from openglider.gui.qt import QtCore, QtWidgets
+from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.gui.views_2d import Canvas, LayoutGraphics
 from openglider.gui.wizzards.base import Wizard
 from openglider.plots import Patterns
@@ -254,4 +254,4 @@ class PatternTask(Task):
     async def run(self) -> None:
         logger.info("patterns running")
         await self.execute(self.patterns.unwrap, self.directory)  # type: ignore
-        os.system(f"xdg-open {self.directory}")
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(self.directory))

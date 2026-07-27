@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 import logging
 
 import openglider.rs
@@ -80,7 +80,7 @@ class AttachmentPoint(Node):
         }
     
     @classmethod
-    def __from_json__(cls, **data: Any) -> AttachmentPoint:
+    def __from_json__(cls, **data: Any) -> Self:
         data["force"] = openglider.rs.vector.Vector3D(data["force"])
         return super().__from_json__(**data)
     

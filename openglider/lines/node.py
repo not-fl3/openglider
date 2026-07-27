@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import enum
-from typing import Any
+from typing import Any, Self
 
 import openglider.rs
 from typing import ClassVar
@@ -37,7 +37,7 @@ class Node(BaseModel):
         }
     
     @classmethod
-    def __from_json__(cls, **kwargs: Any) -> Node:
+    def __from_json__(cls, **kwargs: Any) -> Self:
         node_type_name: str = kwargs.pop("node_type")
         node_type: NODE_TYPE_ENUM = getattr(NODE_TYPE_ENUM, node_type_name)
 

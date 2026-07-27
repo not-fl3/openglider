@@ -28,6 +28,8 @@ class GliderPreview(QtWidgets.QWidget):
         self.setLayout(QtWidgets.QHBoxLayout())
         self.tabs_widget = QtWidgets.QTabWidget(self)
 
+        self.view_3d = Glider3DView(app)
+
         self.tabs = {
             "Shape": ShapeView(app),
             "Arc": ArcView(app),
@@ -38,7 +40,7 @@ class GliderPreview(QtWidgets.QWidget):
             "Table": GliderTable(app),
             "Lines": GliderLineSetTable(app),
             "Straps": GliderStrapTable(app),
-            "3D": Glider3DView(app)
+            "3D": self.view_3d
         }
         self.tab_names = list(self.tabs.keys())
 
