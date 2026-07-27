@@ -35,8 +35,7 @@ CPP_FILES = [
 HEADER_FILES = [
     "solver.hpp",
     "xfoil_params.h",
-    "xfoil.h",
-    "version.hpp",
+    "xfoil.h"
 ]
 
 extra_compile_args = []

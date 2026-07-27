@@ -2,7 +2,6 @@
 #include <pybind11/stl.h>
 
 #include "solver.hpp"
-#include "version.hpp"
 
 namespace py=pybind11;
 
@@ -49,6 +48,4 @@ PYBIND11_MODULE(xfoil, m) {
         .def_readwrite("xtr_top", &Solver::xtr_top)
         .def_readwrite("xtr_bottom", &Solver::xtr_bottom)
         .def_readwrite("ncrit", &Solver::ncrit);
-
-    m.attr("__version__") = py::str(version);
 }

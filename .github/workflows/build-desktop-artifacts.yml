@@ -1,21 +1,12 @@
 name: Build Desktop Artifacts
 
 on:
-  workflow_dispatch:
-    inputs:
-      target:
-        description: "Build target"
-        required: true
-        default: all
-        type: choice
-        options:
-          - all
-          - windows-exe
-          - macos-app-x64
-          - macos-app-arm64
+  release:
+    types:
+      - published
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -55,11 +46,12 @@ jobs:
       - name: Build desktop artifact
         shell: bash
         run: ${{ matrix.build_script }}
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_path }}
-          if-no-files-found: error
-          retention-days: 14
-          compression-level: 0
+
+      - name: Upload artifact to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          ASSET_PATH: ${{ matrix.artifact_path }}
+        shell: bash
+        run: |
+          gh release upload "$RELEASE_TAG" "$ASSET_PATH" --clobber

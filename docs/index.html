@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenGlider Downloads</title>
+    <meta
+      name="description"
+      content="Download desktop artifacts for OpenGlider from the latest and previous GitHub releases."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f6f2e9;
+        --surface: rgba(255, 255, 255, 0.86);
+        --surface-strong: #ffffff;
+        --text: #1b1d1e;
+        --muted: #596369;
+        --line: #d6d7cf;
+        --accent: #0f766e;
+        --accent-2: #e67e22;
+        --danger: #9b1c1c;
+        --ring: rgba(15, 118, 110, 0.25);
+        --radius: 18px;
+        --shadow: 0 10px 30px rgba(18, 25, 31, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        color: var(--text);
+        font-family: "Space Grotesk", sans-serif;
+      }
+
+      body {
+        background:
+          linear-gradient(rgba(246, 242, 233, 0.62), rgba(236, 246, 244, 0.64)),
+          url("spiral.jpg") center top / cover fixed no-repeat,
+          radial-gradient(1500px 800px at 15% 0%, #f9e2c4 0%, transparent 50%),
+          radial-gradient(1200px 700px at 90% 10%, #cfe8df 0%, transparent 46%),
+          linear-gradient(160deg, #fff9ef 0%, #f6f2e9 55%, #ecf6f4 100%);
+      }
+
+      .page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 42px 20px 56px;
+      }
+
+      .hero {
+        background: linear-gradient(125deg, #ffffff 0%, #fffaef 48%, #f2fbf8 100%);
+        border: 1px solid var(--line);
+        border-radius: calc(var(--radius) + 4px);
+        padding: 28px;
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        right: -60px;
+        bottom: -90px;
+        width: 260px;
+        height: 260px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(230, 126, 34, 0.24), rgba(230, 126, 34, 0));
+        pointer-events: none;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.7rem, 3vw, 2.55rem);
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+      }
+
+      .lede {
+        margin: 10px 0 0;
+        color: var(--muted);
+        max-width: 70ch;
+        font-size: 1rem;
+        line-height: 1.55;
+      }
+
+      .top-actions {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .sponsor-link {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .sponsor-link img {
+        border-radius: 8px;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+      }
+
+      .plain-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #c3cec9;
+        border-radius: 999px;
+        padding: 9px 14px;
+        text-decoration: none;
+        color: #11564f;
+        background: #f2fbf8;
+        font-weight: 600;
+      }
+
+      .plain-link:hover,
+      .plain-link:focus-visible {
+        background: #e4f5ef;
+        outline: none;
+      }
+
+      .status {
+        margin-top: 18px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.9rem;
+        color: #35434a;
+      }
+
+      .status.error {
+        color: var(--danger);
+      }
+
+      .grid {
+        margin-top: 22px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .section-head {
+        margin: 28px 0 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 1.2rem;
+      }
+
+      .pill {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.8rem;
+        color: #086b62;
+        border: 1px solid #abd7ce;
+        background: #e8f9f5;
+        padding: 3px 8px;
+        border-radius: 999px;
+      }
+
+      .release {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .release.featured {
+        background: var(--surface-strong);
+        border-color: #9bc8bf;
+      }
+
+      .release-head {
+        padding: 16px 18px;
+        border-bottom: 1px solid #e6e7df;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 10px;
+      }
+
+      .release-title {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      .release-meta {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      .assets {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .asset {
+        border-top: 1px solid #eceee8;
+      }
+
+      .asset:first-child {
+        border-top: none;
+      }
+
+      .asset a {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: space-between;
+        align-items: center;
+        text-decoration: none;
+        color: inherit;
+        padding: 15px 18px;
+        line-height: 1.35;
+        transition: background-color 120ms ease, transform 120ms ease;
+      }
+
+      .asset a:hover,
+      .asset a:focus-visible {
+        background: #f8f8f2;
+        outline: none;
+        transform: translateX(1px);
+      }
+
+      .asset-name {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.9rem;
+        line-height: 1.35;
+        word-break: break-all;
+      }
+
+      .asset-meta {
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-family: "IBM Plex Mono", monospace;
+        line-height: 1.35;
+      }
+
+      .empty {
+        margin: 0;
+        padding: 14px 18px 16px;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+
+      .footer {
+        margin-top: 22px;
+        color: #5a656a;
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          padding: 20px 14px 40px;
+        }
+
+        .hero {
+          padding: 20px;
+        }
+
+        .release-head,
+        .asset a {
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .hero,
+        .release {
+          animation: rise 500ms ease both;
+        }
+
+        .release:nth-child(2) {
+          animation-delay: 80ms;
+        }
+
+        .release:nth-child(3) {
+          animation-delay: 140ms;
+        }
+
+        .release:nth-child(4) {
+          animation-delay: 180ms;
+        }
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>OpenGlider Desktop Downloads</h1>
+        <p class="lede">
+          Install artifacts from GitHub releases. The page lists the newest release first, then all prior releases with direct download links.
+        </p>
+        <div class="top-actions">
+          <a
+            class="sponsor-link"
+            href="https://github.com/sponsors/booya-at"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Sponsor OpenGlider on GitHub"
+          >
+            <img
+              src="https://img.shields.io/github/sponsors/booya-at?style=for-the-badge&logo=githubsponsors&label=Sponsor"
+              alt="GitHub Sponsors"
+            />
+          </a>
+          <a
+            class="plain-link"
+            href="https://github.com/booya-at/OpenGlider/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Browse release notes
+          </a>
+        </div>
+        <p id="status" class="status">Loading releases...</p>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>Latest release</h2>
+          <span class="pill">current</span>
+        </div>
+        <div id="latest" class="grid"></div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>Earlier releases</h2>
+          <span class="pill">history</span>
+        </div>
+        <div id="previous" class="grid"></div>
+      </section>
+
+      <p class="footer">Data source: GitHub Releases API</p>
+    </main>
+
+    <script>
+      const REPO = "booya-at/OpenGlider";
+      const RELEASES_API = `https://api.github.com/repos/${REPO}/releases?per_page=100`;
+
+      const statusEl = document.getElementById("status");
+      const latestEl = document.getElementById("latest");
+      const previousEl = document.getElementById("previous");
+
+      function formatDate(value) {
+        const date = new Date(value);
+        return new Intl.DateTimeFormat("en", {
+          year: "numeric",
+          month: "short",
+          day: "numeric"
+        }).format(date);
+      }
+
+      function formatBytes(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) {
+          return "0 B";
+        }
+
+        const units = ["B", "KB", "MB", "GB"];
+        let i = 0;
+        let size = bytes;
+        while (size >= 1024 && i < units.length - 1) {
+          size /= 1024;
+          i += 1;
+        }
+
+        const rounded = size >= 10 ? size.toFixed(0) : size.toFixed(1);
+        return `${rounded} ${units[i]}`;
+      }
+
+      function releaseTitle(release) {
+        return release.name && release.name.trim().length > 0 ? release.name : release.tag_name;
+      }
+
+      function buildAssetItem(asset) {
+        const li = document.createElement("li");
+        li.className = "asset";
+
+        const link = document.createElement("a");
+        link.href = asset.browser_download_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+
+        const name = document.createElement("span");
+        name.className = "asset-name";
+        name.textContent = asset.name;
+
+        const meta = document.createElement("span");
+        meta.className = "asset-meta";
+        meta.textContent = `${formatBytes(asset.size)} • ${asset.download_count} downloads`;
+
+        link.append(name, meta);
+        li.append(link);
+        return li;
+      }
+
+      function buildReleaseCard(release, { featured = false } = {}) {
+        const card = document.createElement("article");
+        card.className = featured ? "release featured" : "release";
+
+        const head = document.createElement("header");
+        head.className = "release-head";
+
+        const title = document.createElement("h3");
+        title.className = "release-title";
+        title.textContent = releaseTitle(release);
+
+        const meta = document.createElement("p");
+        meta.className = "release-meta";
+
+        const date = release.published_at || release.created_at;
+        const parts = [`${release.tag_name}`, formatDate(date)];
+        if (release.prerelease) {
+          parts.push("pre-release");
+        }
+
+        meta.textContent = parts.join(" • ");
+        head.append(title, meta);
+
+        const list = document.createElement("ul");
+        list.className = "assets";
+
+        if (release.assets.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "empty";
+          empty.textContent = "No downloadable assets attached to this release.";
+          card.append(head, empty);
+          return card;
+        }
+
+        release.assets.forEach((asset) => {
+          list.append(buildAssetItem(asset));
+        });
+
+        card.append(head, list);
+        return card;
+      }
+
+      function setStatus(text, isError = false) {
+        statusEl.textContent = text;
+        statusEl.className = isError ? "status error" : "status";
+      }
+
+      async function loadReleases() {
+        try {
+          const response = await fetch(RELEASES_API, {
+            headers: {
+              Accept: "application/vnd.github+json"
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`GitHub API returned ${response.status}`);
+          }
+
+          const releases = await response.json();
+          const visibleReleases = releases.filter((release) => !release.draft);
+
+          if (visibleReleases.length === 0) {
+            setStatus("No public releases found.");
+            latestEl.textContent = "";
+            previousEl.textContent = "";
+            return;
+          }
+
+          const [latest, ...previous] = visibleReleases;
+          latestEl.append(buildReleaseCard(latest, { featured: true }));
+
+          if (previous.length === 0) {
+            const note = document.createElement("p");
+            note.className = "empty";
+            note.textContent = "No earlier releases available yet.";
+            previousEl.append(note);
+          } else {
+            previous.forEach((release) => {
+              previousEl.append(buildReleaseCard(release));
+            });
+          }
+
+          setStatus(`Showing ${visibleReleases.length} release(s).`);
+        } catch (error) {
+          console.error(error);
+          setStatus("Could not load releases right now. Please try again later.", true);
+        }
+      }
+
+      loadReleases();
+    </script>
+  </body>
+</html>
