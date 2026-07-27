@@ -31,6 +31,9 @@ class CellAttachmentPoint(Node):
         return {
             "cell_pos": self.cell_pos,
             "rib_pos": self.rib_pos,
+            "node_type": self.node_type.name,
+            "ballooned": self.ballooned,
+            "offset": self.offset,
             "name": self.name,
             "force": self.force
         }

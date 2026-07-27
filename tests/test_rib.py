@@ -5,6 +5,7 @@ import math
 import openglider.rs
 
 import openglider
+import openglider.airfoil
 from openglider.glider.rib.rib import Rib, rib_rotation, rib_transformation
 from openglider.glider.rib.crossports import RibHole
 from openglider.materials import cloth

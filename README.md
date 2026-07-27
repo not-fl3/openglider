@@ -7,7 +7,7 @@ This is the airG fork of OpenGlider.
 - without the freecad gui & dependencies
 - excessive use of Pydantic Models for Physical objects (ribs, cells, panels, etc)
 - added a custom qt-gui with compare functionality but no editing features.
-- reduced the use of numpy and use [euklid](https://github.com/airgproducts/euklid) for vector calculations.
+- reduced the use of numpy and use rust internal module instead
 
 ## Try It
 

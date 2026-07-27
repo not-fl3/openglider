@@ -73,6 +73,7 @@ class AttachmentPoint(Node):
     def __json__(self) -> dict[str, Any]:
         return {
             "name": self.name,
+            "node_type": self.node_type.name,
             "rib_pos": self.rib_pos,
             "force": self.force,
             "protoloops": self.protoloops,

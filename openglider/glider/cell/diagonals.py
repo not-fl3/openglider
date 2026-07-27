@@ -401,8 +401,8 @@ class TensionLine(TensionStrap):
         super().__init__(side1, side2, Length(0.01), material_code=material_code, name=name)
 
     def __json__(self) -> dict[str, Any]:
-        return {"left": self.side1,
-                "right": self.side2,
+        return {"side1": self.side1,
+                "side2": self.side2,
                 "material_code": self.material_code,
                 "name": self.name
             }
