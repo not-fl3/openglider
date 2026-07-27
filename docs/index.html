@@ -6,7 +6,7 @@
     <title>OpenGlider Downloads</title>
     <meta
       name="description"
-      content="Download desktop artifacts for OpenGlider from the latest and previous GitHub releases."
+      content="Download desktop artifacts for OpenGlider, an app for glider design and visualization, and support ongoing development."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -92,6 +92,35 @@
         max-width: 70ch;
         font-size: 1rem;
         line-height: 1.55;
+      }
+
+      .info-grid {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .info-card {
+        border: 1px solid #dde2dc;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.7);
+        padding: 14px 16px;
+      }
+
+      .info-card h2 {
+        margin: 0 0 6px;
+        font-size: 0.92rem;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: #0e5d56;
+      }
+
+      .info-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+        font-size: 0.95rem;
       }
 
       .top-actions {
@@ -272,6 +301,10 @@
           padding: 20px;
         }
 
+        .info-grid {
+          grid-template-columns: 1fr;
+        }
+
         .release-head,
         .asset a {
           padding-left: 14px;
@@ -313,10 +346,24 @@
   <body>
     <main class="page">
       <section class="hero">
-        <h1>OpenGlider Desktop Downloads</h1>
+        <h1>OpenGlider Downloads</h1>
         <p class="lede">
-          Install artifacts from GitHub releases. The page lists the newest release first, then all prior releases with direct download links.
+          Install from GitHub-releases. The page lists the newest release first, then all prior releases with direct download links.
         </p>
+        <div class="info-grid" aria-label="Project information and support note">
+          <div class="info-card">
+            <h2>About the software</h2>
+            <p>
+              OpenGlider is a desktop application and library built with Python, VTK, Qt, and Pydantic for glider design, visualization, and related workflows.
+            </p>
+          </div>
+          <div class="info-card">
+            <h2>Why support development</h2>
+            <p>
+              Sponsoring the project helps keep releases, packaging, testing, and maintenance moving so the software stays usable and improves over time.
+            </p>
+          </div>
+        </div>
         <div class="top-actions">
           <a
             class="sponsor-link"
@@ -337,6 +384,14 @@
             rel="noopener noreferrer"
           >
             Browse release notes
+          </a>
+          <a
+            class="plain-link"
+            href="https://github.com/hiaselhans/OpenGlider/blob/develop/README.md"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View README
           </a>
         </div>
         <p id="status" class="status">Loading releases...</p>

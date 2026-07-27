@@ -56,7 +56,7 @@ openglider = "openglider.gui:start_main_window"
 
 [project.urls]
 Homepage = "https://www.openglider.org"
-Repository = "https://github.com/booya-at/OpenGlider"
+Repository = "https://github.com/hiaselhans/OpenGlider"
 
 [tool.setuptools]
 include-package-data = false
