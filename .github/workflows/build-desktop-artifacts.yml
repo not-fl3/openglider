@@ -19,18 +19,18 @@ jobs:
           - os: windows-latest
             target_name: windows-exe
             build_script: ./scripts/build_windows_exe.sh
-            artifact_name: OpenGlider-windows-exe
+            artifact_name: OpenGlider-windows-exe.exe
             artifact_path: dist/OpenGlider.exe
           - os: macos-13
             target_name: macos-app-x64
             build_script: ./scripts/build_macos_app.sh
-            artifact_name: OpenGlider-macos-app-x64
-            artifact_path: dist/OpenGlider.app
+            artifact_name: OpenGlider-macos-app-x64.tar.gz
+            artifact_path: dist/OpenGlider-macos-app-x64.tar.gz
           - os: macos-14
             target_name: macos-app-arm64
             build_script: ./scripts/build_macos_app.sh
-            artifact_name: OpenGlider-macos-app-arm64
-            artifact_path: dist/OpenGlider.app
+            artifact_name: OpenGlider-macos-app-arm64.tar.gz
+            artifact_path: dist/OpenGlider-macos-app-arm64.tar.gz
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,11 +47,20 @@ jobs:
         shell: bash
         run: ${{ matrix.build_script }}
 
+      - name: Archive macOS app bundle
+        if: runner.os == 'macOS'
+        env:
+          ASSET_PATH: ${{ matrix.artifact_path }}
+        shell: bash
+        run: |
+          tar -C dist -czf "$ASSET_PATH" OpenGlider.app
+
       - name: Upload artifact to release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           ASSET_PATH: ${{ matrix.artifact_path }}
+          ASSET_NAME: ${{ matrix.artifact_name }}
         shell: bash
         run: |
-          gh release upload "$RELEASE_TAG" "$ASSET_PATH" --clobber
+          gh release upload "$RELEASE_TAG" "$ASSET_PATH#$ASSET_NAME" --clobber
