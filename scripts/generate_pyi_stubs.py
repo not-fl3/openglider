@@ -22,77 +22,57 @@ def _build_debug_extension() -> None:
     subprocess.run(["cargo", "build", "--quiet", "--lib", "--features", "inspect"], cwd=PROJECT_ROOT, check=True)
 
 
-def _find_extension_binary() -> Path:
-    explicit_binary = os.environ.get("OPENGLIDER_RS_BINARY")
-    if explicit_binary:
-        candidate = Path(explicit_binary)
-        if candidate.exists():
-            return candidate
-
+def _find_extension_binaries() -> list[Path]:
     _build_debug_extension()
 
-    debug_candidates = [
-        PROJECT_ROOT / "target" / "debug" / "librs.so",
-        PROJECT_ROOT / "target" / "debug" / "deps" / "librs.so",
+    search_roots = [
+        PROJECT_ROOT / "target" / "debug",
+        PROJECT_ROOT / "build",
+        PACKAGE_ROOT,
     ]
 
-    for candidate in debug_candidates:
-        if candidate.exists():
-            return candidate
-
-    for candidate in debug_candidates:
-        if candidate.exists():
-            return candidate
-
-    search_roots = [PROJECT_ROOT / "target" / "debug"]
-
-    def search_candidates() -> list[Path]:
-        extensions: list[Path] = []
-
-        for search_root in search_roots:
-            if not search_root.exists():
-                continue
-            for pattern in (
-                "rs*.pyd",
-                "rs*.so",
-                "rs*.dylib",
-                "rs*.dll",
-            ):
-                extensions.extend(search_root.rglob(pattern))
-
-        return sorted(set(extensions), key=lambda p: p.stat().st_mtime, reverse=True)
-
-    unique_extensions = search_candidates()
-    if unique_extensions:
-        return unique_extensions[0]
-
-    _build_debug_extension()
-    unique_extensions = search_candidates()
-    if unique_extensions:
-        return unique_extensions[0]
-
-    # Keep unique paths and prefer newest debug build output when multiple candidates exist.
+    # Keep unique paths and prefer newest build output when multiple candidates exist.
     search_patterns = (
         "rs*.pyd",
         "rs*.so",
         "rs*.dylib",
         "rs*.dll",
+        "librs*.so",
+        "librs*.dylib",
+        "librs*.dll",
     )
 
     extensions: list[Path] = []
     for search_root in search_roots:
         if not search_root.exists():
             continue
+        root_matches: list[Path] = []
         for pattern in search_patterns:
-            extensions.extend(search_root.rglob(pattern))
+            root_matches.extend(search_root.rglob(pattern))
+        extensions.extend(sorted(set(root_matches), key=lambda p: p.stat().st_mtime, reverse=True))
 
-    unique_extensions = sorted(set(extensions), key=lambda p: p.stat().st_mtime, reverse=True)
+    explicit_binary = os.environ.get("OPENGLIDER_RS_BINARY")
+    if explicit_binary:
+        explicit_path = Path(explicit_binary)
+        if explicit_path.exists():
+            # Keep explicit binary as a fallback candidate, but do not force it first.
+            # Editable/wheel artifacts often lack the `inspect` feature required by pyo3-introspection.
+            extensions.append(explicit_path)
+
+    unique_extensions: list[Path] = []
+    seen: set[Path] = set()
+    for extension_path in extensions:
+        if extension_path in seen:
+            continue
+        seen.add(extension_path)
+        unique_extensions.append(extension_path)
+
     if not unique_extensions:
         raise FileNotFoundError(
             "Could not find the compiled openglider.rs extension in source or debug build directories. "
             "Build the extension first."
         )
-    return unique_extensions[0]
+    return unique_extensions
 
 
 def _run_introspection(binary_path: Path, output_dir: Path) -> None:
@@ -167,11 +147,26 @@ def _ensure_root_exports_submodules() -> None:
 
 
 def generate_pyi_stubs() -> None:
-    binary_path = _find_extension_binary()
+    candidate_binaries = _find_extension_binaries()
+    errors: list[str] = []
+
     with tempfile.TemporaryDirectory(prefix="openglider-pyo3-stubs-") as tmp_dir:
         output_dir = Path(tmp_dir)
-        _run_introspection(binary_path, output_dir)
-        _install_generated_files(output_dir)
+
+        for binary_path in candidate_binaries:
+            try:
+                _run_introspection(binary_path, output_dir)
+                _install_generated_files(output_dir)
+                return
+            except subprocess.CalledProcessError as exc:
+                errors.append(f"{binary_path}: {exc}")
+
+    details = "\n".join(errors) if errors else "No candidate binaries were tried."
+    raise RuntimeError(
+        "Failed to generate stubs from any Rust extension candidate. "
+        "This usually means the selected binary was built without the `inspect` feature.\n"
+        f"Tried:\n{details}"
+    )
 
 
 if __name__ == "__main__":
