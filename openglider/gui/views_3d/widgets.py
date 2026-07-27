@@ -1,6 +1,6 @@
 import sys
 
-from openglider.gui.qt import QtWidgets
+from openglider.gui.qt import QtGui, QtWidgets
 import vtkmodules
 import vtkmodules.vtkRenderingOpenGL2
 import vtkmodules.vtkRenderingCore
@@ -63,7 +63,7 @@ class View3D(QtWidgets.QWidget):
         self.axes = vtkAxesActor()
         self.clear(autorerender=False)
 
-    def showEvent(self, event: QtWidgets.QShowEvent) -> None:
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
         super().showEvent(event)
         if not self._has_rendered:
             self.rerender()

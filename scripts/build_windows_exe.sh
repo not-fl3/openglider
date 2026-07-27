@@ -46,7 +46,4 @@ fi
     --hidden-import PySide6 \
     scripts/launch_gui.py
 
-tar -C "$ROOT_DIR/dist" -czf "$ROOT_DIR/dist/OpenGlider-windows-exe.tar.gz" OpenGlider.exe
-
 echo "Windows executable created at: $ROOT_DIR/dist/OpenGlider.exe"
-echo "Windows artifact archive created at: $ROOT_DIR/dist/OpenGlider-windows-exe.tar.gz"

@@ -49,21 +49,4 @@ fi
     --hidden-import PySide6 \
     scripts/launch_gui.py
 
-ARCH="$(uname -m)"
-case "$ARCH" in
-    arm64)
-        ARTIFACT_NAME="OpenGlider-macos-app-arm64.tar.gz"
-        ;;
-    x86_64)
-        ARTIFACT_NAME="OpenGlider-macos-app-x64.tar.gz"
-        ;;
-    *)
-        echo "Unsupported macOS architecture: $ARCH"
-        exit 1
-        ;;
-esac
-
-tar -C "$ROOT_DIR/dist" -czf "$ROOT_DIR/dist/$ARTIFACT_NAME" OpenGlider.app
-
 echo "macOS app bundle created at: $ROOT_DIR/dist/OpenGlider.app"
-echo "macOS artifact archive created at: $ROOT_DIR/dist/$ARTIFACT_NAME"
