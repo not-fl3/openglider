@@ -1,16 +1,17 @@
 import logging
 
-
 from openglider.gui.wizzards.base import Wizard
 from openglider.gui.wizzards.input import input_wizzards
 from openglider.gui.wizzards.line_forces import LineForceView
+from openglider.gui.wizzards.abwicklung import PlotWizzard
 
 logger = logging.getLogger(__name__)
 __all__ = ["menu_actions"]
 
 menu_actions: dict[str, list[tuple[type[Wizard], str]]] = {
     "view": [
-        (LineForceView, "Lines")
+        (LineForceView, "Lines"),
+        (PlotWizzard, "Patterns")
     ],
     "edit": input_wizzards
 }
