@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterator
 
 from openglider.glider.project import GliderProject
 from openglider.gui.qt import QtCore, QtWidgets, QtGui, QAction
+from openglider.version import __version__
 from openglider.gui.icons import icon
 from openglider.gui.views.compare import GliderPreview
 from openglider.gui.views.console import ConsoleHandler, ConsoleWidget, LogFilterPanel
@@ -62,7 +63,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, app: GliderApp):
         super().__init__()
-        self.setWindowTitle("Glider Schneider")
+        self.setWindowTitle(f"OpenGlider v {__version__}")
         gui_dir = os.path.dirname(os.path.dirname(__file__))
         filepath = os.path.join(gui_dir, "openglider.png")
         print(filepath)
@@ -350,6 +351,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         Ask to save unsaved gliders
         """
+        should_quit = True
         unsaved_gliders = [
             p for p in self.state.projects.elements.values()
             if p.is_temporary or p.element.filename is None
@@ -370,9 +372,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if ret == QtWidgets.QMessageBox.StandardButton.Save:
                 event.ignore()
+                should_quit = False
+                return
             else:
                 event.accept()
-                #sys.exit(0)
 
         if self.task_queue.queue.is_busy():
             msgBox = QtWidgets.QMessageBox()
@@ -390,9 +393,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if ret == QtWidgets.QMessageBox.StandardButton.Save:
                 event.ignore()
+                should_quit = False
+                return
             else:
                 self.app.loop.run_until_complete(self.task_queue.queue.quit())
                 event.accept()
-                #sys.exit(0)
+        if should_quit and not self.app.reloading:
+            self.app.quit()
         
         

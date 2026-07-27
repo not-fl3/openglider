@@ -69,7 +69,7 @@ openglider = [
     "py.typed",
     "*.pyi",
     "rs/*.pyi",
-    "*.csv",
+    "**/*.csv",
     "**/*.svg",
     "**/*.png",
     "**/*.qss",

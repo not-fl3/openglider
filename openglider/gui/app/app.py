@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import asyncio
 import functools
 import importlib
@@ -16,6 +15,8 @@ from collections.abc import Callable
 import pyqtgraph  # fix strange error by loading it before qtmodern
 import qtmodern.styles
 import qtmodern.windows
+
+from openglider.version import __version__
 from openglider.gui.qt import QtWidgets
 from openglider.gui.app.files import OpengliderDir
 from qasync import QEventLoop
@@ -30,10 +31,12 @@ class GliderApp(QtWidgets.QApplication):
     debug = False
     exception_window: QtWidgets.QMessageBox | None = None
     state: ApplicationState
+    reloading = False
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
-        self.setApplicationName("GliderSchneider")
+        self.setQuitOnLastWindowClosed(True)
+        self.setApplicationName(f"OpenGlider v {__version__}")
         qtmodern.styles.dark(self)
 
         log_format = '%(levelname)s %(asctime)s - %(name)s : %(message)s'
@@ -74,20 +77,24 @@ class GliderApp(QtWidgets.QApplication):
         self.main_window.showMaximized()
     
     def reload_code(self) -> None:
-        self.main_window.close()
-        self.state.dump()
+        self.reloading = True
+        try:
+            self.main_window.close()
+            self.state.dump()
 
-        #self._deep_reload("euklid")
-        #self._deep_reload("openglider", "gpufem")
-        self._deep_reload("openglider")
+            #self._deep_reload("euklid")
+            #self._deep_reload("openglider", "gpufem")
+            self._deep_reload("openglider")
 
-        # TODO: check!
-        # for x in list(pydantic.class_validators._FUNCS):
-        #     if x.startswith("openglider"):
-        #         pydantic.class_validators._FUNCS.remove(x)
+            # TODO: check!
+            # for x in list(pydantic.class_validators._FUNCS):
+            #     if x.startswith("openglider"):
+            #         pydantic.class_validators._FUNCS.remove(x)
 
 
-        self.setup()
+            self.setup()
+        finally:
+            self.reloading = False
 
     @staticmethod
     def _deep_reload(*names: str) -> None:
