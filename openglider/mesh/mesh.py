@@ -328,6 +328,48 @@ class Mesh:
 
     __from_json__ = from_indexed
 
+    @classmethod
+    def from_obj(cls, path: str | Path, name: str | None=None) -> Mesh:
+        obj_path = Path(path)
+        vertices: list[Vertex] = []
+        polygons: dict[str, list[Polygon]] = {}
+        current_group = name or obj_path.stem or "obj"
+
+        def resolve_index(raw_index: str) -> int:
+            index = int(raw_index)
+            if index > 0:
+                return index - 1
+            if index < 0:
+                return len(vertices) + index
+            raise ValueError("OBJ indices are 1-based")
+
+        for line in obj_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+
+            parts = stripped.split()
+            prefix = parts[0]
+
+            if prefix == "v" and len(parts) >= 4:
+                vertices.append(Vertex(float(parts[1]), float(parts[2]), float(parts[3])))
+            elif prefix in ("o", "g") and len(parts) >= 2:
+                current_group = " ".join(parts[1:])
+            elif prefix in ("f", "l") and len(parts) >= 3:
+                node_indices = []
+                for token in parts[1:]:
+                    vertex_token = token.split("/")[0]
+                    if not vertex_token:
+                        continue
+                    node_indices.append(resolve_index(vertex_token))
+
+                if node_indices:
+                    polygons.setdefault(current_group, []).append(
+                        Polygon([vertices[index] for index in node_indices])
+                    )
+
+        return cls(polygons, name=obj_path.stem if name is None else name)
+
     def export_obj(self, path: str | Path | None=None, offset: float=0) -> str:
         vertices, polygons, boundaries = self.get_indexed()
         out = ""

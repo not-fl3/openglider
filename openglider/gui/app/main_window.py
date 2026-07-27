@@ -274,7 +274,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 fname = str(url.toLocalFile())
             
             if fname:
-                asyncio.ensure_future(self.load_glider(fname))
+                suffix = pathlib.Path(fname).suffix.lower()
+                if suffix == ".obj":
+                    preview = self.glider_preview.tabs["3D"]
+                    preview.import_obj(fname)
+                    self.top_panel.setCurrentIndex(0)
+                    self.glider_preview.tabs_widget.setCurrentIndex(self.glider_preview.tab_names.index("3D"))
+                else:
+                    asyncio.ensure_future(self.load_glider(fname))
             #self.load_image()
         else:
             e.ignore()

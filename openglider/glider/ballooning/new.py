@@ -50,7 +50,7 @@ class BallooningNew(BallooningBase):
     
     def __mul__(self, factor: float) -> BallooningNew:
         interpolation = self.interpolation.copy()
-        interpolation.scale(openglider.rs.vector.Vector2D([1, factor]))
+        interpolation = interpolation.scale(openglider.rs.vector.Vector2D([1, factor]))
         return BallooningNew(interpolation)
 
     def close_trailing_edge(self, start_x: float) -> None:
@@ -67,6 +67,10 @@ class BallooningNew(BallooningBase):
                 nodes.append([n[0], y])
             
             self.interpolation = openglider.rs.vector.Interpolation(nodes)
+
+    @property
+    def amount_maximal(self) -> float:
+        return max([p[1] for p in self.interpolation.nodes])
 
     def copy(self) -> BallooningNew:
         return BallooningNew(self.interpolation.copy(), name=self.name)
@@ -160,10 +164,6 @@ class BallooningBezierNeu(BallooningNew):
     def scale(self, factor: float) -> None:
         self.spline_curve.controlpoints = self.spline_curve.controlpoints.scale(openglider.rs.vector.Vector2D([1, factor]))
         self.apply_splines()
-
-    @property
-    def amount_maximal(self) -> float:
-        return max([p[1] for p in self.interpolation.nodes])
 
     def _repr_svg_(self) -> str:
         import svgwrite

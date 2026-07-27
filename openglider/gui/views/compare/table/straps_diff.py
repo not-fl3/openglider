@@ -36,7 +36,17 @@ class StrapsTableCache(GliderCache[Table]):
             row += 1
             column = 0
 
-        
+        column = table.num_columns
+        for row, cell in enumerate(project.get_glider_3d().cells):
+            table[row+1, column] = f"TE{row+1}"
+
+            ballooning = (cell.ballooning_modified[1] + cell.ballooning_modified[-1])/2
+            vector = cell.prof1.get(0) - cell.prof2.get(0)
+
+            diff = vector.length() * (1 + ballooning)
+
+            table[row+1, column+1] = f"{diff*1000:.0f}"
+
         return table
 
 
@@ -49,6 +59,7 @@ class GliderStrapTable(QtWidgets.QWidget, CompareView):
 
         super().__init__(parent)
 
+        self.app = app
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         self.table_widget = QTable()
@@ -80,6 +91,6 @@ class GliderStrapTable(QtWidgets.QWidget, CompareView):
                 copied += self.table_widget.item(row, col).text() + '\t'
             copied = copied[:-1] + '\n'
 
-        clipboard = QClipboard()
+        clipboard = self.app.clipboard()
         clipboard.setText(copied)
 

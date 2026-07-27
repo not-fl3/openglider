@@ -1,12 +1,15 @@
 import logging
+from pathlib import Path
 
+from openglider.mesh.mesh import Mesh
 from openglider.gui.app.app import GliderApp
-from openglider.gui.qt import QtWidgets
+from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.gui.state.glider_list import GliderCache
 from openglider.gui.views.compare.base import CompareView
 from openglider.gui.views.compare.glider_3d.actor import GliderActors
 from openglider.gui.views.compare.glider_3d.config import \
     GliderViewConfigWidget
+from openglider.gui.views_3d.actors import MeshView
 from openglider.gui.views_3d.widgets import View3D
 
 logger = logging.getLogger(__name__)
@@ -21,6 +24,59 @@ class Glider3DCache(GliderCache[GliderActors]):
         return GliderActors(project.element)
 
 
+class DropView3D(View3D):
+    def __init__(self, parent: QtWidgets.QWidget, on_obj_drop) -> None:
+        super().__init__(parent)
+        self.on_obj_drop = on_obj_drop
+        self.setAcceptDrops(True)
+        self.frame.setAcceptDrops(True)
+        self.VTKRenderWindowInteractor.setAcceptDrops(True)
+        self.frame.installEventFilter(self)
+        self.VTKRenderWindowInteractor.installEventFilter(self)
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        event_type = event.type()
+        if event_type == QtCore.QEvent.Type.DragEnter and isinstance(event, QtGui.QDragEnterEvent):
+            if self._get_obj_path(event):
+                event.acceptProposedAction()
+                return True
+            return False
+
+        if event_type == QtCore.QEvent.Type.Drop and isinstance(event, QtGui.QDropEvent):
+            filename = self._get_obj_path(event)
+            if filename is None:
+                return False
+
+            event.setDropAction(QtCore.Qt.DropAction.CopyAction)
+            event.accept()
+            self.on_obj_drop(filename)
+            return True
+
+        return super().eventFilter(watched, event)
+
+    @staticmethod
+    def _get_obj_path(event: QtGui.QDropEvent | QtGui.QDragEnterEvent) -> str | None:
+        if not event.mimeData().hasUrls():
+            return None
+
+        for url in event.mimeData().urls():
+            filename = Path(url.toLocalFile())
+            if filename.suffix.lower() == ".obj":
+                return str(filename)
+
+        return None
+
+    def dropEvent(self, event: QtGui.QDropEvent) -> None:
+        filename = self._get_obj_path(event)
+        if filename is None:
+            event.ignore()
+            return
+
+        event.setDropAction(QtCore.Qt.DropAction.CopyAction)
+        event.accept()
+        self.on_obj_drop(filename)
+
+
 class Glider3DView(QtWidgets.QWidget, CompareView):
     def __init__(self, app: GliderApp):
         super().__init__()
@@ -32,15 +88,50 @@ class Glider3DView(QtWidgets.QWidget, CompareView):
         self.layout().addWidget(self.config)
         self.actor_cache = Glider3DCache(app.state.projects)
 
-        self.view_3d = View3D(self)
+        self.imported_mesh_actor: MeshView | None = None
+
+        self.clear_obj_button = QtWidgets.QPushButton("Remove OBJ", self)
+        self.clear_obj_button.setVisible(False)
+        self.clear_obj_button.clicked.connect(self.clear_imported_obj)
+        self.layout().addWidget(self.clear_obj_button)
+
+        self.view_3d = DropView3D(self, self.import_obj)
         self.view_3d.show_axes = False
         self.view_3d.clear()
         self.layout().addWidget(self.view_3d)
+
+    def import_obj(self, filename: str) -> None:
+        try:
+            mesh = Mesh.from_obj(filename)
+        except Exception:
+            logger.exception("Failed to import OBJ file: %s", filename)
+            return
+
+        if self.imported_mesh_actor is not None:
+            self.view_3d.renderer.RemoveActor(self.imported_mesh_actor)
+
+        mesh_view = MeshView()
+        mesh_view.draw_mesh(mesh)
+        self.imported_mesh_actor = mesh_view
+        self.view_3d.show_actor(mesh_view)
+        self.clear_obj_button.setVisible(True)
+
+    def clear_imported_obj(self) -> None:
+        if self.imported_mesh_actor is None:
+            return
+
+        self.view_3d.renderer.RemoveActor(self.imported_mesh_actor)
+        self.imported_mesh_actor = None
+        self.clear_obj_button.setVisible(False)
+        self.view_3d.rerender()
     
     def update_config(self) -> None:
         self.view_3d.clear()
         for actor in self.actor_cache.get_update().active:
             actor.add(self.view_3d, self.config.config)
+
+        if self.imported_mesh_actor is not None:
+            self.view_3d.show_actor(self.imported_mesh_actor)
 
     def update_view(self) -> None:
         changeset = self.actor_cache.get_update()

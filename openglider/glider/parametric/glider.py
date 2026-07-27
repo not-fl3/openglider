@@ -310,23 +310,36 @@ class ParametricGlider:
         
         return result
 
-    def apply_shape_and_arc(self, glider: Glider) -> None:
-        x_values = [abs(x) for x in self.shape.rib_x_values]
+    def get_rib_positions(self) -> list[openglider.rs.vector.Vector3D]:
+        rib_positions = self.shape.baseline
         shape_ribs = self.shape.ribs
-
-        arc_pos = list(self.arc.get_arc_positions(x_values))
-        rib_angles = self.arc.get_rib_angles(x_values)
+        x_values = self.shape.rib_x_values
+        arc_pos = self.arc.get_arc_positions(x_values).nodes
 
         offset_x = shape_ribs[0][0][1]
 
+        result: list[openglider.rs.vector.Vector3D] = []
+
         for rib_no, x in enumerate(x_values):
-            front, back = shape_ribs[rib_no]
             arc = arc_pos[rib_no]
-            startpoint = openglider.rs.vector.Vector3D([-front[1] + offset_x, arc[0], arc[1]])
+            shape_pos = rib_positions[rib_no]
+            startpoint = openglider.rs.vector.Vector3D([-shape_pos[1] + offset_x, arc[0], arc[1]])
+            result.append(startpoint)
+
+        return result
+
+    def apply_shape_and_arc(self, glider: Glider) -> None:
+        rib_positions = self.get_rib_positions()
+        ribs = self.shape.ribs
+        x_values = [abs(x) for x in self.shape.rib_x_values]
+
+        rib_angles = self.arc.get_rib_angles(x_values)
+
+        for rib_no, pos in enumerate(rib_positions):
             rib = glider.ribs[rib_no]
 
-            rib.pos = startpoint
-            rib.chord = abs(front[1]-back[1])
+            rib.pos = pos
+            rib.chord = abs(ribs[rib_no][0][1]-ribs[rib_no][1][1])
             rib.arcang = rib_angles[rib_no]
 
     @cached_property('tables.curves', 'shape')
@@ -426,37 +439,30 @@ class ParametricGlider:
     def get_glider_3d(self, glider: Glider=None, num: int=50, num_profile: int | None=None) -> Glider:
         """returns a new glider from parametric values"""
         logger.debug("get glider 3d")
-        glider = glider or Glider()
+
+        if glider is None:
+            glider = Glider()
+        
         ribs = []
 
         logger.debug("apply curves")
         self.rescale_curves()
-        curves = self.get_curves()
         resolvers = self.resolvers
 
         x_values = self.shape.rib_x_values
         shape_ribs = self.shape.ribs
-        rib_positions = self.shape.baseline
 
         aoa_values = self.get_aoa()
 
-        arc_pos = self.arc.get_arc_positions(x_values).tolist()
         rib_angles = self.arc.get_rib_angles(x_values)
         profiles = self.get_profiles(num_profile=num_profile)
 
-        # set front to 0,0,0
-        offset_x = shape_ribs[0][0][1]
+        rib_positions = self.get_rib_positions()
 
         logger.info("create ribs")
 
         for rib_no, x_value in enumerate(x_values):
             front, back = shape_ribs[rib_no]
-            shape_pos = rib_positions[rib_no]
-            arc = arc_pos[rib_no]
-            profile = profiles[rib_no]
-
-            #startpoint = openglider.rs.vector.Vector3D([-front[1] + offset_x, arc[0], arc[1]])
-            startpoint = openglider.rs.vector.Vector3D([-shape_pos[1] + offset_x, arc[0], arc[1]])
 
             try:
                 material = self.tables.material_ribs.get(rib_no)[0]
@@ -479,8 +485,8 @@ class ParametricGlider:
             rotation = self.tables.rib_modifiers.get_rotation(rib_no, resolvers=resolvers)
 
             rib = Rib(
-                profile_2d=profile,
-                pos=startpoint,
+                profile_2d=profiles[rib_no],
+                pos=rib_positions[rib_no],
                 rotation_position=self.config.baseline_pct,
                 chord=chord,
                 arcang=rib_angles[rib_no],

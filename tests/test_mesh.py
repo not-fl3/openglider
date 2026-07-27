@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 from tests.helpers import GliderTestCase
@@ -35,6 +37,26 @@ class TestMesh(GliderTestCase):
             m += rib.get_mesh()
         m.delete_duplicates()
         m.get_indexed()
+
+    def test_from_obj(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            obj_path = Path(tmpdir) / "sample.obj"
+            obj_path.write_text(
+                """\
+v 0 0 0
+v 1 0 0
+v 1 1 0
+v 0 1 0
+f 1 2 3 4
+""",
+                encoding="utf-8",
+            )
+
+            mesh = Mesh.from_obj(obj_path)
+
+        self.assertEqual(mesh.name, "sample")
+        self.assertEqual(len(mesh.polygons["sample"]), 1)
+        self.assertEqual(len(mesh.vertices), 4)
 
 
 
