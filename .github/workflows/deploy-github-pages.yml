@@ -3,7 +3,7 @@ name: Deploy GitHub Pages
 on:
   push:
     branches:
-      - migrate-to-rust
+      - develop
     paths:
       - docs/**
       - .github/workflows/deploy-github-pages.yml
