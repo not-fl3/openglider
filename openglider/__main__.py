@@ -1,3 +1,4 @@
 import openglider.gui
 
-openglider.gui.start_main_window()
+if __name__ == "__main__":
+    openglider.gui.start_main_window()

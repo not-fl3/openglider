@@ -1,8 +1,11 @@
+import sys
+
 from openglider.gui.qt import QtWidgets
 import vtkmodules
 import vtkmodules.vtkRenderingOpenGL2
 import vtkmodules.vtkRenderingCore
 import vtkmodules.qt
+vtkmodules.qt.QVTKRWIBase = "QOpenGLWidget"
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 from vtkmodules.vtkRenderingAnnotation import vtkAxesActor
 from vtkmodules.vtkRenderingCore import vtkActor
@@ -24,16 +27,18 @@ class View3D(QtWidgets.QWidget):
         
         self.renderer = vtkmodules.vtkRenderingCore.vtkRenderer()
 
-        # enable SSAO
-        self.renderer.UseSSAOOn()
-        self.renderer.SetSSAORadius(0.2)
-        self.renderer.SetSSAOKernelSize(256)
-        self.renderer.SetSSAOBlur(False)
+        # SSAO can trigger native OpenGL crashes on some macOS driver stacks.
+        if sys.platform != "darwin":
+            self.renderer.UseSSAOOn()
+            self.renderer.SetSSAORadius(0.2)
+            self.renderer.SetSSAOKernelSize(256)
+            self.renderer.SetSSAOBlur(False)
 
         self.renderer.SetBackground(.2, .3, .4)
         self.renderer.SetViewport(0, 0, 1, 1)
 
         self.VTKRenderWindow = vtkmodules.vtkRenderingCore.vtkRenderWindow()
+        self.VTKRenderWindow.SetMultiSamples(0)
 
         self.VTKRenderWindow.AddRenderer(self.renderer)
 
@@ -53,14 +58,23 @@ class View3D(QtWidgets.QWidget):
         #self.VTKRenderWindowInteractor.Start()
         #self.VTKRenderWindowInteractor.ReInitialize()
 
-        self.axes = vtkAxesActor()
-        self.clear()
+        self._has_rendered = False
 
-    def clear(self) -> None:
+        self.axes = vtkAxesActor()
+        self.clear(autorerender=False)
+
+    def showEvent(self, event: QtWidgets.QShowEvent) -> None:
+        super().showEvent(event)
+        if not self._has_rendered:
+            self.rerender()
+            self._has_rendered = True
+
+    def clear(self, autorerender: bool=True) -> None:
         self.renderer.RemoveAllViewProps()
         if self.show_axes:
             self.show_actor(self.axes)  # type: ignore
-        self.rerender()
+        if autorerender:
+            self.rerender()
 
     def show_actor(self, actor: vtkActor) -> None:
         self.renderer.AddActor(actor)

@@ -11,6 +11,17 @@ if sys.platform.startswith("linux"):
 
 def start_main_window() -> None:
     from openglider.gui.app import GliderApp
+    from openglider.gui.qt import QtCore, QtWidgets
+
+    QtWidgets.QApplication.setAttribute(
+        QtCore.Qt.ApplicationAttribute.AA_ShareOpenGLContexts,
+        True
+    )
+    if sys.platform == "darwin":
+        QtWidgets.QApplication.setAttribute(
+            QtCore.Qt.ApplicationAttribute.AA_UseDesktopOpenGL,
+            True
+        )
 
     app = GliderApp(sys.argv)
 
