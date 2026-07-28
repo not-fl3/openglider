@@ -1,105 +1,113 @@
 use crate::mesh::Mesh;
+use std::collections::HashMap;
 
 use super::Vertex;
 
 fn triangle_normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
-    let ux = b[0] - a[0];
-    let uy = b[1] - a[1];
-    let uz = b[2] - a[2];
-    let vx = c[0] - a[0];
-    let vy = c[1] - a[1];
-    let vz = c[2] - a[2];
-
+    let ux = b[0] - a[0]; let uy = b[1] - a[1]; let uz = b[2] - a[2];
+    let vx = c[0] - a[0]; let vy = c[1] - a[1]; let vz = c[2] - a[2];
     let nx = uy * vz - uz * vy;
     let ny = uz * vx - ux * vz;
     let nz = ux * vy - uy * vx;
-    let length = (nx * nx + ny * ny + nz * nz).sqrt().max(1e-6);
-    [nx / length, ny / length, nz / length]
+    let len = (nx * nx + ny * ny + nz * nz).sqrt().max(1e-6);
+    [nx / len, ny / len, nz / len]
 }
 
-pub(crate) fn mesh_to_vertices(mesh: &Mesh) -> (Vec<Vertex>, Vec<Vertex>) {
-    let mut fill_vertices = Vec::new();
-    let mut line_vertices = Vec::new();
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct EdgeKey(u32, u32);
+impl EdgeKey {
+    fn new(a: u32, b: u32) -> Self { if a < b { EdgeKey(a, b) } else { EdgeKey(b, a) } }
+}
 
-    for object in &mesh.objects {
-        let color = [
-            object.color.0 as f32 / 255.0,
-            object.color.1 as f32 / 255.0,
-            object.color.2 as f32 / 255.0,
-        ];
+/// Returns `(fill, mesh_lines, polygon_edges)`.
+///
+/// - `fill`:          fill vertices from triangles/quads
+/// - `mesh_lines`:    vertices from MeshObject::lines (always emitted, depth-tested only)
+/// - `polygon_edges`: outline vertices from polygon topology (stencil-tested at render time)
+pub(crate) fn mesh_to_vertices(
+    mesh: &Mesh,
+    draw_polygon_edges: bool,
+    boundary_only: bool,
+) -> (Vec<Vertex>, Vec<Vertex>, Vec<Vertex>) {
+    let mut fill: Vec<Vertex> = Vec::new();
+    let mut mesh_lines: Vec<Vertex> = Vec::new();
+    let mut poly_edges: Vec<Vertex> = Vec::new();
+    let mut edge_count: HashMap<EdgeKey, u32> = HashMap::new();
 
-        for line in &object.lines {
-            if let (Some(a), Some(b)) = (mesh.points.get(line.a), mesh.points.get(line.b)) {
-                line_vertices.push(Vertex {
-                    position: [a.x as f32, a.y as f32, a.z as f32],
-                    color,
-                    normal: [0.0, 0.0, 1.0],
-                });
-                line_vertices.push(Vertex {
-                    position: [b.x as f32, b.y as f32, b.z as f32],
-                    color,
-                    normal: [0.0, 0.0, 1.0],
-                });
+    if boundary_only && draw_polygon_edges {
+        for obj in &mesh.objects {
+            for t in &obj.triangles {
+                for (a, b) in [(t.a, t.b), (t.b, t.c), (t.c, t.a)] {
+                    edge_count.entry(EdgeKey::new(a as u32, b as u32)).and_modify(|e| *e += 1).or_insert(1);
+                }
             }
-        }
-
-        for triangle in &object.triangles {
-            let p0 = mesh.points.get(triangle.a);
-            let p1 = mesh.points.get(triangle.b);
-            let p2 = mesh.points.get(triangle.c);
-            if let (Some(p0), Some(p1), Some(p2)) = (p0, p1, p2) {
-                let a = [p0.x as f32, p0.y as f32, p0.z as f32];
-                let b = [p1.x as f32, p1.y as f32, p1.z as f32];
-                let c = [p2.x as f32, p2.y as f32, p2.z as f32];
-                let normal = triangle_normal(a, b, c);
-                fill_vertices.push(Vertex {
-                    position: a,
-                    color,
-                    normal,
-                });
-                fill_vertices.push(Vertex {
-                    position: b,
-                    color,
-                    normal,
-                });
-                fill_vertices.push(Vertex {
-                    position: c,
-                    color,
-                    normal,
-                });
-            }
-        }
-
-        for quad in &object.quads {
-            let faces = [(quad.a, quad.b, quad.c), (quad.a, quad.c, quad.d)];
-            for (a, b, c) in faces {
-                let p0 = mesh.points.get(a);
-                let p1 = mesh.points.get(b);
-                let p2 = mesh.points.get(c);
-                if let (Some(p0), Some(p1), Some(p2)) = (p0, p1, p2) {
-                    let pa = [p0.x as f32, p0.y as f32, p0.z as f32];
-                    let pb = [p1.x as f32, p1.y as f32, p1.z as f32];
-                    let pc = [p2.x as f32, p2.y as f32, p2.z as f32];
-                    let normal = triangle_normal(pa, pb, pc);
-                    fill_vertices.push(Vertex {
-                        position: pa,
-                        color,
-                        normal,
-                    });
-                    fill_vertices.push(Vertex {
-                        position: pb,
-                        color,
-                        normal,
-                    });
-                    fill_vertices.push(Vertex {
-                        position: pc,
-                        color,
-                        normal,
-                    });
+            for q in &obj.quads {
+                for (a, b) in [(q.a, q.b), (q.b, q.c), (q.c, q.d), (q.d, q.a)] {
+                    edge_count.entry(EdgeKey::new(a as u32, b as u32)).and_modify(|e| *e += 1).or_insert(1);
                 }
             }
         }
     }
 
-    (fill_vertices, line_vertices)
+    for obj in &mesh.objects {
+        let color = [obj.color.0 as f32 / 255.0, obj.color.1 as f32 / 255.0, obj.color.2 as f32 / 255.0];
+        let ec = [((color[0]*0.5+0.5).max(0.7)).min(1.0), ((color[1]*0.5+0.5).max(0.7)).min(1.0), ((color[2]*0.5+0.5).max(0.7)).min(1.0)];
+
+        for line in &obj.lines {
+            if let (Some(a), Some(b)) = (mesh.points.get(line.a), mesh.points.get(line.b)) {
+                for p in [a, b] {
+                    mesh_lines.push(Vertex { position: [p.x as f32, p.y as f32, p.z as f32], color, normal: [0.0, 0.0, 1.0] });
+                }
+            }
+        }
+
+        for t in &obj.triangles {
+            if let (Some(p0), Some(p1), Some(p2)) = (mesh.points.get(t.a), mesh.points.get(t.b), mesh.points.get(t.c)) {
+                let a = [p0.x as f32, p0.y as f32, p0.z as f32];
+                let b = [p1.x as f32, p1.y as f32, p1.z as f32];
+                let c = [p2.x as f32, p2.y as f32, p2.z as f32];
+                let n = triangle_normal(a, b, c);
+                for pos in [a, b, c] { fill.push(Vertex { position: pos, color, normal: n }); }
+                if draw_polygon_edges {
+                    for (k, pa, pb) in [
+                        (EdgeKey::new(t.a as u32, t.b as u32), a, b),
+                        (EdgeKey::new(t.b as u32, t.c as u32), b, c),
+                        (EdgeKey::new(t.c as u32, t.a as u32), c, a),
+                    ] {
+                        if !boundary_only || edge_count.get(&k).map_or(false, |&n| n == 1) {
+                            poly_edges.push(Vertex { position: pa, color: ec, normal: [0.0,0.0,1.0] });
+                            poly_edges.push(Vertex { position: pb, color: ec, normal: [0.0,0.0,1.0] });
+                        }
+                    }
+                }
+            }
+        }
+
+        for q in &obj.quads {
+            for (ai, bi, ci) in [(q.a, q.b, q.c), (q.a, q.c, q.d)] {
+                if let (Some(p0), Some(p1), Some(p2)) = (mesh.points.get(ai), mesh.points.get(bi), mesh.points.get(ci)) {
+                    let a = [p0.x as f32, p0.y as f32, p0.z as f32];
+                    let b = [p1.x as f32, p1.y as f32, p1.z as f32];
+                    let c = [p2.x as f32, p2.y as f32, p2.z as f32];
+                    let n = triangle_normal(a, b, c);
+                    for pos in [a, b, c] { fill.push(Vertex { position: pos, color, normal: n }); }
+                }
+            }
+            if draw_polygon_edges {
+                if let (Some(pa), Some(pb), Some(pc), Some(pd)) = (
+                    mesh.points.get(q.a), mesh.points.get(q.b), mesh.points.get(q.c), mesh.points.get(q.d)) {
+                    let pts = [[pa.x as f32,pa.y as f32,pa.z as f32],[pb.x as f32,pb.y as f32,pb.z as f32],[pc.x as f32,pc.y as f32,pc.z as f32],[pd.x as f32,pd.y as f32,pd.z as f32]];
+                    for (ai, bi, pi, qi) in [(q.a,q.b,0usize,1usize),(q.b,q.c,1,2),(q.c,q.d,2,3),(q.d,q.a,3,0)] {
+                        let k = EdgeKey::new(ai as u32, bi as u32);
+                        if !boundary_only || edge_count.get(&k).map_or(false, |&n| n == 1) {
+                            poly_edges.push(Vertex { position: pts[pi], color: ec, normal: [0.0,0.0,1.0] });
+                            poly_edges.push(Vertex { position: pts[qi], color: ec, normal: [0.0,0.0,1.0] });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (fill, mesh_lines, poly_edges)
 }

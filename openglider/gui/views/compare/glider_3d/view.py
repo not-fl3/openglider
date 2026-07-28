@@ -4,6 +4,7 @@ from pathlib import Path
 from collections.abc import Callable
 
 from openglider.mesh import Mesh
+import openglider.rs
 from openglider.gui.app.app import GliderApp
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.gui.state.glider_list import GliderCache
@@ -11,7 +12,6 @@ from openglider.gui.views.compare.base import CompareView
 from openglider.gui.views.compare.glider_3d.actor import GliderActors
 from openglider.gui.views.compare.glider_3d.config import \
     GliderViewConfigWidget
-from openglider.gui.views_3d.actors import MeshView
 from openglider.gui.views_3d.widgets import View3D
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class Glider3DView(QtWidgets.QWidget, CompareView):
         self.layout().addWidget(self.config)
         self.actor_cache = Glider3DCache(app.state.projects)
 
-        self.imported_mesh_actor: MeshView | None = None
+        self.imported_mesh_actor: "openglider.rs.wgpu.MeshActor | None" = None
 
         self.clear_obj_button = QtWidgets.QPushButton("Remove OBJ", self)
         self.clear_obj_button.setVisible(False)
@@ -118,12 +118,10 @@ class Glider3DView(QtWidgets.QWidget, CompareView):
             return
 
         if self.imported_mesh_actor is not None:
-            self.view_3d.renderer.RemoveActor(self.imported_mesh_actor)
+            self.view_3d.remove_actor(self.imported_mesh_actor)
 
-        mesh_view = MeshView()
-        mesh_view.draw_mesh(mesh)
-        self.imported_mesh_actor = mesh_view
-        self.view_3d.show_actor(mesh_view)
+        self.imported_mesh_actor = openglider.rs.wgpu.MeshActor(mesh)
+        self.view_3d.show_actor(self.imported_mesh_actor)
         self.clear_obj_button.setVisible(True)
 
     def clear_imported_obj(self) -> None:

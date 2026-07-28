@@ -9,7 +9,6 @@ from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.mesh import Mesh
 import openglider.rs
 
-from openglider.gui.views_3d.actors import MeshView
 from openglider.gui.views_3d.interactor import OrbitInteractor
 
 
@@ -17,7 +16,7 @@ class _RendererShim:
     def __init__(self, view: "View3D") -> None:
         self._view = view
 
-    def RemoveActor(self, actor: MeshView) -> None:
+    def RemoveActor(self, actor: "openglider.rs.wgpu.MeshActor") -> None:
         self._view.remove_actor(actor)
 
 
@@ -45,6 +44,8 @@ class WgpuRenderWidget(QtWidgets.QWidget):
         self._interactor = OrbitInteractor()
         self._is_closing = False
         self._render_scheduled = False
+        # Maps id(actor) -> (actor, visible): tracks desired state for renderer re-creation
+        self._actor_state: dict[int, tuple[openglider.rs.wgpu.MeshActor, bool]] = {}
         self._activate_timer = QtCore.QTimer(self)
         self._activate_timer.setSingleShot(True)
         self._activate_timer.timeout.connect(self._activate_surface)
@@ -110,7 +111,6 @@ class WgpuRenderWidget(QtWidgets.QWidget):
             display_id,
         )
         self._apply_camera()
-        self._renderer.set_mesh(self._mesh)
         return self._renderer
 
     def _apply_camera(self) -> None:
@@ -149,6 +149,31 @@ class WgpuRenderWidget(QtWidgets.QWidget):
 
         renderer = self._ensure_renderer()
         if renderer is not None:
+            # Sync all actors that should be visible to the (possibly new) renderer
+            for actor, visible in self._actor_state.values():
+                if visible:
+                    renderer.add_actor(actor)
+            self._request_render()
+
+    def add_actor(self, actor: openglider.rs.wgpu.MeshActor) -> None:
+        """Register a MeshActor and make it visible."""
+        if self._is_closing:
+            return
+        self._actor_state[id(actor)] = (actor, True)
+        renderer = self._ensure_renderer()
+        if renderer is not None:
+            renderer.add_actor(actor)
+            self._request_render()
+
+    def remove_actor(self, actor: openglider.rs.wgpu.MeshActor) -> None:
+        """Hide a MeshActor (keeps GPU data cached for instant re-show)."""
+        if self._is_closing:
+            return
+        if id(actor) in self._actor_state:
+            self._actor_state[id(actor)] = (actor, False)
+        renderer = self._renderer
+        if renderer is not None:
+            renderer.remove_actor(actor)
             self._request_render()
 
     def set_mesh(self, mesh: Mesh) -> None:
@@ -159,6 +184,39 @@ class WgpuRenderWidget(QtWidgets.QWidget):
         renderer = self._renderer
         if renderer is not None:
             renderer.set_mesh(mesh)
+            # Enable boundary-only edges so each mesh keeps its boundary cached
+            renderer.set_draw_edges(True)
+            renderer.set_boundary_only(True)
+            self._request_render()
+
+    def add_mesh(self, name: str, mesh: Mesh, draw_edges: bool | None = None, boundary_only: bool | None = None) -> None:
+        """Add a named mesh to the renderer with optional per-mesh edge settings."""
+        if self._is_closing:
+            return
+
+        renderer = self._ensure_renderer()
+        if renderer is not None:
+            renderer.add_mesh(name, mesh, draw_edges=draw_edges, boundary_only=boundary_only)
+            self._request_render()
+
+    def remove_mesh(self, name: str) -> None:
+        """Remove a named mesh from the renderer."""
+        if self._is_closing:
+            return
+
+        renderer = self._renderer
+        if renderer is not None:
+            renderer.remove_mesh(name)
+            self._request_render()
+
+    def clear_meshes(self) -> None:
+        """Clear all meshes from the renderer."""
+        if self._is_closing:
+            return
+
+        renderer = self._renderer
+        if renderer is not None:
+            renderer.clear_meshes()
             self._request_render()
 
     def showEvent(self, event: QtGui.QShowEvent) -> None:
@@ -263,7 +321,7 @@ class View3D(QtWidgets.QWidget):
         self.render_window_interactor = self.render_widget
         self.renderer = _RendererShim(self)
 
-        self._actors: list[MeshView] = []
+        self._actors: list[openglider.rs.wgpu.MeshActor] = []
 
         self._has_rendered = False
         self.clear(autorerender=False)
@@ -277,36 +335,32 @@ class View3D(QtWidgets.QWidget):
             self._has_rendered = True
 
     def clear(self, autorerender: bool=True) -> None:
+        for actor in self._actors:
+            self.render_widget.remove_actor(actor)
         self._actors.clear()
         if autorerender:
-            self.rerender()
+            self.render_widget._request_render()
 
-    def show_actor(self, actor: MeshView) -> None:
+    def show_actor(self, actor: openglider.rs.wgpu.MeshActor) -> None:
         if actor not in self._actors:
             self._actors.append(actor)
-        self.rerender()
+        self.render_widget.add_actor(actor)
 
-    def remove_actor(self, actor: MeshView) -> None:
+    def remove_actor(self, actor: openglider.rs.wgpu.MeshActor) -> None:
         if actor in self._actors:
             self._actors.remove(actor)
-            self.rerender()
+        self.render_widget.remove_actor(actor)
 
-    def _compose_mesh(self) -> Mesh:
-        result: Mesh | None = None
-        for actor in self._actors:
-            if result is None:
-                result = actor.mesh.copy()
-            else:
-                result = result + actor.mesh
-
-        if result is None:
-            return Mesh(name="empty")
-        return result
+    def _add_actor_to_renderer(self, mesh: Mesh, actor_type: str) -> None:
+        """Legacy helper - kept for any external callers."""
+        pass
 
     def rerender(self) -> None:
         if self.render_widget._is_closing:
             return
-        self.render_widget.set_mesh(self._compose_mesh())
+        # Re-register all visible actors (idempotent - GPU data cached after first upload)
+        for actor in self._actors:
+            self.render_widget.add_actor(actor)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.render_widget._is_closing = True

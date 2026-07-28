@@ -1,21 +1,23 @@
 import logging
 
 import openglider.mesh
+import openglider.rs
 from openglider.glider.glider import Glider
 from openglider.glider.project import GliderProject
 from openglider.gui.views_3d.widgets import View3D
-from openglider.gui.views_3d.actors import MeshView
+from openglider.mesh import Mesh
 from openglider.gui.views.compare.glider_3d.config import GliderViewConfig
 
 
 logger = logging.getLogger(__name__)
 
 
+
 class GliderActors:
     project: GliderProject
     glider_3d: Glider | None
     config: GliderViewConfig | None
-    actors: dict[str, MeshView]
+    actors: dict
 
     def __init__(self, project: GliderProject):
         self.project = project
@@ -23,7 +25,7 @@ class GliderActors:
         self.actors = {}
         self.config = None
         
-    def get_panels(self, numribs: int) -> MeshView:
+    def get_panels(self, numribs: int):
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
 
@@ -37,11 +39,9 @@ class GliderActors:
                 if not (i == 0 and self.glider_3d.has_center_cell):
                     panel_mesh += mesh_temp.copy().mirror("y")
 
-        mesh_view = MeshView()
-        mesh_view.draw_mesh(panel_mesh)
-        return mesh_view
+        return openglider.rs.wgpu.MeshActor(panel_mesh, draw_edges=False)
     
-    def get_ribs(self, hole_numpoints: int) -> MeshView:
+    def get_ribs(self, hole_numpoints: int):
         ribs_mesh = openglider.mesh.Mesh()
 
         if self.glider_3d is None:
@@ -56,22 +56,17 @@ class GliderActors:
             if i > self.glider_3d.has_center_cell:
                 ribs_mesh += mesh_temp.copy().mirror("y")
 
-        mesh_view = MeshView()
-        mesh_view.draw_mesh(ribs_mesh)
-        return mesh_view
+        return openglider.rs.wgpu.MeshActor(ribs_mesh, draw_edges=True, boundary_only=True)
 
-    def get_lines(self, numpoints: int=3) -> MeshView:
+    def get_lines(self, numpoints: int=3):
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
 
         mesh_lineset = self.glider_3d.lineset.get_mesh(numpoints=numpoints)
-
-        mesh_view = MeshView()
-        mesh_view.draw_mesh(mesh_lineset + mesh_lineset.copy().mirror("y"))
-
-        return mesh_view
+        mesh = mesh_lineset + mesh_lineset.copy().mirror("y")
+        return openglider.rs.wgpu.MeshActor(mesh)
     
-    def get_diagonals(self, hole_numpoints: int, numribs: int) -> MeshView:
+    def get_diagonals(self, hole_numpoints: int, numribs: int):
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
 
@@ -84,11 +79,9 @@ class GliderActors:
                 if cell_no > 0 or not self.glider_3d.has_center_cell:
                     mesh += cell_mesh.copy().mirror("y")
         
-        mesh_view = MeshView()
-        mesh_view.draw_mesh(mesh)
-        return mesh_view
+        return openglider.rs.wgpu.MeshActor(mesh, draw_edges=True, boundary_only=True)
 
-    def get_straps(self, numribs: int) -> MeshView:
+    def get_straps(self, numribs: int):
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
             
@@ -108,11 +101,9 @@ class GliderActors:
                 if cell_no > 0 or not self.glider_3d.has_center_cell:
                     mesh += cell_mesh.copy().mirror("y")
         
-        mesh_view = MeshView()
-        mesh_view.draw_mesh(mesh)
-        return mesh_view
+        return openglider.rs.wgpu.MeshActor(mesh, draw_edges=True, boundary_only=True)
     
-    def get_miniribs(self) -> MeshView:
+    def get_miniribs(self):
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
             
@@ -125,9 +116,7 @@ class GliderActors:
                 if cell_no > 0 or not self.glider_3d.has_center_cell:
                     mesh += minirib_mesh.copy().mirror("y")
         
-        mesh_view = MeshView()
-        mesh_view.draw_mesh(mesh)
-        return mesh_view
+        return openglider.rs.wgpu.MeshActor(mesh, draw_edges=False)
     
  
     def add(self, view_3d: View3D, config: GliderViewConfig) -> None:
@@ -148,7 +137,6 @@ class GliderActors:
                 "diagonals": self.get_diagonals(config.hole_numpoints, config.numribs),
                 "straps": self.get_straps(config.numribs),
                 "miniribs": self.get_miniribs()
-
             }
         
         for name in config.get_active_keys():
@@ -161,7 +149,7 @@ class GliderActors:
             return
 
         for name in self.config.get_active_keys():
-            view_3d.renderer.RemoveActor(self.actors[name])
+            view_3d.remove_actor(self.actors[name])
 
     def update(self, view_3d: View3D, config: GliderViewConfig) -> None:
         self.remove(view_3d)
