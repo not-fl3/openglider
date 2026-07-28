@@ -341,15 +341,26 @@ class View3D(QtWidgets.QWidget):
         if autorerender:
             self.render_widget._request_render()
 
-    def show_actor(self, actor: openglider.rs.wgpu.MeshActor) -> None:
-        if actor not in self._actors:
-            self._actors.append(actor)
-        self.render_widget.add_actor(actor)
+    @staticmethod
+    def _unwrap_actor(actor: object) -> openglider.rs.wgpu.MeshActor:
+        if isinstance(actor, openglider.rs.wgpu.MeshActor):
+            return actor
+        wrapped = getattr(actor, "actor", None)
+        if isinstance(wrapped, openglider.rs.wgpu.MeshActor):
+            return wrapped
+        raise TypeError("View3D.show_actor expects MeshActor or wrapper with .actor")
 
-    def remove_actor(self, actor: openglider.rs.wgpu.MeshActor) -> None:
-        if actor in self._actors:
-            self._actors.remove(actor)
-        self.render_widget.remove_actor(actor)
+    def show_actor(self, actor: object) -> None:
+        actor_obj = self._unwrap_actor(actor)
+        if actor_obj not in self._actors:
+            self._actors.append(actor_obj)
+        self.render_widget.add_actor(actor_obj)
+
+    def remove_actor(self, actor: object) -> None:
+        actor_obj = self._unwrap_actor(actor)
+        if actor_obj in self._actors:
+            self._actors.remove(actor_obj)
+        self.render_widget.remove_actor(actor_obj)
 
     def _add_actor_to_renderer(self, mesh: Mesh, actor_type: str) -> None:
         """Legacy helper - kept for any external callers."""
