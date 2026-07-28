@@ -2,7 +2,7 @@ import logging
 from typing import Dict
 
 from openglider.gui.app.app import GliderApp
-from openglider.gui.qt import QtWidgets
+from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.gui.views.compare.arc import ArcView
 from openglider.gui.views.compare.base import CompareView
 from openglider.gui.views.compare.cell import CellView
@@ -66,9 +66,12 @@ class GliderPreview(QtWidgets.QWidget):
     def set_tab(self) -> None:
         name = self.get_active_view_name()
         self.app.state.current_preview = name
-        self.update_current()
+        QtCore.QTimer.singleShot(0, self.update_current)
 
     def update_current(self) -> None:
+        if getattr(self, '_is_closing', False):
+            return
+
         if not self.app.state.current_preview:
             name = self.get_active_view_name()
             if name:
@@ -76,9 +79,23 @@ class GliderPreview(QtWidgets.QWidget):
             else:
                 return
 
+        if self.app.state.current_preview not in self.tabs:
+            return
+
         if self.app.state.current_preview != self.get_active_view_name():
             if self.app.state.current_preview in self.tab_names:
                 self.tabs_widget.setCurrentIndex(self.tab_names.index(self.app.state.current_preview))
 
         self.tabs[self.app.state.current_preview].update_view()
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self._is_closing = True
+        blocker = QtCore.QSignalBlocker(self.tabs_widget)
+        for widget in self.tabs.values():
+            widget.close()
+
+        self.tabs_widget.clear()
+        self.tabs.clear()
+        del blocker
+        super().closeEvent(event)
 

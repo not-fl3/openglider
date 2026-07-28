@@ -399,6 +399,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.app.loop.run_until_complete(self.task_queue.queue.quit())
                 event.accept()
         if should_quit and not self.app.reloading:
+            self.top_panel.blockSignals(True)
+            self.top_panel.clear()
+            self.top_panel.blockSignals(False)
+            self.glider_preview = None
+            self.overview = None
+            self.glider_list = None
+            self.console = None
+            self.log_filter_panel = None
             self.app.quit()
         
         

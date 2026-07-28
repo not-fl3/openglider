@@ -1,27 +1,110 @@
-from typing import Any
-from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+
+from openglider.gui.qt import QtCore, QtGui
 
 
-class Interactor(vtkInteractorStyleTrackballCamera):
+@dataclass
+class OrbitCameraState:
+    yaw: float = -1.2
+    pitch: float = 0.3
+    distance: float = 20.0
+    target_x: float = 0.0
+    target_y: float = 0.0
+    target_z: float = 0.0
+
+
+class OrbitInteractor:
+    """Simple orbit/pan/zoom camera interactor driven by Qt mouse events."""
+
+    ORBIT_SENSITIVITY = 0.008
+    PAN_SENSITIVITY = 0.0025
+    DOLLY_SENSITIVITY = 0.006
+
     def __init__(self) -> None:
-        super().__init__()
-        self.AddObserver("MiddleButtonPressEvent",self.middleButtonPressEvent)  # type: ignore
-        self.AddObserver("MiddleButtonReleaseEvent",self.middleButtonReleaseEvent)  # type: ignore
-        self.AddObserver("RightButtonPressEvent",self.rightButtonPressEvent)  # type: ignore
-        self.AddObserver("RightButtonReleaseEvent",self.rightButtonReleaseEvent)  # type: ignore
+        self.camera = OrbitCameraState()
+        self._last_pos: QtCore.QPointF | None = None
 
-    def middleButtonPressEvent(self, obj: Any,event: Any) -> None:
-        self.OnRightButtonDown()
-        return
+    def begin_drag(self, event: QtGui.QMouseEvent) -> None:
+        self._last_pos = event.position()
 
-    def middleButtonReleaseEvent(self, obj: Any,event: Any) -> None:
-        self.OnRightButtonUp()
-        return
+    def end_drag(self) -> None:
+        self._last_pos = None
 
-    def rightButtonPressEvent(self, obj: Any,event: Any) -> None:
-        self.OnMiddleButtonDown()
-        return
+    def drag(self, event: QtGui.QMouseEvent) -> bool:
+        if self._last_pos is None:
+            self._last_pos = event.position()
+            return False
 
-    def rightButtonReleaseEvent(self, obj: Any,event: Any) -> None:
-        self.OnMiddleButtonUp()
-        return
+        current = event.position()
+        delta = current - self._last_pos
+        self._last_pos = current
+        dx = float(delta.x())
+        dy = float(delta.y())
+
+        is_shift = bool(event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier)
+
+        # Requested mappings:
+        # - Left drag: orbit
+        # - Right drag: pan
+        # - Middle drag or Shift+Left: pan
+        if event.buttons() & QtCore.Qt.MouseButton.MiddleButton or (
+            is_shift and event.buttons() & QtCore.Qt.MouseButton.LeftButton
+        ):
+            self._pan(dx, dy)
+            return True
+
+        if event.buttons() & QtCore.Qt.MouseButton.LeftButton:
+            self.camera.yaw -= dx * self.ORBIT_SENSITIVITY
+            self.camera.pitch += dy * self.ORBIT_SENSITIVITY
+            self.camera.pitch = max(-1.54, min(1.54, self.camera.pitch))
+            return True
+
+        if event.buttons() & QtCore.Qt.MouseButton.RightButton:
+            self._pan(dx, dy)
+            return True
+
+        return False
+
+    def zoom(self, angle_delta_y: int) -> bool:
+        factor = math.exp(-angle_delta_y / 960.0)
+        self.camera.distance = max(0.05, self.camera.distance * factor)
+        return True
+
+    def _pan(self, dx: float, dy: float) -> None:
+        # Screen-space pan based on the current camera frame.
+        scale = self.PAN_SENSITIVITY * max(0.05, self.camera.distance)
+
+        cy = math.cos(self.camera.yaw)
+        sy = math.sin(self.camera.yaw)
+        cp = math.cos(self.camera.pitch)
+        sp = math.sin(self.camera.pitch)
+
+        # Forward points from camera to target in a z-up frame.
+        fx = -cp * cy
+        fy = -cp * sy
+        fz = -sp
+
+        # Right = normalize(forward x world_up), with world_up=(0,0,1)
+        rx = fy
+        ry = -fx
+        rz = 0.0
+        rlen = math.sqrt(rx * rx + ry * ry + rz * rz)
+        if rlen > 1e-6:
+            rx /= rlen
+            ry /= rlen
+
+        # Up = right x forward
+        ux = ry * fz - rz * fy
+        uy = rz * fx - rx * fz
+        uz = rx * fy - ry * fx
+
+        self.camera.target_x += (-rx * dx + ux * dy) * scale
+        self.camera.target_y += (-ry * dx + uy * dy) * scale
+        self.camera.target_z += (-rz * dx + uz * dy) * scale
+
+    def _dolly(self, dy: float) -> None:
+        factor = math.exp(dy * self.DOLLY_SENSITIVITY)
+        self.camera.distance = max(0.05, self.camera.distance * factor)

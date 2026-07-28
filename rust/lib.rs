@@ -7,6 +7,7 @@ mod spline;
 mod voronoi;
 mod vector;
 mod cell;
+mod wgpu_renderer;
 
 #[pyfunction]
 #[pyo3(signature = (a, b, c))]
@@ -51,4 +52,6 @@ mod rs {
     use crate::voronoi::voronoi_mod as voronoi;
     #[pymodule_export]
     use crate::vector::vector_mod as vector;
+    #[pymodule_export]
+    use crate::wgpu_renderer::wgpu_mod as wgpu;
 }

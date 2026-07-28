@@ -6,7 +6,9 @@ os.environ["FORCE_QT_API"] = "pyside6"
 os.environ["QT_API"] = "pyside6"
 
 if sys.platform.startswith("linux"):
-    os.environ["QT_QPA_PLATFORM"] = "xcb"
+    platform_override = os.environ.get("OPENGLIDER_QT_PLATFORM")
+    if platform_override:
+        os.environ["QT_QPA_PLATFORM"] = platform_override
 
 
 def start_main_window() -> None:
