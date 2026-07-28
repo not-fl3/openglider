@@ -17,8 +17,9 @@ import qtmodern.styles
 import qtmodern.windows
 
 from openglider.version import __version__
-from openglider.gui.qt import QtWidgets
+from openglider.gui.qt import QtCore, QtWidgets
 from openglider.gui.app.files import OpengliderDir
+from openglider.gui.app.splash import SplashController
 from qasync import QEventLoop
 
 if TYPE_CHECKING:
@@ -48,11 +49,19 @@ class GliderApp(QtWidgets.QApplication):
         self.loop = QEventLoop(self)
         asyncio.set_event_loop(self.loop)
 
+        self.splash_controller = SplashController(
+            __version__,
+            logger,
+            default_delay_ms=2500,
+        )
+        self.splash_controller.show()
 
         sys.excepthook = self.show_exception
 
+    def _bootstrap_startup(self) -> None:
         self.setup()
-    
+        self.splash_controller.schedule_finish(self.main_window)
+
     def setup(self) -> None:
         logger.info("Load modules")
         import openglider.gui.app.main_window
@@ -110,6 +119,7 @@ class GliderApp(QtWidgets.QApplication):
     def run(self) -> None:
         with self.loop:
             try:
+                QtCore.QTimer.singleShot(0, self._bootstrap_startup)
                 self.loop.run_forever()
             finally:
                 self.loop.run_until_complete(self._shutdown_async())
