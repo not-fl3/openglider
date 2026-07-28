@@ -1,4 +1,5 @@
 import logging
+import math
 from pathlib import Path
 from collections.abc import Callable
 
@@ -31,9 +32,17 @@ class DropView3D(View3D):
         self.on_obj_drop = on_obj_drop
         self.setAcceptDrops(True)
         self.frame.setAcceptDrops(True)
-        self.VTKRenderWindowInteractor.setAcceptDrops(True)
+        self.render_window_interactor.setAcceptDrops(True)
         self.frame.installEventFilter(self)
-        self.VTKRenderWindowInteractor.installEventFilter(self)
+        self.render_window_interactor.installEventFilter(self)
+
+
+        # set defautl camera
+        self.render_widget._interactor.camera.yaw = -math.pi * 3 / 4
+        self.render_widget._interactor.camera.pitch = 0.3
+        self.render_widget._interactor.camera.distance = 10.0
+        self.render_widget._interactor.camera.target_z = -2
+
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         event_type = event.type()

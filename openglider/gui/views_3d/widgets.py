@@ -260,7 +260,7 @@ class View3D(QtWidgets.QWidget):
         self.frame.layout().addWidget(self.render_widget)
 
         # Backwards-compatible names used by drop handlers.
-        self.VTKRenderWindowInteractor = self.render_widget
+        self.render_window_interactor = self.render_widget
         self.renderer = _RendererShim(self)
 
         self._actors: list[MeshView] = []
