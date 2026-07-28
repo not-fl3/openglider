@@ -5,6 +5,7 @@ import functools
 import logging
 import sys
 import time
+import contextlib
 from typing import Any, TypeVar, ParamSpec, Self
 from collections.abc import Callable
 
@@ -129,7 +130,7 @@ class TaskQueue:
             execute_function = asyncio.ensure_future
             
         self.execute = execute_function
-        asyncio.ensure_future(self.process())
+        self._process_task = asyncio.ensure_future(self.process())
 
     def add(self, task: Task) -> None:
         self.tasks.append(task)
@@ -145,6 +146,18 @@ class TaskQueue:
         for task in self.tasks:
             if task.running:
                 await task.stop()
+
+    async def shutdown(self) -> None:
+        """Stop queue processing and tear down process workers gracefully."""
+        self.running = False
+        await self.quit()
+
+        if hasattr(self, "_process_task"):
+            self._process_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._process_task
+
+        self.pool.shutdown(wait=False, cancel_futures=True)
     
     async def process(self) -> None:
         self.running = True

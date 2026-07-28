@@ -55,7 +55,7 @@ def start_main_window() -> None:
 
     #os.killpg(0, signal.SIGKILL)
     app.state.clean()
-    sys.exit(0)
+    return
 
 
 if __name__ == '__main__':

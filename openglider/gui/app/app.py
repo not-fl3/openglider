@@ -32,6 +32,7 @@ class GliderApp(QtWidgets.QApplication):
     exception_window: QtWidgets.QMessageBox | None = None
     state: ApplicationState
     reloading = False
+    _shutdown_done = False
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
@@ -108,7 +109,20 @@ class GliderApp(QtWidgets.QApplication):
     
     def run(self) -> None:
         with self.loop:
-            self.loop.run_forever()
+            try:
+                self.loop.run_forever()
+            finally:
+                self.loop.run_until_complete(self._shutdown_async())
+
+    async def _shutdown_async(self) -> None:
+        if self._shutdown_done:
+            return
+
+        self._shutdown_done = True
+
+        task_queue = getattr(self, "task_queue", None)
+        if task_queue is not None:
+            await task_queue.shutdown()
 
 
     async def execute(self, function: Callable[[Any], Any], *args: Any, **kwargs: Any) -> Any:
