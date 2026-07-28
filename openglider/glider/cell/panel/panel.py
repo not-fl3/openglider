@@ -377,22 +377,20 @@ class Panel(BaseModel):
 
             nodes += list(midrib.get(front, back))
 
-        points = [mesh.Vertex(p[0], p[1], p[2]) for p in nodes]
-
-        polygons: list[mesh.Polygon] = []
+        polygons: list[tuple[tuple[int, ...], dict[str, Any]]] = []
 
         # helper functions
-        def left_triangle(l_i: int, r_i: int) -> list[mesh.Polygon]:
-            return [mesh.Polygon([points[l_i+1], points[l_i], points[r_i]])]
+        def left_triangle(l_i: int, r_i: int) -> list[tuple[tuple[int, int, int], dict[str, Any]]]:
+            return [((l_i+1, l_i, r_i), {})]
 
-        def right_triangle(l_i: int, r_i: int) -> list[mesh.Polygon]:
-            return [mesh.Polygon([points[r_i+1], points[l_i], points[r_i]])]
+        def right_triangle(l_i: int, r_i: int) -> list[tuple[tuple[int, int, int], dict[str, Any]]]:
+            return [((r_i+1, l_i, r_i), {})]
 
-        def quad(l_i: int, r_i: int) -> list[mesh.Polygon]:
+        def quad(l_i: int, r_i: int) -> list[tuple[tuple[int, ...], dict[str, Any]]]:
             if tri:
                 return left_triangle(l_i, r_i) + right_triangle(l_i+1, r_i)
             else:
-                return [mesh.Polygon([points[l_i+1], points[l_i], points[r_i], points[r_i+1]])]
+                return [((l_i+1, l_i, r_i, r_i+1), {})]
 
         for rib_no, _ in enumerate(rib_iks[:-1]):
             x = (2*rib_no+1) / (numribs+1) / 2
@@ -404,7 +402,7 @@ class Panel(BaseModel):
             l_i = r_i = 0            
 
             while l_i < len(indices_left)-1 or r_i < len(indices_right)-1:
-                poly: list[mesh.Polygon] | None = None
+                poly: list[tuple[tuple[int, ...], dict[str, Any]]] | None = None
                 if l_i == len(indices_left) - 1:
                     poly = right_triangle(indices_left[l_i], indices_right[r_i])
                     r_i += 1
@@ -435,16 +433,15 @@ class Panel(BaseModel):
                 
                 if poly is not None:
                     for p in poly:
-                        p.attributes["center"] = [x, x_value_interpolation.get_value(sum(iks)/len(iks))]
+                        p[1]["center"] = [x, x_value_interpolation.get_value(sum(iks)/len(iks))]
 
                     polygons += poly
 
         mesh_data = {
             f"panel_{self.material}#{self.material.color_code}": polygons,
-            }
+        }
 
-
-        return mesh.Mesh(mesh_data, name=self.name)
+        return mesh.Mesh.from_indexed(nodes, mesh_data, name=self.name)
 
     def mirror(self) -> Panel:
         """

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import openglider.rs
 from openglider.glider.cell import cell
 from openglider.glider.cell.panel import cuts
-from openglider.mesh.mesh import Mesh
+from openglider.mesh import Mesh
 from openglider.glider.cell.panel.panel import PANELCUT_TYPES, FlattenedPanel
 from openglider.utils.dataclass import dataclass
 import openglider.vector.drawing

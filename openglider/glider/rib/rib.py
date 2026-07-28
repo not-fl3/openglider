@@ -246,7 +246,7 @@ class Rib(RibBase):
         if self.is_closed():
             # stabi
             # TODO: return line
-            return Mesh.from_indexed([], {}, {})
+            return Mesh.from_indexed([], {})
 
         outline = self.get_hull().curve
         hole_curves: list[openglider.rs.vector.PolyLine2D] = []
@@ -265,9 +265,8 @@ class Rib(RibBase):
             mesh = tri.triangulate()
 
             points = self.align_all(openglider.rs.vector.PolyLine2D(mesh.points))
-            boundaries = {self.name: list(range(len(mesh.points)))}
 
-            rib_mesh = Mesh.from_indexed(points.nodes, polygons={f"ribs_{self.material}": [(tri, {}) for tri in mesh.elements]} , boundaries=boundaries)
+            rib_mesh = Mesh.from_indexed(points.nodes, polygons={f"ribs_{self.material}": [(tri, {}) for tri in mesh.elements]})
 
             for hole in self.holes:
                 if hole_mesh := hole.get_mesh(self):

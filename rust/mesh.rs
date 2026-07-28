@@ -1,8 +1,1019 @@
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyTuple};
 use spade::{ConstrainedDelaunayTriangulation, Point2, RefinementParameters, Triangulation};
 use std::collections::HashMap;
+use std::fs;
 
 use crate::vector::{PolyLine2D, Vector2D, Vector3D};
+
+#[derive(Debug, Clone)]
+struct UnionFind {
+    parent: Vec<usize>,
+    rank: Vec<u8>,
+}
+
+impl UnionFind {
+    fn new(size: usize) -> Self {
+        Self {
+            parent: (0..size).collect(),
+            rank: vec![0; size],
+        }
+    }
+
+    fn find(&mut self, node: usize) -> usize {
+        if self.parent[node] != node {
+            let root = self.find(self.parent[node]);
+            self.parent[node] = root;
+        }
+        self.parent[node]
+    }
+
+    fn union(&mut self, a: usize, b: usize) {
+        let mut root_a = self.find(a);
+        let mut root_b = self.find(b);
+
+        if root_a == root_b {
+            return;
+        }
+
+        if self.rank[root_a] < self.rank[root_b] {
+            std::mem::swap(&mut root_a, &mut root_b);
+        }
+
+        self.parent[root_b] = root_a;
+        if self.rank[root_a] == self.rank[root_b] {
+            self.rank[root_a] += 1;
+        }
+    }
+}
+
+fn cell_coords(point: &Vector3D, cell_size: f64) -> (i64, i64, i64) {
+    (
+        (point.x / cell_size).floor() as i64,
+        (point.y / cell_size).floor() as i64,
+        (point.z / cell_size).floor() as i64,
+    )
+}
+
+fn duplicate_representatives_impl(points: &[Vector3D], max_distance: f64) -> Vec<usize> {
+    if points.is_empty() {
+        return Vec::new();
+    }
+
+    if max_distance <= 0.0 {
+        return (0..points.len()).collect();
+    }
+
+    let mut union_find = UnionFind::new(points.len());
+    let mut buckets: HashMap<(i64, i64, i64), Vec<usize>> = HashMap::new();
+
+    for (index, point) in points.iter().enumerate() {
+        let (cx, cy, cz) = cell_coords(point, max_distance);
+
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                for dz in -1..=1 {
+                    if let Some(candidates) = buckets.get(&(cx + dx, cy + dy, cz + dz)) {
+                        for candidate_index in candidates {
+                            if points[index].distance(&points[*candidate_index]) < max_distance {
+                                union_find.union(index, *candidate_index);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        buckets.entry((cx, cy, cz)).or_default().push(index);
+    }
+
+    let mut root_to_representative: HashMap<usize, usize> = HashMap::new();
+    let mut representatives = vec![0usize; points.len()];
+
+    for index in 0..points.len() {
+        let root = union_find.find(index);
+        root_to_representative
+            .entry(root)
+            .and_modify(|existing| {
+                if index < *existing {
+                    *existing = index;
+                }
+            })
+            .or_insert(index);
+    }
+
+    for (index, representative_slot) in representatives.iter_mut().enumerate() {
+        let root = union_find.find(index);
+        *representative_slot = *root_to_representative.get(&root).unwrap();
+    }
+
+    representatives
+}
+
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug)]
+pub struct Line {
+    #[pyo3(get, set)]
+    pub a: usize,
+    #[pyo3(get, set)]
+    pub b: usize,
+}
+
+#[pymethods]
+impl Line {
+    #[new]
+    fn new(a: usize, b: usize) -> Self {
+        Self { a, b }
+    }
+
+    fn as_tuple(&self) -> (usize, usize) {
+        (self.a, self.b)
+    }
+
+}
+
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug)]
+pub struct Triangle {
+    #[pyo3(get, set)]
+    pub a: usize,
+    #[pyo3(get, set)]
+    pub b: usize,
+    #[pyo3(get, set)]
+    pub c: usize,
+}
+
+#[pymethods]
+impl Triangle {
+    #[new]
+    fn new(a: usize, b: usize, c: usize) -> Self {
+        Self { a, b, c }
+    }
+
+    fn as_tuple(&self) -> (usize, usize, usize) {
+        (self.a, self.b, self.c)
+    }
+
+}
+
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug)]
+pub struct Quad {
+    #[pyo3(get, set)]
+    pub a: usize,
+    #[pyo3(get, set)]
+    pub b: usize,
+    #[pyo3(get, set)]
+    pub c: usize,
+    #[pyo3(get, set)]
+    pub d: usize,
+}
+
+#[pymethods]
+impl Quad {
+    #[new]
+    fn new(a: usize, b: usize, c: usize, d: usize) -> Self {
+        Self { a, b, c, d }
+    }
+
+    fn as_tuple(&self) -> (usize, usize, usize, usize) {
+        (self.a, self.b, self.c, self.d)
+    }
+
+}
+
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug)]
+pub struct MeshObject {
+    #[pyo3(get, set)]
+    pub name: String,
+    #[pyo3(get, set)]
+    pub color: (u8, u8, u8),
+    #[pyo3(get)]
+    pub lines: Vec<Line>,
+    #[pyo3(get)]
+    pub triangles: Vec<Triangle>,
+    #[pyo3(get)]
+    pub quads: Vec<Quad>,
+}
+
+#[pymethods]
+impl MeshObject {
+    #[new]
+    #[pyo3(signature = (name, color = (255, 255, 255), lines = None, triangles = None, quads = None))]
+    fn new(
+        name: String,
+        color: (u8, u8, u8),
+        lines: Option<Vec<Line>>,
+        triangles: Option<Vec<Triangle>>,
+        quads: Option<Vec<Quad>>,
+    ) -> Self {
+        Self {
+            name,
+            color,
+            lines: lines.unwrap_or_default(),
+            triangles: triangles.unwrap_or_default(),
+            quads: quads.unwrap_or_default(),
+        }
+    }
+}
+
+#[pyclass(from_py_object)]
+#[derive(Clone, Debug)]
+pub struct Mesh {
+    #[pyo3(get, set)]
+    pub name: String,
+    #[pyo3(get)]
+    pub points: Vec<Vector3D>,
+    #[pyo3(get)]
+    pub objects: Vec<MeshObject>,
+}
+
+#[pymethods]
+impl Mesh {
+    #[new]
+    #[pyo3(signature = (name = "unnamed".to_string()))]
+    fn new(name: String) -> Self {
+        Self {
+            name,
+            points: Vec::new(),
+            objects: Vec::new(),
+        }
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (vertices, polygons, boundaries = None, name = "unnamed".to_string(), node_attributes = None))]
+    fn from_indexed(
+        py: Python<'_>,
+        vertices: Vec<Vector3D>,
+        polygons: HashMap<String, Vec<(Py<PyAny>, Py<PyAny>)>>,
+        boundaries: Option<Py<PyAny>>,
+        name: String,
+        node_attributes: Option<Vec<Py<PyAny>>>,
+    ) -> PyResult<Self> {
+        let _ = boundaries;
+        let _ = node_attributes;
+
+        let mut mesh = Self::new(name);
+        mesh.points = vertices;
+
+        for (object_name, object_polygons) in polygons {
+            let color = parse_color_code(&object_name);
+            let mut object = MeshObject {
+                name: object_name,
+                color,
+                lines: Vec::new(),
+                triangles: Vec::new(),
+                quads: Vec::new(),
+            };
+
+            for (indices_raw, attributes) in object_polygons {
+                let _ = attributes;
+                let indices = extract_indices(py, &indices_raw)?;
+                match indices.len() {
+                    2 => object.lines.push(Line {
+                        a: indices[0],
+                        b: indices[1],
+                    }),
+                    3 => object.triangles.push(Triangle {
+                        a: indices[0],
+                        b: indices[1],
+                        c: indices[2],
+                    }),
+                    4 => object.quads.push(Quad {
+                        a: indices[0],
+                        b: indices[1],
+                        c: indices[2],
+                        d: indices[3],
+                    }),
+                    _ if indices.len() > 4 => {
+                        for i in 1..indices.len() - 1 {
+                            object.triangles.push(Triangle {
+                                a: indices[0],
+                                b: indices[i],
+                                c: indices[i + 1],
+                            });
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            mesh.objects.push(object);
+        }
+
+        Ok(mesh)
+    }
+
+    #[staticmethod]
+    #[pyo3(signature = (path, name = None))]
+    fn from_obj(_py: Python<'_>, path: &Bound<'_, PyAny>, name: Option<String>) -> PyResult<Self> {
+        let path_string = stringify_path(path)?;
+        let content = fs::read_to_string(&path_string).map_err(|error| {
+            pyo3::exceptions::PyIOError::new_err(format!("failed to read {path_string}: {error}"))
+        })?;
+
+        let mut points: Vec<Vector3D> = Vec::new();
+        let mut objects: HashMap<String, MeshObject> = HashMap::new();
+        let mut current_group = name.clone().unwrap_or_else(|| {
+            std::path::Path::new(&path_string)
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or("obj")
+                .to_string()
+        });
+
+        for line in content.lines() {
+            let stripped = line.trim();
+            if stripped.is_empty() || stripped.starts_with('#') {
+                continue;
+            }
+
+            let parts: Vec<&str> = stripped.split_whitespace().collect();
+            if parts.is_empty() {
+                continue;
+            }
+
+            match parts[0] {
+                "v" if parts.len() >= 4 => {
+                    let x = parts[1].parse::<f64>().unwrap_or(0.0);
+                    let y = parts[2].parse::<f64>().unwrap_or(0.0);
+                    let z = parts[3].parse::<f64>().unwrap_or(0.0);
+                    points.push(Vector3D { x, y, z });
+                }
+                "o" | "g" if parts.len() >= 2 => {
+                    current_group = parts[1..].join(" ");
+                }
+                "f" | "l" if parts.len() >= 3 => {
+                    let mut indices: Vec<usize> = Vec::new();
+                    for token in &parts[1..] {
+                        let vertex_token = token.split('/').next().unwrap_or("");
+                        if vertex_token.is_empty() {
+                            continue;
+                        }
+                        let raw = vertex_token.parse::<isize>().unwrap_or(0);
+                        let resolved = if raw > 0 {
+                            (raw - 1) as usize
+                        } else if raw < 0 {
+                            (points.len() as isize + raw) as usize
+                        } else {
+                            continue;
+                        };
+                        indices.push(resolved);
+                    }
+
+                    if indices.is_empty() {
+                        continue;
+                    }
+
+                    let object = objects.entry(current_group.clone()).or_insert_with(|| {
+                        MeshObject {
+                            name: current_group.clone(),
+                            color: parse_color_code(&current_group),
+                            lines: Vec::new(),
+                            triangles: Vec::new(),
+                            quads: Vec::new(),
+                        }
+                    });
+
+                    match indices.len() {
+                        2 => object.lines.push(Line {
+                            a: indices[0],
+                            b: indices[1],
+                        }),
+                        3 => object.triangles.push(Triangle {
+                            a: indices[0],
+                            b: indices[1],
+                            c: indices[2],
+                        }),
+                        4 => object.quads.push(Quad {
+                            a: indices[0],
+                            b: indices[1],
+                            c: indices[2],
+                            d: indices[3],
+                        }),
+                        _ => {
+                            for i in 1..indices.len() - 1 {
+                                object.triangles.push(Triangle {
+                                    a: indices[0],
+                                    b: indices[i],
+                                    c: indices[i + 1],
+                                });
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let mesh_name = name.unwrap_or_else(|| {
+            std::path::Path::new(&path_string)
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or("obj")
+                .to_string()
+        });
+
+        Ok(Self {
+            name: mesh_name,
+            points,
+            objects: objects.into_values().collect(),
+        })
+    }
+
+    fn add_point(&mut self, point: PyRef<'_, Vector3D>) -> usize {
+        let index = self.points.len();
+        self.points.push(*point);
+        index
+    }
+
+    #[pyo3(signature = (name, color = (255, 255, 255)))]
+    fn add_object(&mut self, name: String, color: (u8, u8, u8)) -> usize {
+        self.objects.push(MeshObject {
+            name,
+            color,
+            lines: Vec::new(),
+            triangles: Vec::new(),
+            quads: Vec::new(),
+        });
+        self.objects.len() - 1
+    }
+
+    fn add_line(&mut self, object_index: usize, line: PyRef<'_, Line>) {
+        if let Some(object) = self.objects.get_mut(object_index) {
+            object.lines.push(line.clone());
+        }
+    }
+
+    fn add_triangle(&mut self, object_index: usize, triangle: PyRef<'_, Triangle>) {
+        if let Some(object) = self.objects.get_mut(object_index) {
+            object.triangles.push(triangle.clone());
+        }
+    }
+
+    fn add_quad(&mut self, object_index: usize, quad: PyRef<'_, Quad>) {
+        if let Some(object) = self.objects.get_mut(object_index) {
+            object.quads.push(quad.clone());
+        }
+    }
+
+    #[getter]
+    fn vertices(&self) -> Vec<Vector3D> {
+        self.points.clone()
+    }
+
+    #[getter]
+    fn polygons(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<HashMap<String, Vec<(Py<PyAny>, Py<PyAny>)>>> {
+        Ok(self.polygons_dict(py))
+    }
+
+    fn get_indexed(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<(
+        Vec<Vector3D>,
+        HashMap<String, Vec<(Py<PyAny>, Py<PyAny>)>>,
+        HashMap<String, Vec<usize>>,
+    )> {
+        Ok((
+            self.points.clone(),
+            self.polygons_dict(py),
+            HashMap::new(),
+        ))
+    }
+
+    fn point_vectors(&self) -> Vec<Vector3D> {
+        self.points.clone()
+    }
+
+    fn copy(&self) -> Self {
+        self.clone()
+    }
+
+    fn __copy__(&self) -> Self {
+        self.clone()
+    }
+
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> Self {
+        self.clone()
+    }
+
+    fn __repr__(&self) -> String {
+        let face_count: usize = self
+            .objects
+            .iter()
+            .map(|object| object.lines.len() + object.triangles.len() + object.quads.len())
+            .sum();
+        format!(
+            "Mesh {} ({} faces, {} vertices)",
+            self.name,
+            face_count,
+            self.points.len()
+        )
+    }
+
+    #[pyo3(signature = (axis = "x"))]
+    fn mirror(&mut self, axis: &str) -> Self {
+        let factors = match axis {
+            "y" => (1.0, -1.0, 1.0),
+            "z" => (1.0, 1.0, -1.0),
+            _ => (-1.0, 1.0, 1.0),
+        };
+
+        for point in &mut self.points {
+            point.x *= factors.0;
+            point.y *= factors.1;
+            point.z *= factors.2;
+        }
+
+        for object in &mut self.objects {
+            for triangle in &mut object.triangles {
+                std::mem::swap(&mut triangle.b, &mut triangle.c);
+            }
+            for quad in &mut object.quads {
+                let a = quad.a;
+                let b = quad.b;
+                let c = quad.c;
+                let d = quad.d;
+                quad.a = d;
+                quad.b = c;
+                quad.c = b;
+                quad.d = a;
+            }
+        }
+
+        self.clone()
+    }
+
+    fn triangularize(&self) -> Self {
+        let mut result = self.clone();
+        for object in &mut result.objects {
+            let mut quads_as_triangles = Vec::new();
+            for quad in &object.quads {
+                quads_as_triangles.push(Triangle {
+                    a: quad.a,
+                    b: quad.b,
+                    c: quad.c,
+                });
+                quads_as_triangles.push(Triangle {
+                    a: quad.a,
+                    b: quad.c,
+                    c: quad.d,
+                });
+            }
+            object.triangles.extend(quads_as_triangles);
+            object.quads.clear();
+        }
+        result
+    }
+
+    fn __add__(&self, other: &Mesh) -> Self {
+        let mut result = self.clone();
+        result.merge_from(other);
+        result
+    }
+
+    fn __getitem__(&self, item: String) -> PyResult<Self> {
+        let selected: Vec<MeshObject> = self
+            .objects
+            .iter()
+            .filter(|object| object.name == item)
+            .cloned()
+            .collect();
+        if selected.is_empty() {
+            return Err(pyo3::exceptions::PyKeyError::new_err(item));
+        }
+        Ok(Self {
+            name: self.name.clone(),
+            points: self.points.clone(),
+            objects: selected,
+        })
+    }
+
+    #[pyo3(signature = (boundaries = None))]
+    fn delete_duplicates(&mut self, boundaries: Option<Py<PyAny>>) {
+        let _ = boundaries;
+        self.merge_duplicate_points(1e-10);
+    }
+
+    fn polygon_size(&self) -> (f64, f64, f64) {
+        let mut areas = Vec::new();
+        for object in &self.objects {
+            for triangle in &object.triangles {
+                let area = triangle_area(
+                    &self.points[triangle.a],
+                    &self.points[triangle.b],
+                    &self.points[triangle.c],
+                );
+                areas.push(area);
+            }
+            for quad in &object.quads {
+                let a1 = triangle_area(
+                    &self.points[quad.a],
+                    &self.points[quad.b],
+                    &self.points[quad.c],
+                );
+                let a2 = triangle_area(
+                    &self.points[quad.a],
+                    &self.points[quad.c],
+                    &self.points[quad.d],
+                );
+                areas.push(a1 + a2);
+            }
+        }
+
+        if areas.is_empty() {
+            return (0.0, 0.0, 0.0);
+        }
+
+        let min = areas.iter().copied().fold(f64::INFINITY, f64::min);
+        let max = areas.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let avg = areas.iter().sum::<f64>() / areas.len() as f64;
+        (min, max, avg)
+    }
+
+    #[getter]
+    fn bounding_box(&self) -> (Vector3D, Vector3D) {
+        if self.points.is_empty() {
+            return (
+                Vector3D { x: 0.0, y: 0.0, z: 0.0 },
+                Vector3D { x: 0.0, y: 0.0, z: 0.0 },
+            );
+        }
+
+        let mut min_x = self.points[0].x;
+        let mut min_y = self.points[0].y;
+        let mut min_z = self.points[0].z;
+        let mut max_x = self.points[0].x;
+        let mut max_y = self.points[0].y;
+        let mut max_z = self.points[0].z;
+
+        for point in &self.points {
+            min_x = min_x.min(point.x);
+            min_y = min_y.min(point.y);
+            min_z = min_z.min(point.z);
+            max_x = max_x.max(point.x);
+            max_y = max_y.max(point.y);
+            max_z = max_z.max(point.z);
+        }
+
+        (
+            Vector3D {
+                x: min_x,
+                y: min_y,
+                z: min_z,
+            },
+            Vector3D {
+                x: max_x,
+                y: max_y,
+                z: max_z,
+            },
+        )
+    }
+
+    #[pyo3(signature = (path = None, offset = 0.0))]
+    fn export_obj(&self, py: Python<'_>, path: Option<&Bound<'_, PyAny>>, offset: f64) -> PyResult<String> {
+        let mut output = String::new();
+
+        for point in &self.points {
+            output.push_str(&format!("v {:.6} {:.6} {:.6}\n", point.x, point.y, point.z));
+        }
+
+        for object in &self.objects {
+            output.push_str(&format!("o {}\n", object.name));
+            for line in &object.lines {
+                output.push_str(&format!(
+                    "l {} {}\n",
+                    line.a as f64 + offset + 1.0,
+                    line.b as f64 + offset + 1.0
+                ));
+            }
+            for triangle in &object.triangles {
+                output.push_str(&format!(
+                    "f {} {} {}\n",
+                    triangle.a as f64 + offset + 1.0,
+                    triangle.b as f64 + offset + 1.0,
+                    triangle.c as f64 + offset + 1.0
+                ));
+            }
+            for quad in &object.quads {
+                output.push_str(&format!(
+                    "f {} {} {} {}\n",
+                    quad.a as f64 + offset + 1.0,
+                    quad.b as f64 + offset + 1.0,
+                    quad.c as f64 + offset + 1.0,
+                    quad.d as f64 + offset + 1.0
+                ));
+            }
+        }
+
+        if let Some(path_value) = path {
+            let path_string = stringify_path(path_value)?;
+            fs::write(&path_string, &output).map_err(|error| {
+                pyo3::exceptions::PyIOError::new_err(format!("failed to write {path_string}: {error}"))
+            })?;
+        }
+
+        let _ = py;
+        Ok(output)
+    }
+
+    #[pyo3(signature = (path = None, version = "AC1021".to_string()))]
+    fn export_dxf(&self, path: Option<&Bound<'_, PyAny>>, version: String) -> PyResult<String> {
+        let mut output = String::new();
+        output.push_str("0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\n");
+        output.push_str(&version);
+        output.push_str("\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n");
+
+        for object in &self.objects {
+            let layer_name = object.name.replace('#', "_");
+
+            for line in &object.lines {
+                let p1 = self.points[line.a];
+                let p2 = self.points[line.b];
+                output.push_str("0\nLINE\n8\n");
+                output.push_str(&layer_name);
+                output.push_str("\n10\n");
+                output.push_str(&format!("{}\n20\n{}\n30\n{}\n", p1.x, p1.y, p1.z));
+                output.push_str("11\n");
+                output.push_str(&format!("{}\n21\n{}\n31\n{}\n", p2.x, p2.y, p2.z));
+            }
+
+            for triangle in &object.triangles {
+                let p1 = self.points[triangle.a];
+                let p2 = self.points[triangle.b];
+                let p3 = self.points[triangle.c];
+                output.push_str("0\n3DFACE\n8\n");
+                output.push_str(&layer_name);
+                output.push_str("\n10\n");
+                output.push_str(&format!("{}\n20\n{}\n30\n{}\n", p1.x, p1.y, p1.z));
+                output.push_str("11\n");
+                output.push_str(&format!("{}\n21\n{}\n31\n{}\n", p2.x, p2.y, p2.z));
+                output.push_str("12\n");
+                output.push_str(&format!("{}\n22\n{}\n32\n{}\n", p3.x, p3.y, p3.z));
+                output.push_str("13\n");
+                output.push_str(&format!("{}\n23\n{}\n33\n{}\n", p3.x, p3.y, p3.z));
+            }
+
+            for quad in &object.quads {
+                let p1 = self.points[quad.a];
+                let p2 = self.points[quad.b];
+                let p3 = self.points[quad.c];
+                let p4 = self.points[quad.d];
+                output.push_str("0\n3DFACE\n8\n");
+                output.push_str(&layer_name);
+                output.push_str("\n10\n");
+                output.push_str(&format!("{}\n20\n{}\n30\n{}\n", p1.x, p1.y, p1.z));
+                output.push_str("11\n");
+                output.push_str(&format!("{}\n21\n{}\n31\n{}\n", p2.x, p2.y, p2.z));
+                output.push_str("12\n");
+                output.push_str(&format!("{}\n22\n{}\n32\n{}\n", p3.x, p3.y, p3.z));
+                output.push_str("13\n");
+                output.push_str(&format!("{}\n23\n{}\n33\n{}\n", p4.x, p4.y, p4.z));
+            }
+        }
+
+        output.push_str("0\nENDSEC\n0\nEOF\n");
+
+        if let Some(path_value) = path {
+            let path_string = stringify_path(path_value)?;
+            fs::write(&path_string, &output).map_err(|error| {
+                pyo3::exceptions::PyIOError::new_err(format!("failed to write {path_string}: {error}"))
+            })?;
+        }
+
+        Ok(output)
+    }
+
+    fn merge_duplicate_points(&mut self, max_distance: f64) -> Vec<usize> {
+        let vectors = self.point_vectors();
+        let representatives = duplicate_representatives_impl(&vectors, max_distance);
+
+        let mut representative_to_new_index: HashMap<usize, usize> = HashMap::new();
+        let mut merged_points = Vec::new();
+        let mut old_to_new = vec![0usize; self.points.len()];
+
+        for (old_index, representative) in representatives.iter().enumerate() {
+            let new_index = if let Some(existing) = representative_to_new_index.get(representative) {
+                *existing
+            } else {
+                let created_index = merged_points.len();
+                representative_to_new_index.insert(*representative, created_index);
+                merged_points.push(self.points[*representative]);
+                created_index
+            };
+            old_to_new[old_index] = new_index;
+        }
+
+        self.points = merged_points;
+
+        for object in &mut self.objects {
+            object.lines = object
+                .lines
+                .iter()
+                .filter_map(|line| {
+                    let mapped = Line {
+                        a: old_to_new[line.a],
+                        b: old_to_new[line.b],
+                    };
+                    if mapped.a == mapped.b {
+                        None
+                    } else {
+                        Some(mapped)
+                    }
+                })
+                .collect();
+
+            object.triangles = object
+                .triangles
+                .iter()
+                .filter_map(|triangle| {
+                    let mapped = Triangle {
+                        a: old_to_new[triangle.a],
+                        b: old_to_new[triangle.b],
+                        c: old_to_new[triangle.c],
+                    };
+                    if mapped.a == mapped.b || mapped.b == mapped.c || mapped.a == mapped.c {
+                        None
+                    } else {
+                        Some(mapped)
+                    }
+                })
+                .collect();
+
+            object.quads = object
+                .quads
+                .iter()
+                .filter_map(|quad| {
+                    let mapped = Quad {
+                        a: old_to_new[quad.a],
+                        b: old_to_new[quad.b],
+                        c: old_to_new[quad.c],
+                        d: old_to_new[quad.d],
+                    };
+                    let mut unique = std::collections::HashSet::new();
+                    unique.insert(mapped.a);
+                    unique.insert(mapped.b);
+                    unique.insert(mapped.c);
+                    unique.insert(mapped.d);
+                    if unique.len() < 4 {
+                        None
+                    } else {
+                        Some(mapped)
+                    }
+                })
+                .collect();
+        }
+
+        old_to_new
+    }
+
+    fn __json__(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<(Vec<Vector3D>, HashMap<String, Vec<(Py<PyAny>, Py<PyAny>)>>, HashMap<String, Vec<usize>>)> {
+        self.get_indexed(py)
+    }
+}
+
+impl Mesh {
+    fn merge_from(&mut self, other: &Mesh) {
+        let offset = self.points.len();
+        self.points.extend(other.points.iter().copied());
+
+        for other_object in &other.objects {
+            if let Some(target) = self.objects.iter_mut().find(|obj| obj.name == other_object.name) {
+                target.lines.extend(other_object.lines.iter().map(|line| Line {
+                    a: line.a + offset,
+                    b: line.b + offset,
+                }));
+                target.triangles.extend(other_object.triangles.iter().map(|triangle| Triangle {
+                    a: triangle.a + offset,
+                    b: triangle.b + offset,
+                    c: triangle.c + offset,
+                }));
+                target.quads.extend(other_object.quads.iter().map(|quad| Quad {
+                    a: quad.a + offset,
+                    b: quad.b + offset,
+                    c: quad.c + offset,
+                    d: quad.d + offset,
+                }));
+            } else {
+                self.objects.push(MeshObject {
+                    name: other_object.name.clone(),
+                    color: other_object.color,
+                    lines: other_object.lines.iter().map(|line| Line {
+                        a: line.a + offset,
+                        b: line.b + offset,
+                    }).collect(),
+                    triangles: other_object.triangles.iter().map(|triangle| Triangle {
+                        a: triangle.a + offset,
+                        b: triangle.b + offset,
+                        c: triangle.c + offset,
+                    }).collect(),
+                    quads: other_object.quads.iter().map(|quad| Quad {
+                        a: quad.a + offset,
+                        b: quad.b + offset,
+                        c: quad.c + offset,
+                        d: quad.d + offset,
+                    }).collect(),
+                });
+            }
+        }
+    }
+
+    fn polygons_dict(&self, py: Python<'_>) -> HashMap<String, Vec<(Py<PyAny>, Py<PyAny>)>> {
+        let mut polygons: HashMap<String, Vec<(Py<PyAny>, Py<PyAny>)>> = HashMap::new();
+
+        for object in &self.objects {
+            let mut group: Vec<(Py<PyAny>, Py<PyAny>)> = Vec::new();
+
+            for line in &object.lines {
+                let indices = PyTuple::new(py, [line.a, line.b]).unwrap().into_any().unbind();
+                let attributes = PyDict::new(py).into_any().unbind();
+                group.push((indices, attributes));
+            }
+
+            for triangle in &object.triangles {
+                let indices = PyTuple::new(py, [triangle.a, triangle.b, triangle.c])
+                    .unwrap()
+                    .into_any()
+                    .unbind();
+                let attributes = PyDict::new(py).into_any().unbind();
+                group.push((indices, attributes));
+            }
+
+            for quad in &object.quads {
+                let indices = PyTuple::new(py, [quad.a, quad.b, quad.c, quad.d])
+                    .unwrap()
+                    .into_any()
+                    .unbind();
+                let attributes = PyDict::new(py).into_any().unbind();
+                group.push((indices, attributes));
+            }
+
+            polygons.insert(object.name.clone(), group);
+        }
+
+        polygons
+    }
+}
+
+fn stringify_path(path: &Bound<'_, PyAny>) -> PyResult<String> {
+    if let Ok(path_string) = path.extract::<String>() {
+        return Ok(path_string);
+    }
+    let text = path.str()?.to_str()?.to_string();
+    Ok(text)
+}
+
+fn extract_indices(py: Python<'_>, value: &Py<PyAny>) -> PyResult<Vec<usize>> {
+    let bound = value.bind(py);
+    if let Ok(indices) = bound.extract::<Vec<usize>>() {
+        return Ok(indices);
+    }
+
+    if let Ok(nodes) = bound.getattr("nodes") {
+        if let Ok(indices) = nodes.extract::<Vec<usize>>() {
+            return Ok(indices);
+        }
+    }
+
+    Err(pyo3::exceptions::PyTypeError::new_err(
+        "polygon index data must be a sequence of integers",
+    ))
+}
+
+fn parse_color_code(name: &str) -> (u8, u8, u8) {
+    if let Some((_, hex)) = name.rsplit_once('#') {
+        if hex.len() == 6 {
+            let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(255);
+            let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(255);
+            let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(255);
+            return (r, g, b);
+        }
+    }
+    (255, 255, 255)
+}
+
+fn triangle_area(a: &Vector3D, b: &Vector3D, c: &Vector3D) -> f64 {
+    let abx = b.x - a.x;
+    let aby = b.y - a.y;
+    let abz = b.z - a.z;
+    let acx = c.x - a.x;
+    let acy = c.y - a.y;
+    let acz = c.z - a.z;
+
+    let cx = aby * acz - abz * acy;
+    let cy = abz * acx - abx * acz;
+    let cz = abx * acy - aby * acx;
+
+    (cx * cx + cy * cy + cz * cz).sqrt() * 0.5
+}
 
 #[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
@@ -228,22 +1239,41 @@ pub(crate) fn triangulate_with_holes(
 }
 
 #[pyfunction]
+pub(crate) fn duplicate_representatives(points: Vec<Vector3D>, max_distance: f64) -> Vec<usize> {
+    duplicate_representatives_impl(&points, max_distance)
+}
+
+#[pyfunction]
 pub(crate) fn find_duplicates(points: Vec<Vector3D>, max_distance: f64) -> Vec<(usize, usize)> {
-    let mut duplicates = Vec::new();
-    for first_index in 0..points.len() {
-        for second_index in first_index + 1..points.len() {
-            if points[first_index].distance(&points[second_index]) < max_distance {
-                duplicates.push((first_index, second_index));
+    duplicate_representatives_impl(&points, max_distance)
+        .iter()
+        .enumerate()
+        .filter_map(|(index, representative)| {
+            if *representative == index {
+                None
+            } else {
+                Some((*representative, index))
             }
-        }
-    }
-    duplicates
+        })
+        .collect()
 }
 
 #[pymodule(submodule, name = "mesh")]
 pub(crate) mod mesh_mod {
     #[pymodule_export]
+    use super::duplicate_representatives;
+    #[pymodule_export]
     use super::find_duplicates;
+    #[pymodule_export]
+    use super::Line;
+    #[pymodule_export]
+    use super::Mesh;
+    #[pymodule_export]
+    use super::MeshObject;
+    #[pymodule_export]
+    use super::Quad;
+    #[pymodule_export]
+    use super::Triangle;
     #[pymodule_export]
     use super::triangulate_with_holes;
     #[pymodule_export]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from openglider.airfoil import Profile3D, Profile2D
-from typing import Literal
+from typing import Any, Literal
 from collections.abc import Sequence
 
 import openglider.rs
@@ -16,7 +16,7 @@ from openglider.glider.cell.diagonals import DiagonalRib, TensionStrap
 from openglider.glider.cell.panel import PANELCUT_TYPES, Panel, PanelCut
 from openglider.glider.cell.rigidfoil import EntryStrap, PanelRigidFoil
 from openglider.glider.rib import MiniRib, Rib
-from openglider.mesh import Mesh, Polygon, Vertex
+from openglider.mesh import Mesh
 from openglider.utils import consistent_value, linspace
 from openglider.utils.cache import (HashedList, cached_function,
                                     cached_property, hash_list)
@@ -438,7 +438,7 @@ class Cell(BaseModel):
             mean_rib += self.midrib(y).flatten().normalized()
         return mean_rib * (1. / num_midribs)
 
-    def get_mesh_grid(self, numribs: int=0, half_cell: bool=False) -> list[list[Vertex]]:
+    def get_mesh_grid(self, numribs: int=0, half_cell: bool=False) -> list[list[openglider.rs.vector.Vector3D]]:
         """
         Get Cell-grid
         :param numribs: number of miniribs to calculate
@@ -446,14 +446,14 @@ class Cell(BaseModel):
         """
         numribs += 1
 
-        grid: list[list[Vertex]] = []
+        grid: list[list[openglider.rs.vector.Vector3D]] = []
         rib_indices = range(numribs + 1)
         if half_cell:
             rib_indices = rib_indices[(numribs) // 2:]
         for rib_no in rib_indices:
             y = rib_no / max(numribs, 1)
             rib = self.midrib(y).curve.nodes
-            grid.append(Vertex.from_vertices_list(rib[:-1]))
+            grid.append(rib[:-1])
         return grid
 
     def get_mesh(self, numribs: int=0, half_cell: bool=False) -> Mesh:
@@ -465,25 +465,35 @@ class Cell(BaseModel):
 
         grid = self.get_mesh_grid(numribs=numribs, half_cell=half_cell)
 
-        trailing_edge: list[Vertex] = []
+        nodes: list[openglider.rs.vector.Vector3D] = []
+        quads: list[tuple[tuple[int, int, int, int], dict[str, Any]]] = []
 
-        quads: list[Polygon] = []
+        index_by_point_id: dict[int, int] = {}
+
+        def point_index(point: openglider.rs.vector.Vector3D) -> int:
+            point_id = id(point)
+            if point_id in index_by_point_id:
+                return index_by_point_id[point_id]
+            index = len(nodes)
+            index_by_point_id[point_id] = index
+            nodes.append(point)
+            return index
+
         for rib_left, rib_right in zip(grid[:-1], grid[1:]):
             numpoints = len(rib_left)
             for i in range(numpoints):
                 i_next = (i+1)%numpoints
-                pol = Polygon([
-                    rib_left[i],
-                    rib_right[i],
-                    rib_right[i_next],
-                    rib_left[i_next]])
+                quads.append((
+                    (
+                        point_index(rib_left[i]),
+                        point_index(rib_right[i]),
+                        point_index(rib_right[i_next]),
+                        point_index(rib_left[i_next]),
+                    ),
+                    {},
+                ))
 
-                quads.append(pol)
-        for rib in grid:
-            trailing_edge.append(rib[0])
-        mesh = Mesh({"hull": quads}, 
-                    {self.rib1.name: grid[0], self.rib2.name: grid[-1], "trailing_edge": trailing_edge})
-        return mesh
+        return Mesh.from_indexed(nodes, {"hull": quads})
 
     @cached_function("self")
     def get_flattened_cell(self, numribs: int=50, num_inner: int | None=None) -> FlattenedCell:

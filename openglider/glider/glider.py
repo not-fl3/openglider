@@ -144,15 +144,7 @@ class Glider:
         numpoints = len(ribs[0])  # points per rib
 
         polygons: list[tuple[tuple[int, int, int, int], dict[str, Any]]] = []
-        boundary: Mesh.boundary_nodes_type = {
-            "ribs": [],
-            "trailing_edge": []
-        }
         for i in range(num-1):  # because we use i+1 below
-            boundary["trailing_edge"].append(i*numpoints)
-            if not i % (num_midribs+1):
-                boundary["ribs"] += [i*numpoints+k for k in range(numpoints-1)]
-
             for k in range(numpoints - 1):  # same reason as above
                 kplus = (k+1) % (numpoints-1)
                 polygons.append(((
@@ -164,7 +156,7 @@ class Glider:
         
         ribs_flat = [p for rib in ribs for p in rib]
 
-        return Mesh.from_indexed(ribs_flat, {"hull": polygons}, boundary)
+        return Mesh.from_indexed(ribs_flat, {"hull": polygons})
     
     def get_mesh_all(self, numribs: int=10) -> Mesh:
 

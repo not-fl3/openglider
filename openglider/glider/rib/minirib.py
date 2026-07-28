@@ -186,10 +186,8 @@ class MiniRib:
             mesh = tri.triangulate()
 
             points = self.align_all(cell, openglider.rs.vector.PolyLine2D(mesh.points))
-            boundaries = {self.name: list(range(len(points)))}
 
-
-            minirib_mesh = Mesh.from_indexed(points.nodes, polygons={"miniribs": [(tri, {}) for tri in mesh.elements]} , boundaries=boundaries)
+            minirib_mesh = Mesh.from_indexed(points.nodes, polygons={"miniribs": [(tri, {}) for tri in mesh.elements]})
 
         else:
             vertices = [(p[0], p[1]) for p in outline.nodes[:-1]]

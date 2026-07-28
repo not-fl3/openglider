@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 from collections.abc import Callable
 
-from openglider.mesh.mesh import Mesh
+from openglider.mesh import Mesh
 from openglider.gui.app.app import GliderApp
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.gui.state.glider_list import GliderCache

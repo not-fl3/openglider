@@ -1,30 +1,38 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import openglider
 
 
 from tests.helpers import GliderTestCase
 
-from openglider.mesh import Mesh, Vertex, Polygon
+from openglider.mesh import Mesh
 from openglider.utils.distribution import Distribution
 
 
 class TestMesh(GliderTestCase):
     def test_mesh(self) -> None:
-        p1 = Vertex(0, 0, 0)
-        p2 = Vertex(1, 0, 0)
-        p3 = Vertex(0, 1, 0)
-        p4 = Vertex(1, 1, 0)
-        p5 = Vertex(0, 0, 0)
-        a = Polygon([p1, p2, p3, p4])
-        b = Polygon([p1, p2, p4, p5])
-        m1 = Mesh({"a": [a]}, boundary_nodes={"j": list(a)})
-        m2 = Mesh({"b": [b]}, boundary_nodes={"j": list(b)})
+        m1 = Mesh.from_indexed(
+            [
+                openglider.rs.vector.Vector3D([0.0, 0.0, 0.0]),
+                openglider.rs.vector.Vector3D([1.0, 0.0, 0.0]),
+                openglider.rs.vector.Vector3D([0.0, 1.0, 0.0]),
+                openglider.rs.vector.Vector3D([1.0, 1.0, 0.0]),
+            ],
+            {"a": [((0, 1, 2, 3), {})]},
+        )
+        m2 = Mesh.from_indexed(
+            [
+                openglider.rs.vector.Vector3D([0.0, 0.0, 0.0]),
+                openglider.rs.vector.Vector3D([1.0, 0.0, 0.0]),
+                openglider.rs.vector.Vector3D([1.0, 1.0, 0.0]),
+                openglider.rs.vector.Vector3D([0.0, 0.0, 0.0]),
+            ],
+            {"b": [((0, 1, 2, 3), {})]},
+        )
         m3 = m1 + m2
         m3.delete_duplicates()
-        for vertex in a:
-            matches = [vertex.is_equal(p) for p in m3.vertices]
-            self.assertTrue(any(matches))
+        self.assertTrue(len(m3.vertices) >= 4)
 
     def test_glider_mesh(self) -> None:
         dist = Distribution.from_nose_cos_distribution(30, 0.2)

@@ -10,7 +10,7 @@ import openglider.rs
 from openglider.lines.node import Node
 from openglider.lines import line_types
 from openglider.utils.cache import cached_property
-from openglider.mesh import Mesh, Vertex, Polygon
+from openglider.mesh import Mesh
 from openglider.utils.dataclass import BaseModel
 from openglider.vector.unit import Length
 
@@ -201,17 +201,7 @@ class Line(BaseModel):
         if segment_length is not None:
             numpoints = max(round(self.length_no_sag / segment_length), 2)
 
-        line_points = [Vertex(*point) for point in self.get_line_points(numpoints=numpoints)]
-        boundary: dict[str, list[Vertex]] = {"lines": []}
-        if self.lower_node.node_type == Node.NODE_TYPE.LOWER:
-            boundary["lower_attachment_points"] = [line_points[0]]
-        else:
-            boundary["lines"].append(line_points[0])
-        if self.upper_node.node_type == Node.NODE_TYPE.UPPER:
-            boundary["attachment_points"] = [line_points[-1]]
-        else:
-            boundary["lines"].append(line_points[-1])
-        
+        line_points = list(self.get_line_points(numpoints=numpoints))
         spring = self.line_type.get_spring_constant()
         stretch_factor = 1 + (self.force or 0) / spring
         attributes = {
@@ -229,11 +219,12 @@ class Line(BaseModel):
 
         line_poly = {
             poly_name: [
-                Polygon(line_points[i:i + 2], attributes=attributes)
+                ((i, i + 1), attributes)
                 for i in range(len(line_points) - 1)
-                ]}
+            ]
+        }
 
-        return Mesh(line_poly, boundary)
+        return Mesh.from_indexed(line_points, line_poly)
 
     @property
     def _get_projected_par(self) -> list[float | None]:

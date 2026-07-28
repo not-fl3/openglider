@@ -1,7 +1,7 @@
 import re
 import logging
 from typing import Any
-from openglider.mesh.mesh import Mesh
+from openglider.mesh import Mesh
 
 import vtkmodules
 import vtkmodules.vtkCommonCore
