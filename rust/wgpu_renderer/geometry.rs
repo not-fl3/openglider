@@ -13,6 +13,65 @@ fn triangle_normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
     [nx / len, ny / len, nz / len]
 }
 
+fn normalize_vector(v: [f32; 3]) -> [f32; 3] {
+    let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-6);
+    [v[0] / len, v[1] / len, v[2] / len]
+}
+
+fn compute_vertex_normals(mesh: &Mesh) -> Vec<[f32; 3]> {
+    let mut accum = vec![[0.0_f32; 3]; mesh.points.len()];
+    let mut counts = vec![0_u32; mesh.points.len()];
+
+    for obj in &mesh.objects {
+        for t in &obj.triangles {
+            if let (Some(p0), Some(p1), Some(p2)) = (mesh.points.get(t.a), mesh.points.get(t.b), mesh.points.get(t.c)) {
+                let a = [p0.x as f32, p0.y as f32, p0.z as f32];
+                let b = [p1.x as f32, p1.y as f32, p1.z as f32];
+                let c = [p2.x as f32, p2.y as f32, p2.z as f32];
+                let n = triangle_normal(a, b, c);
+                for idx in [t.a, t.b, t.c] {
+                    if idx < accum.len() {
+                        accum[idx][0] += n[0];
+                        accum[idx][1] += n[1];
+                        accum[idx][2] += n[2];
+                        counts[idx] += 1;
+                    }
+                }
+            }
+        }
+
+        for q in &obj.quads {
+            for (ai, bi, ci) in [(q.a, q.b, q.c), (q.a, q.c, q.d)] {
+                if let (Some(p0), Some(p1), Some(p2)) = (mesh.points.get(ai), mesh.points.get(bi), mesh.points.get(ci)) {
+                    let a = [p0.x as f32, p0.y as f32, p0.z as f32];
+                    let b = [p1.x as f32, p1.y as f32, p1.z as f32];
+                    let c = [p2.x as f32, p2.y as f32, p2.z as f32];
+                    let n = triangle_normal(a, b, c);
+                    for idx in [ai, bi, ci] {
+                        if idx < accum.len() {
+                            accum[idx][0] += n[0];
+                            accum[idx][1] += n[1];
+                            accum[idx][2] += n[2];
+                            counts[idx] += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut normals = vec![[0.0_f32; 3]; mesh.points.len()];
+    for (idx, count) in counts.iter().enumerate() {
+        if *count > 0 {
+            normals[idx] = normalize_vector(accum[idx]);
+        } else {
+            normals[idx] = [0.0, 0.0, 1.0];
+        }
+    }
+
+    normals
+}
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct EdgeKey(u32, u32);
 impl EdgeKey {
@@ -33,6 +92,7 @@ pub(crate) fn mesh_to_vertices(
     let mut mesh_lines: Vec<Vertex> = Vec::new();
     let mut poly_edges: Vec<Vertex> = Vec::new();
     let mut edge_count: HashMap<EdgeKey, u32> = HashMap::new();
+    let vertex_normals = compute_vertex_normals(mesh);
 
     if boundary_only && draw_polygon_edges {
         for obj in &mesh.objects {
@@ -66,8 +126,14 @@ pub(crate) fn mesh_to_vertices(
                 let a = [p0.x as f32, p0.y as f32, p0.z as f32];
                 let b = [p1.x as f32, p1.y as f32, p1.z as f32];
                 let c = [p2.x as f32, p2.y as f32, p2.z as f32];
-                let n = triangle_normal(a, b, c);
-                for pos in [a, b, c] { fill.push(Vertex { position: pos, color, normal: n }); }
+                let normals = [
+                    vertex_normals.get(t.a).copied().unwrap_or([0.0, 0.0, 1.0]),
+                    vertex_normals.get(t.b).copied().unwrap_or([0.0, 0.0, 1.0]),
+                    vertex_normals.get(t.c).copied().unwrap_or([0.0, 0.0, 1.0]),
+                ];
+                for (pos, normal) in [(a, normals[0]), (b, normals[1]), (c, normals[2])] {
+                    fill.push(Vertex { position: pos, color, normal });
+                }
                 if draw_polygon_edges {
                     for (k, pa, pb) in [
                         (EdgeKey::new(t.a as u32, t.b as u32), a, b),
@@ -89,8 +155,14 @@ pub(crate) fn mesh_to_vertices(
                     let a = [p0.x as f32, p0.y as f32, p0.z as f32];
                     let b = [p1.x as f32, p1.y as f32, p1.z as f32];
                     let c = [p2.x as f32, p2.y as f32, p2.z as f32];
-                    let n = triangle_normal(a, b, c);
-                    for pos in [a, b, c] { fill.push(Vertex { position: pos, color, normal: n }); }
+                    let normals = [
+                        vertex_normals.get(ai).copied().unwrap_or([0.0, 0.0, 1.0]),
+                        vertex_normals.get(bi).copied().unwrap_or([0.0, 0.0, 1.0]),
+                        vertex_normals.get(ci).copied().unwrap_or([0.0, 0.0, 1.0]),
+                    ];
+                    for (pos, normal) in [(a, normals[0]), (b, normals[1]), (c, normals[2])] {
+                        fill.push(Vertex { position: pos, color, normal });
+                    }
                 }
             }
             if draw_polygon_edges {

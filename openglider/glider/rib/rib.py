@@ -67,7 +67,7 @@ class RibBase(BaseModel):
     def get_hull(self, normalize_x_values: bool = False) -> Profile2D:
         return self.profile_2d
     
-    @cached_function("self")
+    @cached_function('profile_2d', 'transformation')
     def get_profile_3d(self, x_values: list[float]=None) -> Profile3D:
         hull = self.get_hull(normalize_x_values=x_values is None)
 

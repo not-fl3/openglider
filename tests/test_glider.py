@@ -1,6 +1,7 @@
 import random
 import unittest
 
+from openglider.glider.glider import Glider
 from tests.helpers import GliderTestCase
 
 
@@ -12,6 +13,15 @@ class TestGlider(GliderTestCase):
         numpoints = random.randint(1, 100)*2+1
         self.glider.profile_numpoints = numpoints
         self.assertEqual(self.glider.profile_numpoints, numpoints)
+
+    def test_profile_3d_x_values_refresh_with_numpoints(self) -> None:
+        rib = self.glider.ribs[0]
+        old_x_values = rib.profile_3d.x_values[:]
+
+        self.glider.profile_numpoints = self.glider.profile_numpoints + 2
+
+        self.assertEqual(rib.profile_3d.x_values, rib.profile_2d.x_values)
+        self.assertNotEqual(rib.profile_3d.x_values, old_x_values)
 
     def test_span(self) -> None:
         span = random.random() * 100

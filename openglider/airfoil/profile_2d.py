@@ -1,4 +1,3 @@
-from functools import cached_property as std_cached_property
 from typing import Any, Callable, Iterable, List, Self, Sequence
 import os
 import re
@@ -6,6 +5,7 @@ import math
 import logging
 
 import openglider.rs
+from openglider.utils.cache import cached_property
 import openglider.xfoil as xfoil
 import pandas
 
@@ -34,6 +34,9 @@ class Profile2D:
             self._curve = openglider.rs.vector.PolyLine2D(data)
 
         self._setup()
+
+    def __hash__(self) -> int:
+        return hash((self.curve.__hash__(), self.name))
 
     @property
     def curve(self) -> openglider.rs.vector.PolyLine2D:
@@ -244,7 +247,7 @@ class Profile2D:
                 out.write("\n{: 10.8f}\t{: 10.8f}".format(*p))
         return pfad
 
-    @std_cached_property
+    @cached_property("curve")
     def x_values(self) -> List[float]:
         """Get XValues of airfoil. upper side neg, lower positive"""
         i = self.noseindex

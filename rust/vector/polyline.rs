@@ -2,6 +2,8 @@ use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyList};
 use std::fmt;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 use super::signature::*;
 use super::vector::*;
@@ -209,6 +211,15 @@ fn polyline_tangents<V: VectorOps>(nodes: &[V]) -> Vec<V> {
 
     tangents.push(*segments.last().unwrap());
     tangents
+}
+
+fn polyline_hash<V: VectorOps>(nodes: &[V]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    nodes.len().hash(&mut hasher);
+    for node in nodes {
+        node.hash_value().hash(&mut hasher);
+    }
+    hasher.finish()
 }
 
 fn polyline_scale_nodes<V: VectorOps>(nodes: &[V], factors: &[f64]) -> Result<Vec<V>, SimpleError> {
@@ -494,6 +505,8 @@ impl PolyLine2D {
 
     fn __json__(&self) -> Vec<Vec<f64>> { self.nodes.iter().map(VectorOps::components).collect() }
     fn tolist(&self) -> Vec<Vec<f64>> { self.nodes.iter().map(VectorOps::components).collect() }
+
+    fn __hash__(&self) -> u64 { polyline_hash(&self.nodes) }
 
     #[pyo3(signature = (value, end = None))]
     pub fn get(&self, value: f64, end: Option<f64>, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -1007,6 +1020,8 @@ impl PolyLine3D {
 
     fn __json__(&self) -> Vec<Vec<f64>> { self.nodes.iter().map(VectorOps::components).collect() }
     fn tolist(&self) -> Vec<Vec<f64>> { self.nodes.iter().map(VectorOps::components).collect() }
+
+    fn __hash__(&self) -> u64 { polyline_hash(&self.nodes) }
 
     #[pyo3(signature = (value, end = None))]
     fn get(&self, value: f64, end: Option<f64>, py: Python<'_>) -> PyResult<Py<PyAny>> {
