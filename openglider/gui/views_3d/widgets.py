@@ -53,6 +53,32 @@ class WgpuRenderWidget(QtWidgets.QWidget):
         self._render_timer.setSingleShot(True)
         self._render_timer.timeout.connect(self._render_now)
 
+    def shutdown(self) -> None:
+        """Deterministically release native renderer resources before app exit."""
+        if self._is_closing:
+            return
+
+        self._is_closing = True
+        self._activate_timer.stop()
+        self._render_timer.stop()
+
+        # Prevent any late input callbacks during destruction.
+        self._container.removeEventFilter(self)
+        self._surface.removeEventFilter(self)
+
+        self.clearFocus()
+        self._container.clearFocus()
+        self._actor_state.clear()
+
+        renderer = self._renderer
+        if renderer is not None:
+            renderer.clear_meshes()
+            renderer.close()
+        self._renderer = None
+
+        self._container.hide()
+        self._surface.hide()
+
     def _platform_info(self) -> tuple[str, int | None]:
         if sys.platform.startswith("win"):
             return ("win32", None)
@@ -287,16 +313,7 @@ class WgpuRenderWidget(QtWidgets.QWidget):
         super().wheelEvent(event)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
-        self._is_closing = True
-        self._activate_timer.stop()
-        self._render_timer.stop()
-        self.clearFocus()
-        self._container.clearFocus()
-        if self._renderer is not None:
-            self._renderer.close()
-        self._renderer = None
-        self._container.hide()
-        self._surface.hide()
+        self.shutdown()
         super().closeEvent(event)
 
 
@@ -373,10 +390,15 @@ class View3D(QtWidgets.QWidget):
         for actor in self._actors:
             self.render_widget.add_actor(actor)
 
+    def shutdown(self) -> None:
+        if self.render_widget._is_closing:
+            return
+
+        self.clear(autorerender=False)
+        self.render_widget.shutdown()
+
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
-        self.render_widget._is_closing = True
-        self.render_widget.clearFocus()
-        self.render_widget.close()
+        self.shutdown()
         super().closeEvent(event)
 
 

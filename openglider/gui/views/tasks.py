@@ -132,8 +132,13 @@ class QTaskQueue(QtWidgets.QWidget):
                 entry.update()
             await asyncio.sleep(1)
 
+    def shutdown(self) -> None:
+        if self.update_task.done():
+            return
+        self.update_task.cancel()
+
     def close(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
-        #self.update_task.cancel()
+        self.shutdown()
         super().close(*args, **kwargs)
 
 

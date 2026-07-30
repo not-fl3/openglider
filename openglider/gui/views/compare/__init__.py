@@ -1,5 +1,4 @@
 import logging
-from typing import Dict
 
 from openglider.gui.app.app import GliderApp
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
@@ -20,6 +19,17 @@ logger = logging.getLogger(__name__)
 class GliderPreview(QtWidgets.QWidget):
     tabs_widget: QtWidgets.QTabWidget
     tabs: dict[str, CompareView]
+    shape_tab: ShapeView | None = None
+    arc_tab: ArcView | None = None
+    rib_plots_tab: RibPlotView | None = None
+    ribs_tab: RibView | None = None
+    cell_plots_tab: CellPlotView | None = None
+    cells_tab: CellView | None = None
+    table_tab: GliderTable | None = None
+    lines_tab: GliderLineSetTable | None = None
+    straps_tab: GliderStrapTable | None = None
+    view_3d: Glider3DView | None = None
+    _is_closing = False
 
     def __init__(self, app: GliderApp) -> None:
         super().__init__()
@@ -28,18 +38,27 @@ class GliderPreview(QtWidgets.QWidget):
         self.setLayout(QtWidgets.QHBoxLayout())
         self.tabs_widget = QtWidgets.QTabWidget(self)
 
+        self.shape_tab = ShapeView(app)
+        self.arc_tab = ArcView(app)
+        self.rib_plots_tab = RibPlotView(app)
+        self.ribs_tab = RibView(app)
+        self.cell_plots_tab = CellPlotView(app)
+        self.cells_tab = CellView(app)
+        self.table_tab = GliderTable(app)
+        self.lines_tab = GliderLineSetTable(app)
+        self.straps_tab = GliderStrapTable(app)
         self.view_3d = Glider3DView(app)
 
         self.tabs = {
-            "Shape": ShapeView(app),
-            "Arc": ArcView(app),
-            "Rib Plots": RibPlotView(app),
-            "Ribs": RibView(app),
-            "Cell Plots": CellPlotView(app),
-            "Cells": CellView(app),
-            "Table": GliderTable(app),
-            "Lines": GliderLineSetTable(app),
-            "Straps": GliderStrapTable(app),
+            "Shape": self.shape_tab,
+            "Arc": self.arc_tab,
+            "Rib Plots": self.rib_plots_tab,
+            "Ribs": self.ribs_tab,
+            "Cell Plots": self.cell_plots_tab,
+            "Cells": self.cells_tab,
+            "Table": self.table_tab,
+            "Lines": self.lines_tab,
+            "Straps": self.straps_tab,
             "3D": self.view_3d
         }
         self.tab_names = list(self.tabs.keys())
@@ -69,7 +88,7 @@ class GliderPreview(QtWidgets.QWidget):
         QtCore.QTimer.singleShot(0, self.update_current)
 
     def update_current(self) -> None:
-        if getattr(self, '_is_closing', False):
+        if self._is_closing:
             return
 
         if not self.app.state.current_preview:
@@ -89,13 +108,33 @@ class GliderPreview(QtWidgets.QWidget):
         self.tabs[self.app.state.current_preview].update_view()
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self.shutdown()
+        super().closeEvent(event)
+
+    def shutdown(self) -> None:
+        if self._is_closing:
+            return
+
         self._is_closing = True
         blocker = QtCore.QSignalBlocker(self.tabs_widget)
+
+        if self.view_3d is not None:
+            self.view_3d.shutdown()
+
         for widget in self.tabs.values():
             widget.close()
 
         self.tabs_widget.clear()
         self.tabs.clear()
+        self.shape_tab = None
+        self.arc_tab = None
+        self.rib_plots_tab = None
+        self.ribs_tab = None
+        self.cell_plots_tab = None
+        self.cells_tab = None
+        self.table_tab = None
+        self.lines_tab = None
+        self.straps_tab = None
+        self.view_3d = None
         del blocker
-        super().closeEvent(event)
 

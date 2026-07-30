@@ -24,6 +24,8 @@ from qasync import QEventLoop
 
 if TYPE_CHECKING:
     from openglider.gui.app.state import ApplicationState
+    from openglider.gui.app.main_window import MainWindow
+    from openglider.utils.tasks import TaskQueue
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,8 @@ class GliderApp(QtWidgets.QApplication):
     debug = False
     exception_window: QtWidgets.QMessageBox | None = None
     state: ApplicationState
+    main_window: MainWindow | None = None
+    task_queue: TaskQueue | None = None
     reloading = False
     _shutdown_done = False
 
@@ -58,9 +62,14 @@ class GliderApp(QtWidgets.QApplication):
 
         sys.excepthook = self.show_exception
 
+    def _shutdown_main_window(self) -> None:
+        if self.main_window is not None:
+            self.main_window.shutdown()
+
     def _bootstrap_startup(self) -> None:
         self.setup()
-        self.splash_controller.schedule_finish(self.main_window)
+        if self.main_window is not None:
+            self.splash_controller.schedule_finish(self.main_window)
 
     def setup(self) -> None:
         logger.info("Load modules")
@@ -130,9 +139,10 @@ class GliderApp(QtWidgets.QApplication):
 
         self._shutdown_done = True
 
-        task_queue = getattr(self, "task_queue", None)
-        if task_queue is not None:
-            await task_queue.shutdown()
+        self._shutdown_main_window()
+
+        if self.task_queue is not None:
+            await self.task_queue.shutdown()
 
 
     async def execute(self, function: Callable[[Any], Any], *args: Any, **kwargs: Any) -> Any:

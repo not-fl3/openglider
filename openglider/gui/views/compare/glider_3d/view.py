@@ -151,3 +151,13 @@ class Glider3DView(QtWidgets.QWidget, CompareView):
             actor.add(self.view_3d, self.config.config)
         
         self.view_3d.rerender()
+
+    def shutdown(self) -> None:
+        if self.imported_mesh_actor is not None:
+            self.view_3d.remove_actor(self.imported_mesh_actor)
+            self.imported_mesh_actor = None
+        self.view_3d.shutdown()
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self.shutdown()
+        super().closeEvent(event)

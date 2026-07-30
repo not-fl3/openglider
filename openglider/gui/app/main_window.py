@@ -60,6 +60,12 @@ class Action():
 class MainWindow(QtWidgets.QMainWindow):
     # actions need to be saved in a dict (prevent garbage collection)
     action_store: dict[str, Action]
+    glider_preview: GliderPreview | None = None
+    task_queue: QTaskQueue | None = None
+    overview: QtWidgets.QSplitter | None = None
+    glider_list: GliderListWidget | None = None
+    console: ConsoleWidget | None = None
+    log_filter_panel: LogFilterPanel | None = None
 
     def __init__(self, app: GliderApp):
         super().__init__()
@@ -129,9 +135,22 @@ class MainWindow(QtWidgets.QMainWindow):
         bottom_panel_layout.addWidget(self.console, 75)
 
         self.signal_handler = ConsoleHandler(self.console, self.log_filter_panel)
+        self._is_shutting_down = False
 
         self.setAcceptDrops(True)
         self.current_glider_changed()
+
+    def shutdown(self) -> None:
+        if self._is_shutting_down:
+            return
+
+        self._is_shutting_down = True
+
+        if self.glider_preview is not None:
+            self.glider_preview.shutdown()
+
+        if self.task_queue is not None:
+            self.task_queue.shutdown()
 
     def add_menu(self) -> None:
         menubar: QtWidgets.QMenuBar = self.menuBar()
@@ -377,7 +396,7 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 event.accept()
 
-        if self.task_queue.queue.is_busy():
+        if self.task_queue is not None and self.task_queue.queue.is_busy():
             msgBox = QtWidgets.QMessageBox()
             
             msgBox.setText("Running Tasks")
@@ -396,13 +415,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 should_quit = False
                 return
             else:
-                self.app.loop.run_until_complete(self.task_queue.queue.quit())
+                if self.task_queue is not None:
+                    self.app.loop.run_until_complete(self.task_queue.queue.quit())
                 event.accept()
         if should_quit and not self.app.reloading:
+            self.shutdown()
             self.top_panel.blockSignals(True)
             self.top_panel.clear()
             self.top_panel.blockSignals(False)
             self.glider_preview = None
+            self.task_queue = None
             self.overview = None
             self.glider_list = None
             self.console = None
