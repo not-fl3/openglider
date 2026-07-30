@@ -169,6 +169,42 @@ def get_geom_sheet(glider_2d: ParametricGlider) -> Table:
     return table
 
 
+def _shape_param_rows(params: dict) -> list[tuple[str, object]]:
+    """Flatten leparagliding shape params into readable key/value rows.
+
+    No ``mode`` row: the column's "leparagliding" type already implies it (there
+    is only one shape mode), unlike the arc column which needs it to distinguish
+    vault_ellipse from vault_circles.
+    """
+    le = params.get("leading_edge", {})
+    te = params.get("trailing_edge", {})
+    cells = params.get("cells", {})
+    rows: list[tuple[str, object]] = []
+    for k in ("a1", "b1", "x1", "x2", "xm", "c01", "ex1", "c02", "ex2"):
+        rows.append((f"le_{k}", le.get(k, 0.0)))
+    for k in ("a1", "b1", "x1", "c0", "y0", "exp"):
+        rows.append((f"te_{k}", te.get(k, 0.0)))
+    rows.append(("cell_dist_type", cells.get("dist_type", 3)))
+    rows.append(("cell_coefficient", cells.get("coefficient", 0.6)))
+    explicit = cells.get("explicit_widths") or []
+    if explicit:
+        rows.append(("cell_explicit_widths", ",".join(str(v) for v in explicit)))
+    return rows
+
+
+def _arc_param_rows(params: dict) -> list[tuple[str, object]]:
+    """Flatten arc generator params into key/value rows (lists -> csv)."""
+    rows: list[tuple[str, object]] = [("mode", params.get("mode", ""))]
+    for key, value in params.items():
+        if key == "mode":
+            continue
+        if isinstance(value, list):
+            rows.append((key, ",".join(str(v) for v in value)))
+        else:
+            rows.append((key, value))
+    return rows
+
+
 def get_parametric_sheet(glider : ParametricGlider) -> Table:
     table = Table(name="Parametric")
 
@@ -180,10 +216,33 @@ def get_parametric_sheet(glider : ParametricGlider) -> Table:
             table[i+1, column_no] = p[0]
             table[i+1, column_no+1] = p[1]
 
-    add_curve("front", glider.shape.front_curve, 0)
-    add_curve("back", glider.shape.back_curve, 2)
+    def add_leparagliding(name: str, rows: list[tuple[str, object]], column_no: int) -> None:
+        # A "leparagliding" curve stores parameter key/value rows instead of
+        # control points; the curve is regenerated from these on import.
+        table[0, column_no] = name
+        table[0, column_no+1] = "leparagliding"
+        for i, (key, value) in enumerate(rows):
+            table[i+1, column_no] = key
+            table[i+1, column_no+1] = value
+
+    shape_params = glider.shape.parametric_params
+    if shape_params and shape_params.get("mode") == "leparagliding":
+        # front carries all the planform params; back is an empty marker.
+        add_leparagliding("front", _shape_param_rows(shape_params), 0)
+        table[0, 2] = "back"
+        table[0, 3] = "leparagliding"
+    else:
+        add_curve("front", glider.shape.front_curve, 0)
+        add_curve("back", glider.shape.back_curve, 2)
+
     add_curve("rib_distribution", glider.shape.rib_distribution, 4)
-    add_curve("arc", glider.arc.curve, 6)
+
+    arc_params = glider.arc.arc_generator_params
+    if arc_params and arc_params.get("mode") in ("vault_ellipse", "vault_circles"):
+        add_leparagliding("arc", _arc_param_rows(arc_params), 6)
+    else:
+        add_curve("arc", glider.arc.curve, 6)
+
     add_curve("aoa", glider.aoa, 8)
     add_curve("ballooning_merge_curve", glider.ballooning_merge_curve, 10)
     add_curve("profile_merge_curve", glider.profile_merge_curve, 12)
