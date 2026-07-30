@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import math
 from typing import TYPE_CHECKING, Any, Literal
 from collections.abc import Callable
 
 import openglider.rs
 from openglider.glider.parametric.shape import ParametricShape
+from openglider.glider.parametric.leparagliding import (
+    CellDistribution,
+    LeadingEdgeParams,
+    LeparaglidingShapeParams,
+    TrailingEdgeParams,
+)
 from openglider.glider.project import GliderProject
 from openglider.gui.qt import QtWidgets, QtCore
 from openglider.gui.views_2d import Canvas, DraggableLine, Line2D
@@ -202,6 +209,16 @@ class RibDistInput(Canvas):
     def on_node_release(self, curve: DraggableLine, event: Any) -> None:
         pass
 
+    def refresh_from_shape(self) -> None:
+        """Refresh the distribution display after rib_distribution was replaced
+        externally (e.g. by the parametric generator)."""
+        self.curve.set_controlpoints(self.glider_shape.rib_distribution.controlpoints.nodes)
+        self.spline_curve.curve_data = self.glider_shape.rib_distribution.get_sequence(100).nodes
+        self.update()
+
+    def set_handle_visible(self, visible: bool) -> None:
+        self.curve.setVisible(visible)
+
 
 @dataclass
 class ShapeSettings:
@@ -300,7 +317,219 @@ class ShapeSettingsWidget(QtWidgets.QWidget):
         self.input_sweep.set_value(shape.get_sweep(), propagate=True)
 
 
+class LeparaglidingPanel(QtWidgets.QGroupBox):
+    """Leparagliding pre-processor parameters (LE, TE, cell distribution).
+
+    Each value change rebuilds the front/back curves and rib distribution from
+    the analytical formulas in ``pre-processor.f``. Inputs use the same
+    parameter names and units as the FORTRAN ``pre-data.txt``, so values can be
+    copied verbatim from a leparagliding design.
+    """
+
+    params_changed = QtCore.Signal()
+
+    def __init__(self, project: GliderProject):
+        super().__init__("Leparagliding parameters")
+        self.project = project
+        self._updating = False
+
+        wrapper = QtWidgets.QVBoxLayout(self)
+        wrapper.setContentsMargins(4, 4, 4, 4)
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        wrapper.addWidget(scroll)
+
+        content = QtWidgets.QWidget()
+        scroll.setWidget(content)
+        outer = QtWidgets.QVBoxLayout(content)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        header_row = QtWidgets.QHBoxLayout()
+        info = QtWidgets.QLabel("LE/TE ellipse parameters from leparagliding pre-processor v1.6")
+        info.setStyleSheet("color: gray; font-size: 10px;")
+        info.setWordWrap(True)
+        header_row.addWidget(info, stretch=1)
+        reset_btn = QtWidgets.QPushButton("Reset to defaults")
+        reset_btn.clicked.connect(self._reset_defaults)
+        header_row.addWidget(reset_btn)
+        outer.addLayout(header_row)
+
+        # ── Leading edge group ──
+        le_group = QtWidgets.QGroupBox("Leading edge (Type 1)")
+        le_form = QtWidgets.QFormLayout(le_group)
+        le_form.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        self.le_a1 = self._make_spin(710.21, 0.0, 99999.0, 4)
+        self.le_b1 = self._make_spin(243.11, 0.0, 99999.0, 4)
+        self.le_x1 = self._make_spin(375.0, 0.0, 99999.0, 4)
+        self.le_x2 = self._make_spin(475.0, 0.0, 99999.0, 4)
+        self.le_xm = self._make_spin(575.5, 0.001, 99999.0, 4)
+        self.le_c01 = self._make_spin(48.30, -9999.0, 9999.0, 4)
+        self.le_ex1 = self._make_spin(2.0, 0.1, 20.0, 3)
+        self.le_c02 = self._make_spin(0.0, -9999.0, 9999.0, 4)
+        self.le_ex2 = self._make_spin(2.0, 0.1, 20.0, 3)
+        le_form.addRow("a1 (horiz semi-axis):", self.le_a1)
+        le_form.addRow("b1 (vert semi-axis):", self.le_b1)
+        le_form.addRow("x1 (corr 1 start):", self.le_x1)
+        le_form.addRow("x2 (corr 2 start):", self.le_x2)
+        le_form.addRow("xm (half span):", self.le_xm)
+        le_form.addRow("c01 (corr 1 amp):", self.le_c01)
+        le_form.addRow("ex1 (corr 1 exp):", self.le_ex1)
+        le_form.addRow("c02 (corr 2 amp):", self.le_c02)
+        le_form.addRow("ex2 (corr 2 exp):", self.le_ex2)
+        outer.addWidget(le_group)
+
+        # ── Trailing edge group ──
+        te_group = QtWidgets.QGroupBox("Trailing edge (Type 1)")
+        te_form = QtWidgets.QFormLayout(te_group)
+        te_form.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        self.te_a1 = self._make_spin(903.01, 0.0, 99999.0, 4)
+        self.te_b1 = self._make_spin(243.11, 0.0, 99999.0, 4)
+        self.te_x1 = self._make_spin(372.50, 0.0, 99999.0, 4)
+        self.te_c0 = self._make_spin(-2.45, -9999.0, 9999.0, 4)
+        self.te_y0 = self._make_spin(215.20, -9999.0, 9999.0, 4)
+        self.te_exp = self._make_spin(2.0, 0.1, 20.0, 3)
+        te_form.addRow("a1 (horiz semi-axis):", self.te_a1)
+        te_form.addRow("b1 (vert semi-axis):", self.te_b1)
+        te_form.addRow("x1 (corr start):", self.te_x1)
+        te_form.addRow("c0 (corr amp):", self.te_c0)
+        te_form.addRow("y0 (vert offset):", self.te_y0)
+        te_form.addRow("exp (corr exp):", self.te_exp)
+        outer.addWidget(te_group)
+
+        # ── Cell distribution group ──
+        cd_group = QtWidgets.QGroupBox("Cell distribution")
+        cd_form = QtWidgets.QFormLayout(cd_group)
+        cd_form.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        self.cd_type = QtWidgets.QComboBox()
+        self.cd_type.addItem("1: Uniform", 1)
+        self.cd_type.addItem("2: Linear", 2)
+        self.cd_type.addItem("3: Proportional to chord", 3)
+        self.cd_type.setCurrentIndex(2)
+        self.cd_type.currentIndexChanged.connect(self._on_dist_type_changed)
+        self.cd_coef = self._make_spin(0.6, 0.0, 1.0, 3)
+        cd_form.addRow("Type:", self.cd_type)
+        cd_form.addRow("Coefficient (xk):", self.cd_coef)
+        outer.addWidget(cd_group)
+
+        outer.addStretch()
+
+        self._restore_from_shape()
+        self._on_dist_type_changed(self.cd_type.currentIndex())
+
+    def _make_spin(self, default: float, lo: float, hi: float, decimals: int) -> QtWidgets.QDoubleSpinBox:
+        sb = QtWidgets.QDoubleSpinBox()
+        sb.setRange(lo, hi)
+        sb.setDecimals(decimals)
+        sb.setSingleStep(10 ** (-min(decimals, 3)))
+        sb.setValue(default)
+        sb.setMinimumWidth(90)
+        sb.setMinimumHeight(22)
+        sb.valueChanged.connect(self._on_value_changed)
+        return sb
+
+    def _restore_from_shape(self) -> None:
+        """Populate widget values from shape's leparagliding params (if any)."""
+        params = self.project.glider.shape.get_leparagliding_params()
+        if params is None:
+            return
+        self._updating = True
+        le = params.leading_edge
+        te = params.trailing_edge
+        cd = params.cells
+        self.le_a1.setValue(le.a1)
+        self.le_b1.setValue(le.b1)
+        self.le_x1.setValue(le.x1)
+        self.le_x2.setValue(le.x2)
+        self.le_xm.setValue(le.xm)
+        self.le_c01.setValue(le.c01)
+        self.le_ex1.setValue(le.ex1)
+        self.le_c02.setValue(le.c02)
+        self.le_ex2.setValue(le.ex2)
+        self.te_a1.setValue(te.a1)
+        self.te_b1.setValue(te.b1)
+        self.te_x1.setValue(te.x1)
+        self.te_c0.setValue(te.c0)
+        self.te_y0.setValue(te.y0)
+        self.te_exp.setValue(te.exp)
+        idx = {1: 0, 2: 1, 3: 2}.get(cd.dist_type, 2)
+        self.cd_type.setCurrentIndex(idx)
+        self.cd_coef.setValue(cd.coefficient)
+        self._updating = False
+
+    def _reset_defaults(self) -> None:
+        self._updating = True
+        defaults = LeparaglidingShapeParams()
+        le = defaults.leading_edge
+        te = defaults.trailing_edge
+        cd = defaults.cells
+        self.le_a1.setValue(le.a1)
+        self.le_b1.setValue(le.b1)
+        self.le_x1.setValue(le.x1)
+        self.le_x2.setValue(le.x2)
+        self.le_xm.setValue(le.xm)
+        self.le_c01.setValue(le.c01)
+        self.le_ex1.setValue(le.ex1)
+        self.le_c02.setValue(le.c02)
+        self.le_ex2.setValue(le.ex2)
+        self.te_a1.setValue(te.a1)
+        self.te_b1.setValue(te.b1)
+        self.te_x1.setValue(te.x1)
+        self.te_c0.setValue(te.c0)
+        self.te_y0.setValue(te.y0)
+        self.te_exp.setValue(te.exp)
+        self.cd_type.setCurrentIndex(2)
+        self.cd_coef.setValue(cd.coefficient)
+        self._updating = False
+        self._on_value_changed()
+
+    def _on_dist_type_changed(self, _index: int) -> None:
+        dist_type = self.cd_type.currentData()
+        self.cd_coef.setEnabled(dist_type in (2, 3))
+        if not self._updating:
+            self._on_value_changed()
+
+    def collect_params(self) -> LeparaglidingShapeParams:
+        return LeparaglidingShapeParams(
+            leading_edge=LeadingEdgeParams(
+                a1=self.le_a1.value(),
+                b1=self.le_b1.value(),
+                x1=self.le_x1.value(),
+                x2=self.le_x2.value(),
+                xm=self.le_xm.value(),
+                c01=self.le_c01.value(),
+                ex1=self.le_ex1.value(),
+                c02=self.le_c02.value(),
+                ex2=self.le_ex2.value(),
+            ),
+            trailing_edge=TrailingEdgeParams(
+                a1=self.te_a1.value(),
+                b1=self.te_b1.value(),
+                x1=self.te_x1.value(),
+                xm=self.le_xm.value(),
+                c0=self.te_c0.value(),
+                y0=self.te_y0.value(),
+                exp=self.te_exp.value(),
+            ),
+            cells=CellDistribution(
+                dist_type=int(self.cd_type.currentData()),
+                cell_num=int(self.project.glider.shape.cell_num),
+                coefficient=self.cd_coef.value(),
+            ),
+        )
+
+    def _on_value_changed(self) -> None:
+        if self._updating:
+            return
+        self.params_changed.emit()
+
+
 class ShapeWizard(GliderSelectionWizard):
+    MODE_SPLINE = "spline"
+    MODE_PARAMETRIC = "parametric"
+
     def __init__(self, app: MainWindow, project: GliderProject):
         super().__init__(app=app, project=project)
         self.shape_backup = self.shape.copy()
@@ -316,18 +545,88 @@ class ShapeWizard(GliderSelectionWizard):
         self.shape_settings_widget = ShapeSettingsWidget(self.project.glider.shape)
         self.settings = self.shape_settings_widget.settings
 
-        self.right_widget_layout.insertWidget(0, self.shape_settings_widget)
+        # Mode toggle: spline (draggable curves) <-> parametric (leparagliding)
+        self.mode_toggle = QtWidgets.QGroupBox("Shape mode")
+        mode_layout = QtWidgets.QHBoxLayout(self.mode_toggle)
+        self.mode_combo = QtWidgets.QComboBox()
+        self.mode_combo.addItem("Spline", self.MODE_SPLINE)
+        self.mode_combo.addItem("Parametric (leparagliding)", self.MODE_PARAMETRIC)
+        mode_layout.addWidget(QtWidgets.QLabel("Mode:"))
+        mode_layout.addWidget(self.mode_combo, stretch=1)
+
+        self.leparagliding_panel = LeparaglidingPanel(self.project)
+        self.leparagliding_panel.params_changed.connect(self._on_parametric_changed)
+
+        # Initial mode from the shape (parametric if it has saved params)
+        if self.shape.get_leparagliding_params() is not None:
+            self.mode_combo.setCurrentIndex(1)
+            self.leparagliding_panel.setVisible(True)
+            self._set_handles_visible(False)
+        else:
+            self.mode_combo.setCurrentIndex(0)
+            self.leparagliding_panel.setVisible(False)
+            self._set_handles_visible(True)
+
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+
+        settings_column = QtWidgets.QWidget()
+        settings_column_layout = QtWidgets.QVBoxLayout(settings_column)
+        settings_column_layout.setContentsMargins(0, 0, 0, 0)
+        settings_column_layout.addWidget(self.mode_toggle)
+        settings_column_layout.addWidget(self.leparagliding_panel)
+        settings_column_layout.addWidget(self.shape_settings_widget)
+        settings_column_layout.addStretch()
+
+        self.right_widget_layout.insertWidget(0, settings_column)
         #self.right_widget.layout().insertWidget(0, self.canvas_controls)
         self._selection_changed()
 
         self.shape_input.on_change.append(self.shape_settings_widget.update_shape)
+        self.shape_input.on_change.append(self._on_spline_dragged)
         self.shape_input.on_change.append(self._selection_changed)
 
         self.shape_settings_widget.changed.connect(self.apply_settings)
-    
+
     @property
     def shape(self) -> ParametricShape:
         return self.project.glider.shape
+
+    # ── Mode toggle: spline <-> parametric ──
+    def _set_handles_visible(self, visible: bool) -> None:
+        """Show or hide the draggable control-point overlays."""
+        self.shape_input.front.setVisible(visible)
+        self.shape_input.back.setVisible(visible)
+        self.distribution_input.set_handle_visible(visible)
+
+    def _on_mode_changed(self, _index: int) -> None:
+        mode = self.mode_combo.currentData()
+        if mode == self.MODE_PARAMETRIC:
+            # Spline -> parametric: apply the panel's current values.
+            params = self.leparagliding_panel.collect_params()
+            params.cells.cell_num = self.shape.cell_num
+            self.shape.apply_leparagliding_params(params)
+            self.leparagliding_panel._restore_from_shape()
+            self.leparagliding_panel.setVisible(True)
+            self._set_handles_visible(False)
+            self._update()
+        else:
+            # Parametric -> spline: keep the generated curves; drop the
+            # parametric metadata so manual edits aren't overwritten.
+            self.shape.clear_parametric_params()
+            self.leparagliding_panel.setVisible(False)
+            self._set_handles_visible(True)
+            self._update()
+
+    def _on_parametric_changed(self) -> None:
+        params = self.leparagliding_panel.collect_params()
+        self.shape.apply_leparagliding_params(params)
+        self._update()
+
+    def _on_spline_dragged(self, _shape: ParametricShape) -> None:
+        """User dragged a control point in spline mode -> the shape no longer
+        matches the leparagliding values, so drop the stale metadata."""
+        if self.mode_combo.currentData() == self.MODE_SPLINE:
+            self.shape.clear_parametric_params()
 
     def set_sweep(self, value: float) -> None:
         self.shape.set_sweep(value)
@@ -338,19 +637,45 @@ class ShapeWizard(GliderSelectionWizard):
         self.shape_input.config.apply_zrot = settings.zrot
 
         shape: ParametricShape = self.shape
-        shape.set_area(settings.area)
-        shape.set_aspect_ratio(settings.aspect_ratio)
-        shape.cell_num = settings.cell_count
 
-        if self.settings.sweep != settings.sweep:
-            self.shape.set_sweep(settings.sweep)
-        
+        if self.mode_combo.currentData() == self.MODE_PARAMETRIC:
+            # Scale the leparagliding params to reach the requested area / aspect
+            # ratio, then regenerate — otherwise apply_leparagliding_params would
+            # rebuild from the unchanged panel values and discard the edit.
+            params = self.leparagliding_panel.collect_params()
+            old_area = shape.area
+            old_ar = shape.aspect_ratio
+            new_area = settings.area
+            new_ar = settings.aspect_ratio
+            if (
+                (new_area != old_area or new_ar != old_ar)
+                and old_area > 0 and old_ar > 0
+                and new_area > 0 and new_ar > 0
+            ):
+                old_span = math.sqrt(old_ar * old_area)
+                new_span = math.sqrt(new_ar * new_area)
+                params.scale(
+                    new_span / old_span,
+                    (new_area / new_span) / (old_area / old_span),
+                )
+            params.cells.cell_num = settings.cell_count
+            shape.apply_leparagliding_params(params)
+            self.leparagliding_panel._restore_from_shape()
+        else:
+            shape.set_area(settings.area)
+            shape.set_aspect_ratio(settings.aspect_ratio)
+            shape.cell_num = settings.cell_count
+
+            if self.settings.sweep != settings.sweep:
+                self.shape.set_sweep(settings.sweep)
+
         self.settings = dataclasses.replace(settings)
         self._update()
 
     def _update(self) -> None:
         self.shape_input.front.set_controlpoints(self.shape.front_curve.controlpoints.nodes)
         self.shape_input.back.set_controlpoints(self.shape.back_curve.controlpoints.nodes)
+        self.distribution_input.refresh_from_shape()
         self.shape_settings_widget.update_shape(self.shape)
         self.shape_input.redraw()
 

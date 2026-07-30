@@ -13,16 +13,31 @@ from openglider.vector.polygon import CirclePart
 
 class ArcCurve:
     """
-    _
+    Arc definition based on a symmetric spline curve.
+
+    The optional ``arc_generator_params`` dict records which generator mode and
+    parameters last produced the current ``curve``. The curve remains
+    authoritative; this is purely informational metadata used to restore the
+    generator panel's state when the arc wizard is reopened.
+
+    Supported modes and their parameter keys:
+
+    - ``vault_ellipse``: a_ratio, b_ratio, x1_ratio, c1_ratio
+    - ``vault_circles``: radii (list of 4 floats), arc_angles (list of 4 floats)
+    - ``spline``: num_cp (int)
     """
     num_interpolation_points = 100
     _x_tolerance = 1e-8
 
-    def __init__(self, curve: SymmetricCurveType) -> None:
+    def __init__(self, curve: SymmetricCurveType, arc_generator_params: dict[str, Any] | None = None) -> None:
         self.curve = curve
+        self.arc_generator_params = arc_generator_params
 
     def __json__(self) -> dict[str, Any]:
-        return {"curve": self.curve}
+        data: dict[str, Any] = {"curve": self.curve}
+        if self.arc_generator_params:
+            data["arc_generator_params"] = self.arc_generator_params
+        return data
 
     def copy(self) -> ArcCurve:
         return copy.deepcopy(self)
@@ -103,8 +118,268 @@ class ArcCurve:
         curve = openglider.rs.vector.PolyLine2D(left_curve.nodes[:-1] + right_curve.nodes)
         
         spline = openglider.rs.spline.SymmetricBSplineCurve.fit(curve, 8) # type: ignore
-        
+
         return cls(spline)
+
+    # ── Arc generators ──────────────────────────────────────────────
+    #
+    # The generators below reproduce the analytical arc shapes from the LE
+    # Paragliding pre-processor. Their math produces a per-cell angle list
+    # (one value per cell, centre outward, centre cell = 0). That list is then
+    # converted into this codebase's spline representation by walking the right
+    # half and fitting a SymmetricBSplineCurve — see _arc_from_all_cell_angles.
+
+    @classmethod
+    def _arc_from_all_cell_angles(
+        cls, all_angles_rad: list[float], x_values: list[float], num_cp: int | None = None
+    ) -> ArcCurve:
+        """Build an ArcCurve by walking per-cell angles into right-half [y, z]
+        positions and fitting a symmetric BSpline.
+
+        :param all_angles_rad: one angle per cell (centre outward, incl. centre cell)
+        :param x_values: shape rib-x-values (may start negative for a centre cell)
+        """
+        x_abs = [abs(x) for x in x_values]
+        # Start at the symmetry centre so the fitted right half is anchored at
+        # the origin (matters most for gliders without a centre cell, where the
+        # centre rib sits exactly at x=0; it roughly halves the fit error).
+        positions: list[list[float]] = [[0.0, 0.0]]
+        y = z = 0.0
+        for i, angle in enumerate(all_angles_rad):
+            d = x_abs[i + 1] - x_abs[i]
+            y += math.cos(angle) * d
+            z -= math.sin(angle) * d
+            positions.append([y, z])
+
+        line = openglider.rs.vector.PolyLine2D(positions)
+
+        if num_cp is None:
+            num_cp = max(3, min(8, len(positions) - 1))
+        num_cp = max(3, min(num_cp, len(positions)))
+
+        # SymmetricBSplineCurve.fit accepts 3 <= num_cp <= len(points); degenerate
+        # inputs (e.g. a zero-span centre cell duplicate) can still reject the
+        # upper end, so decrement until a fit succeeds.
+        spline = None
+        for n in range(num_cp, 2, -1):
+            try:
+                spline = openglider.rs.spline.SymmetricBSplineCurve.fit(line, n)  # type: ignore
+                break
+            except Exception:  # noqa: BLE001 - fall back to fewer control points
+                continue
+        if spline is None:
+            spline = openglider.rs.spline.SymmetricBSplineCurve.fit(line, 3)  # type: ignore
+
+        return cls(spline)
+
+    @staticmethod
+    def _cell_info(x_values: list[float]) -> tuple[bool, list[float], float, int]:
+        """Return (has_center, x_abs, half_span, num_stored)."""
+        has_center = x_values[0] != 0
+        x_abs = [abs(x) for x in x_values]
+        half_span = x_abs[-1]
+        num_cells = len(x_values) - 1
+        num_stored = num_cells - 1 if has_center else num_cells
+        return has_center, x_abs, half_span, num_stored
+
+    @classmethod
+    def from_vault_ellipse(
+        cls,
+        x_values: list[float],
+        a_ratio: float = 0.78,
+        b_ratio: float = 0.44,
+        x1_ratio: float = 0.53,
+        c1_ratio: float = 0.043,
+    ) -> ArcCurve:
+        """
+        Generate an arc from a vault defined by an ellipse with a cosine
+        modification at the tip (LE Paragliding pre-processor Vault Type 1).
+
+        All parameters are expressed as ratios of the half-span so the shape is
+        scale-independent.
+
+        :param x_values: shape rib-x-values (right half; may start negative for a centre cell)
+        :param a_ratio: horizontal semi-axis of the ellipse, as fraction of half-span
+        :param b_ratio: vertical semi-axis (vault height), as fraction of half-span
+        :param x1_ratio: span fraction where cosine modification begins (0..1)
+        :param c1_ratio: cosine modification amplitude, as fraction of half-span
+        """
+        _has_center, x_abs, half_span, _num_stored = cls._cell_info(x_values)
+        num_cells = len(x_values) - 1
+        if half_span == 0 or num_cells == 0:
+            return cls._arc_from_all_cell_angles([0.0] * max(num_cells, 1), x_values)
+
+        a1 = a_ratio * half_span
+        b1 = b_ratio * half_span
+        x1 = x1_ratio * half_span
+        c1 = c1_ratio * half_span
+
+        pi = math.pi
+        n_main = 300  # ellipse sampling points
+        n_mod = 100  # cosine modification zone points
+
+        vault_x: list[float] = []
+        vault_y: list[float] = []
+        jcontrol = False
+
+        for i in range(n_main):
+            theta1 = (pi / 2.0) * i / n_main
+            xq = a1 * math.sin(theta1)
+            yq = b1 * math.sqrt(max(1.0 - (xq * xq) / (a1 * a1), 0.0))
+
+            if xq < x1:
+                vault_x.append(xq)
+                vault_y.append(yq)
+
+            if xq >= x1 and not jcontrol:
+                y1 = b1 * math.sqrt(max(1.0 - (x1 * x1) / (a1 * a1), 0.0))
+                dy = y1 / n_mod
+                for j in range(n_mod):
+                    yq_m = y1 - dy * j
+                    t_arg = max(1.0 - (yq_m * yq_m) / (b1 * b1), 0.0)
+                    cos_arg = (y1 - yq_m) * pi / y1 if y1 > 0 else 0.0
+                    xq_m = a1 * math.sqrt(t_arg) + c1 * (1.0 - (math.cos(cos_arg) + 1.0) * 0.5)
+                    vault_x.append(xq_m)
+                    vault_y.append(yq_m)
+                vault_x.append(a1 + c1)
+                vault_y.append(0.0)
+                jcontrol = True
+
+        angles = cls._angles_from_vault_contour(vault_x, vault_y, x_abs, half_span)
+        return cls._arc_from_all_cell_angles(angles, x_values)
+
+    @classmethod
+    def from_vault_circles(
+        cls,
+        x_values: list[float],
+        radii: list[float] | None = None,
+        arc_angles: list[float] | None = None,
+    ) -> ArcCurve:
+        """
+        Generate an arc from a series of successive tangent circles (LE
+        Paragliding pre-processor Vault Type 2).
+
+        Radius units are arbitrary — only the ratios between radii matter, since
+        the contour is rescaled to match the wingspan. Defaults match the
+        pre-processor docs so values can be copied verbatim.
+
+        :param x_values: shape rib-x-values (right half; may start negative for a centre cell)
+        :param radii: circle radii in arbitrary units (default: [640.56, 480.47, 229.50, 99.26])
+        :param arc_angles: arc angle in degrees per circle (default: [20.35, 21.367, 18.925, 28.349])
+        """
+        _has_center, x_abs, half_span, _num_stored = cls._cell_info(x_values)
+        num_cells = len(x_values) - 1
+        if half_span == 0 or num_cells == 0:
+            return cls._arc_from_all_cell_angles([0.0] * max(num_cells, 1), x_values)
+
+        if radii is None:
+            radii = [640.56, 480.47, 229.50, 99.26]
+        if arc_angles is None:
+            arc_angles = [20.35, 21.367, 18.925, 28.349]
+
+        abs_radii = [r * half_span for r in radii]
+        n_circles = min(len(abs_radii), len(arc_angles))
+
+        pi = math.pi
+        pts_per_circle = 100
+
+        centers_x = [0.0] * n_circles
+        centers_y = [0.0] * n_circles
+        cumulative_angle = 0.0
+        for i in range(1, n_circles):
+            cumulative_angle += arc_angles[i - 1]
+            dx = (abs_radii[i - 1] - abs_radii[i]) * math.sin(cumulative_angle * pi / 180.0)
+            dy = (abs_radii[i - 1] - abs_radii[i]) * math.cos(cumulative_angle * pi / 180.0)
+            centers_x[i] = centers_x[i - 1] + dx
+            centers_y[i] = centers_y[i - 1] + dy
+
+        vault_x: list[float] = []
+        vault_y: list[float] = []
+        start_angle = 0.0
+        for ci in range(n_circles):
+            end_angle = start_angle + arc_angles[ci]
+            step = arc_angles[ci] / pts_per_circle
+            angle = start_angle
+            while angle < end_angle - step * 0.5:
+                vault_x.append(centers_x[ci] + abs_radii[ci] * math.sin(angle * pi / 180.0))
+                vault_y.append(centers_y[ci] + abs_radii[ci] * math.cos(angle * pi / 180.0))
+                angle += step
+            start_angle = end_angle
+
+        final_angle = sum(arc_angles[:n_circles])
+        vault_x.append(centers_x[n_circles - 1] + abs_radii[n_circles - 1] * math.sin(final_angle * pi / 180.0))
+        vault_y.append(centers_y[n_circles - 1] + abs_radii[n_circles - 1] * math.cos(final_angle * pi / 180.0))
+
+        # Translate so the tip is at y=0
+        if vault_y:
+            tip_y = vault_y[-1]
+            vault_y = [vy - tip_y for vy in vault_y]
+
+        angles = cls._angles_from_vault_contour(vault_x, vault_y, x_abs, half_span)
+        return cls._arc_from_all_cell_angles(angles, x_values)
+
+    @staticmethod
+    def _angles_from_vault_contour(
+        vault_x: list[float], vault_y: list[float], x_abs: list[float], half_span: float
+    ) -> list[float]:
+        """Rescale a vault contour to the half-span and derive per-cell angles
+        (radians, centre outward) by interpolating rib positions along it."""
+        num_cells = len(x_abs) - 1
+        if len(vault_x) < 2:
+            return [0.0] * num_cells
+
+        arc_lengths = [0.0]
+        for k in range(len(vault_x) - 1):
+            seg = math.sqrt((vault_x[k + 1] - vault_x[k]) ** 2 + (vault_y[k + 1] - vault_y[k]) ** 2)
+            arc_lengths.append(arc_lengths[-1] + seg)
+
+        total_length = arc_lengths[-1]
+        if total_length <= 0:
+            return [0.0] * num_cells
+
+        scale = half_span / total_length
+        vault_x = [v * scale for v in vault_x]
+        vault_y = [v * scale for v in vault_y]
+        arc_lengths = [a * scale for a in arc_lengths]
+
+        def interp_vault(arc_dist: float) -> tuple[float, float]:
+            if arc_dist <= 0:
+                return vault_x[0], vault_y[0]
+            if arc_dist >= arc_lengths[-1]:
+                return vault_x[-1], vault_y[-1]
+            for k in range(len(arc_lengths) - 1):
+                if arc_lengths[k] <= arc_dist <= arc_lengths[k + 1]:
+                    seg_len = arc_lengths[k + 1] - arc_lengths[k]
+                    if seg_len <= 0:
+                        return vault_x[k], vault_y[k]
+                    frac = (arc_dist - arc_lengths[k]) / seg_len
+                    vx = vault_x[k] + frac * (vault_x[k + 1] - vault_x[k])
+                    vy = vault_y[k] + frac * (vault_y[k + 1] - vault_y[k])
+                    return vx, vy
+            return vault_x[-1], vault_y[-1]
+
+        rib_projected: list[float] = []
+        rib_height: list[float] = []
+        for x_val in x_abs:
+            vx, vy = interp_vault(x_val)
+            rib_projected.append(vx)
+            rib_height.append(vy)
+
+        angles: list[float] = []
+        for i in range(len(x_abs) - 1):
+            drop = rib_height[i] - rib_height[i + 1]
+            dy = rib_projected[i + 1] - rib_projected[i]
+            angles.append(math.atan2(drop, dy) if dy > 0 else 0.0)
+        return angles
+
+    def resample_spline(self, x_values: list[float], num_cp: int) -> ArcCurve:
+        """Refit the current arc with ``num_cp`` control points (fewer = smoother).
+
+        Curve-model equivalent of fitting a BSpline through the current cell
+        angles. Reads the current per-cell angles and rebuilds the arc curve.
+        """
+        angles = self.get_cell_angles(x_values, rad=True)
+        return ArcCurve._arc_from_all_cell_angles(angles, x_values, num_cp=num_cp)
 
     def get_rib_angles(self, x_values: list[float]) -> list[float]:
         """
