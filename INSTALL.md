@@ -124,6 +124,7 @@ OpenGlider can be packaged as:
 
 - Windows executable (`OpenGlider.exe`)
 - macOS application bundle (`OpenGlider.app`)
+- Linux AppImage (`OpenGlider-linux-x86_64.AppImage`)
 
 The repository provides helper scripts in `scripts/` using PyInstaller.
 
@@ -151,9 +152,21 @@ Output:
 
 - `dist/OpenGlider.app`
 
+### 3. Build Linux `.AppImage`
+
+Run this on Linux:
+
+```bash
+./scripts/build_linux_appimage.sh
+```
+
+Output:
+
+- `dist/OpenGlider-linux-x86_64.AppImage`
+
 ### Notes
 
-- Cross-building is not supported here. Build on the target OS (Windows for `.exe`, macOS for `.app`).
+- Cross-building is not supported here. Build on the target OS (Windows for `.exe`, macOS for `.app`, Linux for `.AppImage`).
 - The scripts prefer `uv` when available. In CI they use `uv pip install --system`; locally they use the active venv, or create/use `.venv` automatically.
 - The C++ `fmt` dependency is bootstrapped automatically by `setup.py` via `scripts/fetch_cpp_deps.py` into `src_cpp/fmt` when missing.
 
@@ -167,9 +180,11 @@ Available targets:
 - `windows-exe`
 - `macos-app-x64`
 - `macos-app-arm64`
+- `linux-appimage-x64`
 
 Artifact names:
 
-- `OpenGlider-windows-exe` (`dist/OpenGlider-windows-exe.tar.gz`)
+- `OpenGlider-windows-exe` (`dist/OpenGlider.exe`)
 - `OpenGlider-macos-app-x64` (`dist/OpenGlider-macos-app-x64.tar.gz`)
 - `OpenGlider-macos-app-arm64` (`dist/OpenGlider-macos-app-arm64.tar.gz`)
+- `OpenGlider-linux-appimage-x64` (`dist/OpenGlider-linux-x86_64.AppImage`)

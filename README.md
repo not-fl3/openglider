@@ -36,6 +36,7 @@ Helper scripts are available to package OpenGlider with PyInstaller:
 
 - Windows `.exe`: `./scripts/build_windows_exe.sh` (run on Windows)
 - macOS `.app`: `./scripts/build_macos_app.sh` (run on macOS)
+- Linux `.AppImage`: `./scripts/build_linux_appimage.sh` (run on Linux)
 
 The scripts use `uv` when available and automatically fall back to `pip`.
 
