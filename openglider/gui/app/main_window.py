@@ -178,17 +178,17 @@ class MainWindow(QtWidgets.QMainWindow):
         load_glider.setStatusTip("Load Glider")
         load_glider.triggered.connect(self.open_dialog)
 
-        load_demokite = QAction(icon("fa.folder"), "Demokite", self)
-        load_demokite.setShortcut("Ctrl+D")
-        load_demokite.setStatusTip("Load Demokite")
-        load_demokite.triggered.connect(self.load_demokite)
+        load_demowing = QAction(icon("fa.folder"), "demowing", self)
+        load_demowing.setShortcut("Ctrl+D")
+        load_demowing.setStatusTip("Load demowing")
+        load_demowing.triggered.connect(self.load_demowing)
 
         diff_gliders = QAction(icon("fa.folder"), "Diff gliders", self)
         diff_gliders.setStatusTip("Diff gliders")
         diff_gliders.triggered.connect(self.diff)
 
         self.menus["file"].addAction(load_glider)
-        self.menus["file"].addAction(load_demokite)
+        self.menus["file"].addAction(load_demowing)
 
         for menu_name, actions in self.menu_actions.items():
             for widget, name in actions:
@@ -347,9 +347,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update_menu()
         self.top_panel.setCurrentIndex(0)
 
-    def load_demokite(self) -> None:
+    def load_demowing(self) -> None:
         import openglider
-        filename = openglider.get_demokite_path()
+        filename = openglider.get_demowing_path()
         asyncio.ensure_future(self.load_glider(filename))
 
 

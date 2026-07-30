@@ -32,17 +32,17 @@ def load(filename: str) -> Any:
     return res
 
 
-def get_demokite_path() -> str:
+def get_demowing_path() -> str:
     import os
-    filename = os.path.join(os.path.dirname(__file__), "demokite.ods")
+    filename = os.path.join(os.path.dirname(__file__), "demowing.ods")
 
     return filename
 
-def load_demokite() -> openglider.glider.GliderProject:
-    filename =  get_demokite_path()
+def load_demowing() -> openglider.glider.GliderProject:
+    filename =  get_demowing_path()
 
     if not os.path.isfile(filename):
-        raise FileNotFoundError(f"Demokite file not found: {filename}")
+        raise FileNotFoundError(f"demowing file not found: {filename}")
 
     return load(filename)
 

@@ -22,15 +22,15 @@ from openglider.glider.parametric import ParametricGlider
 
 import_dir = os.path.dirname(os.path.abspath(__file__))
 test_dir = os.path.dirname(import_dir)
-demokite = import_dir + '/demokite.ods'
-#demokite = import_dir + "/demokite.json"
+demowing = import_dir + '/demowing.ods'
+#demowing = import_dir + "/demowing.json"
 
 
 class GliderTestCase(unittest.TestCase):
     project: GliderProject
 
     def setUp(self) -> None:
-        self.project = openglider.load_demokite()
+        self.project = openglider.load_demowing()
 
     @property
     def parametric_glider(self) -> ParametricGlider:
@@ -55,6 +55,6 @@ class GliderTestCase(unittest.TestCase):
 
 if __name__ == "__main__":
     dirname = os.path.dirname(__file__)
-    glider = ParametricGlider.import_ods(os.path.join(dirname, "demokite.ods"))
-    with open(demokite, "w") as outfile:
+    glider = ParametricGlider.import_ods(os.path.join(dirname, "demowing.ods"))
+    with open(demowing, "w") as outfile:
         openglider.jsonify.dump(glider, outfile)

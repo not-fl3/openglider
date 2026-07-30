@@ -16,19 +16,19 @@ PACKAGE_ROOT = TESTS_ROOT.parent / "openglider"
 import_dir = str(TESTS_ROOT / "common")
 
 
-def get_demokite_path() -> str:
-    return str(PACKAGE_ROOT / "demokite.ods")
+def get_demowing_path() -> str:
+    return str(PACKAGE_ROOT / "demowing.ods")
 
 
-def load_demokite() -> GliderProject:
-    return openglider.load(get_demokite_path())
+def load_demowing() -> GliderProject:
+    return openglider.load(get_demowing_path())
 
 
 class GliderTestCase(unittest.TestCase):
     project: GliderProject
 
     def setUp(self) -> None:
-        self.project = load_demokite()
+        self.project = load_demowing()
 
     @property
     def parametric_glider(self) -> ParametricGlider:

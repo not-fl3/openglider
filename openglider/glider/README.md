@@ -2,7 +2,7 @@
 
 ## glider_3d
 
-![demokite](glider.png)
+![demowing](glider.png)
 
 A glider consists of the following elements:
 
