@@ -1,5 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyList};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 use super::signature::*;
 use super::vector::*;
@@ -141,6 +143,16 @@ impl Interpolation {
     fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> Self { self.clone() }
     fn __json__(&self) -> Vec<Vec<f64>> { self.curve.nodes.iter().map(VectorOps::components).collect() }
     fn tolist(&self) -> Vec<Vec<f64>> { self.curve.nodes.iter().map(VectorOps::components).collect() }
+
+    fn __hash__(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.extrapolate.hash(&mut hasher);
+        self.curve.nodes.len().hash(&mut hasher);
+        for node in &self.curve.nodes {
+            node.hash_value().hash(&mut hasher);
+        }
+        hasher.finish()
+    }
 
     #[getter]
     fn nodes(&self) -> Vec<Vector2D> { self.curve.nodes.clone() }

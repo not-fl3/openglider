@@ -144,32 +144,34 @@ class Curve(CurveBase):
     def to_controlpoints(self, points: list[openglider.rs.vector.Vector2D]) -> list[openglider.rs.vector.Vector2D]:
         controlpoints = []
 
-        x_values = [p[0] for p in self.shape.front]
         ribs = self.shape.ribs
+        rib_x = [float(p[0]) for p in self.shape.front]
 
         for point in points:
-            distance = abs(x_values[0] - point[0])
-            index = 0
+            px = float(point[0])
+            py = float(point[1])
 
-            for i, x in enumerate(x_values):
-                _distance = abs(x - point[0])
+            best_index = 0
+            best_distance = abs(rib_x[0] - px)
+            for i, x in enumerate(rib_x):
+                distance = abs(x - px)
+                if distance < best_distance:
+                    best_distance = distance
+                    best_index = i
 
-                if _distance < distance:
-                    distance = _distance
-                    index = i
+            if best_index == 0 and self.shape.has_center_cell:
+                best_index = 1
 
-            if index == 0 and self.shape.has_center_cell:
-                index = 1
+            y1 = float(ribs[best_index][0][1])
+            y2 = float(ribs[best_index][1][1])
 
-            y1 = ribs[index][0][1]
-            y2 = ribs[index][1][1]
+            if abs(y2 - y1) < 1e-12:
+                y = 0.0
+            else:
+                y = (py - y1) / (y2 - y1)
 
-            y = (point[1]-y1) / (y2-y1)
-
-            y = max(0, y)
-            y = min(1, y)
-            
-            controlpoints.append(openglider.rs.vector.Vector2D([index, y]))
+            y = max(0.0, min(1.0, y))
+            controlpoints.append(openglider.rs.vector.Vector2D([float(best_index), y]))
         
         return controlpoints
     
@@ -232,11 +234,19 @@ class ShapeCurve(Curve):
         front, back = self.shape.front.get(rib_no), self.shape.back.get(rib_no)
 
         results = self.points_2d.cut(front, back)
+        expected = float(self.interpolation.get_value(rib_no))
 
-        if len(results) != 1:
-            raise Exception(f"wrong number of cut results: {len(results)}")
+        # During interactive edits, geometric cuts can briefly return multiple
+        # intersections (or none) near tangential/contact configurations.
+        # Select the cut closest to the expected interpolation branch to keep
+        # ShapeCurve/ShapeBSplineCurve stable while preserving shape semantics.
+        if len(results) == 0:
+            value = expected
+        else:
+            value = min(results, key=lambda result: abs(result[1] - expected))[1]
 
-        return self.to_unit(results[0][1])
+        value = max(0.0, min(1.0, float(value)))
+        return self.to_unit(value)
 
 
 class ShapeBSplineCurve(ShapeCurve):
