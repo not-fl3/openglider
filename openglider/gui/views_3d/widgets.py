@@ -89,9 +89,17 @@ class WgpuRenderWidget(QtWidgets.QWidget):
         app = QtWidgets.QApplication.instance()
         if app is not None and hasattr(app, "nativeInterface"):
             native = app.nativeInterface()
-            if hasattr(native, "display"):
+            # Use the platform plugin name to pick the backend. QX11Application
+            # exposes both display() (Xlib Display*) and connection() (xcb), so
+            # inferring the backend from which accessors exist mislabels X11 as
+            # Wayland and feeds an Xlib Display* to wgpu's Wayland path (SIGSEGV).
+            platform_name = app.platformName()
+            if platform_name.startswith("wayland") and hasattr(native, "display"):
                 display = int(native.display())
                 return ("wayland", display if display else None)
+            if hasattr(native, "display"):
+                display = int(native.display())
+                return ("x11", display if display else None)
             if hasattr(native, "connection"):
                 connection = int(native.connection())
                 return ("xcb", connection if connection else None)
