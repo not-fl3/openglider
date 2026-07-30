@@ -48,7 +48,12 @@ class GliderActors:
             raise ValueError("Glider3D not set")
 
         for i, rib in enumerate(self.glider_3d.ribs):
-            mesh_temp = rib.get_mesh(hole_num=hole_numpoints, filled=True)
+            try:
+                mesh_temp = rib.get_mesh(hole_num=hole_numpoints, filled=True)
+            except BaseException as e:
+                logger.error(f"Error generating mesh for rib {rib.name}: {e}")
+                continue  # Skip this rib and continue with the next one
+                #raise e
 
             ribs_mesh += mesh_temp
 
