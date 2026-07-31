@@ -11,40 +11,30 @@ from openglider.utils.types import SymmetricCurveType
 from openglider.vector.polygon import CirclePart
 
 
-class ArcCurve:
+class SplineArc:
     """
-    Arc definition based on a symmetric spline curve.
+    Arc defined by a symmetric spline curve.
 
-    The optional ``arc_generator_params`` dict records which generator mode and
-    parameters last produced the current ``curve``. The curve remains
-    authoritative; this is purely informational metadata used to restore the
-    generator panel's state when the arc wizard is reopened.
-
-    Supported modes and their parameter keys:
-
-    - ``vault_ellipse``: a_ratio, b_ratio, x1_ratio, c1_ratio
-    - ``vault_circles``: radii (list of 4 floats), arc_angles (list of 4 floats)
-    - ``spline``: num_cp (int)
+    This is the *compiled* representation every consumer uses (via ``.curve``)
+    and the base class for the parametric arc variants (``LeparaglidingArc``,
+    ``ExplicitArc``). Those subclasses carry an editable source (vault params /
+    per-cell angles) and derive the same ``.curve`` from it.
     """
     num_interpolation_points = 100
     _x_tolerance = 1e-8
 
-    def __init__(self, curve: SymmetricCurveType, arc_generator_params: dict[str, Any] | None = None) -> None:
+    def __init__(self, curve: SymmetricCurveType) -> None:
         self.curve = curve
-        self.arc_generator_params = arc_generator_params
 
     def __json__(self) -> dict[str, Any]:
-        data: dict[str, Any] = {"curve": self.curve}
-        if self.arc_generator_params:
-            data["arc_generator_params"] = self.arc_generator_params
-        return data
+        return {"curve": self.curve}
 
-    def copy(self) -> ArcCurve:
+    def copy(self) -> SplineArc:
         return copy.deepcopy(self)
 
     @staticmethod
     def has_center_cell(x_values: list[float]) -> bool:
-        return abs(x_values[0]) > ArcCurve._x_tolerance
+        return abs(x_values[0]) > SplineArc._x_tolerance
 
     def get_arc_positions(self, x_values: list[float]) -> openglider.rs.vector.PolyLine2D:
         """
@@ -68,9 +58,9 @@ class ArcCurve:
             scale_center = openglider.rs.vector.Vector2D([0, 1])
         else:
             scale_center = openglider.rs.vector.Vector2D([-1, 1])
-        
+
         positions[0] = positions[0] * scale_center
-        
+
         return openglider.rs.vector.PolyLine2D(positions)
 
     def get_cell_angles(self, x_values: list[float], rad: bool=True) -> list[float]:
@@ -99,7 +89,7 @@ class ArcCurve:
         return cell_angles
 
     @classmethod
-    def from_cell_angles(cls, angles: list[float], x_values: list[float], rad: bool=True) -> ArcCurve:
+    def from_cell_angles(cls, angles: list[float], x_values: list[float], rad: bool=True) -> SplineArc:
         last_pos = openglider.rs.vector.Vector2D([0,0])
         last_x = 0.
         nodes = []
@@ -111,30 +101,30 @@ class ArcCurve:
             last_x = x
 
             nodes.append(last_pos)
-        
+
         right_curve = openglider.rs.vector.PolyLine2D(nodes)
         left_curve = right_curve.mirror()
 
         curve = openglider.rs.vector.PolyLine2D(left_curve.nodes[:-1] + right_curve.nodes)
-        
+
         spline = openglider.rs.spline.SymmetricBSplineCurve.fit(curve, 8) # type: ignore
 
-        return cls(spline)
+        return SplineArc(spline)
 
-    # ── Arc generators ──────────────────────────────────────────────
+    # ── curve compilation from per-cell angles ──────────────────────
     #
-    # The generators below reproduce the analytical arc shapes from the LE
-    # Paragliding pre-processor. Their math produces a per-cell angle list
-    # (one value per cell, centre outward, centre cell = 0). That list is then
-    # converted into this codebase's spline representation by walking the right
-    # half and fitting a SymmetricBSplineCurve — see _arc_from_all_cell_angles.
+    # The generators reproduce the analytical arc shapes from the LE Paragliding
+    # pre-processor. Their math produces a per-cell angle list (one value per
+    # cell, centre outward, centre cell = 0). ``_fit_curve`` converts such a list
+    # into this codebase's spline representation by walking the right half and
+    # fitting a SymmetricBSplineCurve.
 
-    @classmethod
-    def _arc_from_all_cell_angles(
-        cls, all_angles_rad: list[float], x_values: list[float], num_cp: int | None = None
-    ) -> ArcCurve:
-        """Build an ArcCurve by walking per-cell angles into right-half [y, z]
-        positions and fitting a symmetric BSpline.
+    @staticmethod
+    def _fit_curve(
+        all_angles_rad: list[float], x_values: list[float], num_cp: int | None = None
+    ) -> SymmetricCurveType:
+        """Walk per-cell angles into right-half [y, z] positions and fit a
+        symmetric BSpline; returns the fitted curve.
 
         :param all_angles_rad: one angle per cell (centre outward, incl. centre cell)
         :param x_values: shape rib-x-values (may start negative for a centre cell)
@@ -170,7 +160,7 @@ class ArcCurve:
         if spline is None:
             spline = openglider.rs.spline.SymmetricBSplineCurve.fit(line, 3)  # type: ignore
 
-        return cls(spline)
+        return spline
 
     @staticmethod
     def _cell_info(x_values: list[float]) -> tuple[bool, list[float], float, int]:
@@ -182,32 +172,21 @@ class ArcCurve:
         num_stored = num_cells - 1 if has_center else num_cells
         return has_center, x_abs, half_span, num_stored
 
-    @classmethod
-    def from_vault_ellipse(
-        cls,
+    @staticmethod
+    def _vault_ellipse_angles(
         x_values: list[float],
         a_ratio: float = 0.78,
         b_ratio: float = 0.44,
         x1_ratio: float = 0.53,
         c1_ratio: float = 0.043,
-    ) -> ArcCurve:
-        """
-        Generate an arc from a vault defined by an ellipse with a cosine
-        modification at the tip (LE Paragliding pre-processor Vault Type 1).
-
-        All parameters are expressed as ratios of the half-span so the shape is
-        scale-independent.
-
-        :param x_values: shape rib-x-values (right half; may start negative for a centre cell)
-        :param a_ratio: horizontal semi-axis of the ellipse, as fraction of half-span
-        :param b_ratio: vertical semi-axis (vault height), as fraction of half-span
-        :param x1_ratio: span fraction where cosine modification begins (0..1)
-        :param c1_ratio: cosine modification amplitude, as fraction of half-span
-        """
-        _has_center, x_abs, half_span, _num_stored = cls._cell_info(x_values)
+    ) -> list[float]:
+        """Per-cell angles (rad, centre outward, incl. centre cell) for a vault
+        defined by an ellipse with a cosine tip modification (LE Paragliding
+        pre-processor Vault Type 1). Ratios are fractions of the half-span."""
+        _has_center, x_abs, half_span, _num_stored = SplineArc._cell_info(x_values)
         num_cells = len(x_values) - 1
         if half_span == 0 or num_cells == 0:
-            return cls._arc_from_all_cell_angles([0.0] * max(num_cells, 1), x_values)
+            return [0.0] * max(num_cells, 1)
 
         a1 = a_ratio * half_span
         b1 = b_ratio * half_span
@@ -245,32 +224,21 @@ class ArcCurve:
                 vault_y.append(0.0)
                 jcontrol = True
 
-        angles = cls._angles_from_vault_contour(vault_x, vault_y, x_abs, half_span)
-        return cls._arc_from_all_cell_angles(angles, x_values)
+        return SplineArc._angles_from_vault_contour(vault_x, vault_y, x_abs, half_span)
 
-    @classmethod
-    def from_vault_circles(
-        cls,
+    @staticmethod
+    def _vault_circles_angles(
         x_values: list[float],
         radii: list[float] | None = None,
         arc_angles: list[float] | None = None,
-    ) -> ArcCurve:
-        """
-        Generate an arc from a series of successive tangent circles (LE
-        Paragliding pre-processor Vault Type 2).
-
-        Radius units are arbitrary — only the ratios between radii matter, since
-        the contour is rescaled to match the wingspan. Defaults match the
-        pre-processor docs so values can be copied verbatim.
-
-        :param x_values: shape rib-x-values (right half; may start negative for a centre cell)
-        :param radii: circle radii in arbitrary units (default: [640.56, 480.47, 229.50, 99.26])
-        :param arc_angles: arc angle in degrees per circle (default: [20.35, 21.367, 18.925, 28.349])
-        """
-        _has_center, x_abs, half_span, _num_stored = cls._cell_info(x_values)
+    ) -> list[float]:
+        """Per-cell angles (rad, centre outward, incl. centre cell) for a vault
+        of successive tangent circles (LE Paragliding pre-processor Vault Type 2).
+        Radius units are arbitrary — only their ratios matter."""
+        _has_center, x_abs, half_span, _num_stored = SplineArc._cell_info(x_values)
         num_cells = len(x_values) - 1
         if half_span == 0 or num_cells == 0:
-            return cls._arc_from_all_cell_angles([0.0] * max(num_cells, 1), x_values)
+            return [0.0] * max(num_cells, 1)
 
         if radii is None:
             radii = [640.56, 480.47, 229.50, 99.26]
@@ -315,8 +283,7 @@ class ArcCurve:
             tip_y = vault_y[-1]
             vault_y = [vy - tip_y for vy in vault_y]
 
-        angles = cls._angles_from_vault_contour(vault_x, vault_y, x_abs, half_span)
-        return cls._arc_from_all_cell_angles(angles, x_values)
+        return SplineArc._angles_from_vault_contour(vault_x, vault_y, x_abs, half_span)
 
     @staticmethod
     def _angles_from_vault_contour(
@@ -372,14 +339,36 @@ class ArcCurve:
             angles.append(math.atan2(drop, dy) if dy > 0 else 0.0)
         return angles
 
-    def resample_spline(self, x_values: list[float], num_cp: int) -> ArcCurve:
+    # ── generator entry points ──────────────────────────────────────
+
+    @classmethod
+    def from_vault_ellipse(
+        cls, x_values: list[float], a_ratio: float = 0.78, b_ratio: float = 0.44,
+        x1_ratio: float = 0.53, c1_ratio: float = 0.043,
+    ) -> LeparaglidingArc:
+        return LeparaglidingArc.generate(
+            x_values, "vault_ellipse",
+            a_ratio=a_ratio, b_ratio=b_ratio, x1_ratio=x1_ratio, c1_ratio=c1_ratio,
+        )
+
+    @classmethod
+    def from_vault_circles(
+        cls, x_values: list[float], radii: list[float] | None = None,
+        arc_angles: list[float] | None = None,
+    ) -> LeparaglidingArc:
+        return LeparaglidingArc.generate(
+            x_values, "vault_circles",
+            radii=radii if radii is not None else [640.56, 480.47, 229.50, 99.26],
+            arc_angles=arc_angles if arc_angles is not None else [20.35, 21.367, 18.925, 28.349],
+        )
+
+    def resample_spline(self, x_values: list[float], num_cp: int) -> SplineArc:
         """Refit the current arc with ``num_cp`` control points (fewer = smoother).
 
-        Curve-model equivalent of fitting a BSpline through the current cell
-        angles. Reads the current per-cell angles and rebuilds the arc curve.
+        Reads the current per-cell angles and rebuilds a plain spline arc.
         """
         angles = self.get_cell_angles(x_values, rad=True)
-        return ArcCurve._arc_from_all_cell_angles(angles, x_values, num_cp=num_cp)
+        return SplineArc(SplineArc._fit_curve(angles, x_values, num_cp=num_cp))
 
     def get_rib_angles(self, x_values: list[float]) -> list[float]:
         """
@@ -426,3 +415,68 @@ class ArcCurve:
         scale_factor = x_values[-1] / arc_curve_length
 
         self.curve.controlpoints = openglider.rs.vector.PolyLine2D([p * scale_factor for p in self.curve.controlpoints.nodes])
+
+
+class LeparaglidingArc(SplineArc):
+    """Arc generated from LE-Paragliding vault parameters.
+
+    Stores the ``mode`` (``vault_ellipse`` / ``vault_circles``) and its ``params``
+    as the editable source; the ``.curve`` is derived (and kept, so consumers and
+    JSON stay self-contained).
+    """
+
+    def __init__(self, curve: SymmetricCurveType, mode: str, params: dict[str, Any]) -> None:
+        super().__init__(curve)
+        self.mode = mode
+        self.params = dict(params)
+
+    def __json__(self) -> dict[str, Any]:
+        return {"curve": self.curve, "mode": self.mode, "params": self.params}
+
+    @classmethod
+    def generate(cls, x_values: list[float], mode: str, **params: Any) -> LeparaglidingArc:
+        """Compute the vault curve for the given shape rib-x-values + params."""
+        if mode == "vault_ellipse":
+            angles = SplineArc._vault_ellipse_angles(x_values, **params)
+        elif mode == "vault_circles":
+            angles = SplineArc._vault_circles_angles(x_values, **params)
+        else:
+            raise ValueError(f"unknown leparagliding arc mode: {mode!r}")
+        curve = SplineArc._fit_curve(angles, x_values)
+        return cls(curve, mode, params)
+
+
+class ExplicitArc(SplineArc):
+    """Arc defined by explicit per-cell angles.
+
+    ``cell_angles`` are degrees for the right half, excluding the centre cell
+    (matching the openglider-lines representation). The ``.curve`` is derived.
+    """
+
+    def __init__(self, curve: SymmetricCurveType, cell_angles: list[float]) -> None:
+        super().__init__(curve)
+        self.cell_angles = list(cell_angles)
+
+    def __json__(self) -> dict[str, Any]:
+        return {"curve": self.curve, "cell_angles": self.cell_angles}
+
+    @classmethod
+    def from_angles(cls, cell_angles: list[float], x_values: list[float]) -> ExplicitArc:
+        """Build from right-half, centre-excluded angles in degrees."""
+        has_center = SplineArc.has_center_cell(x_values)
+        all_deg = ([0.0] + list(cell_angles)) if has_center else list(cell_angles)
+        all_rad = [a * math.pi / 180.0 for a in all_deg]
+        curve = SplineArc._fit_curve(all_rad, x_values)
+        return cls(curve, cell_angles)
+
+    @classmethod
+    def from_current(cls, arc: SplineArc, x_values: list[float]) -> ExplicitArc:
+        """Snapshot an existing arc's per-cell angles into an ExplicitArc."""
+        all_deg = arc.get_cell_angles(x_values, rad=False)
+        has_center = SplineArc.has_center_cell(x_values)
+        cell_angles = [float(a) for a in (all_deg[1:] if has_center else all_deg)]
+        return cls(arc.curve.copy(), cell_angles)
+
+
+# Backward-compat alias: existing imports and old JSON (`_type: ArcCurve`).
+ArcCurve = SplineArc

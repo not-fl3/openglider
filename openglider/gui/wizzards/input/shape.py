@@ -7,9 +7,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from collections.abc import Callable
 
 import openglider.rs
-from openglider.glider.parametric.shape import ParametricShape
+from openglider.glider.parametric.shape import LeparaglidingShape, ParametricShape
 from openglider.glider.parametric.leparagliding import (
-    CellDistribution,
     LeadingEdgeParams,
     LeparaglidingShapeParams,
     TrailingEdgeParams,
@@ -318,10 +317,10 @@ class ShapeSettingsWidget(QtWidgets.QWidget):
 
 
 class LeparaglidingPanel(QtWidgets.QGroupBox):
-    """Leparagliding pre-processor parameters (LE, TE, cell distribution).
+    """Leparagliding pre-processor parameters for the leading/trailing edges.
 
-    Each value change rebuilds the front/back curves and rib distribution from
-    the analytical formulas in ``pre-processor.f``. Inputs use the same
+    Each value change rebuilds the front/back curves from the analytical
+    formulas in ``pre-processor.f``. Inputs use the same
     parameter names and units as the FORTRAN ``pre-data.txt``, so values can be
     copied verbatim from a leparagliding design.
     """
@@ -399,25 +398,9 @@ class LeparaglidingPanel(QtWidgets.QGroupBox):
         te_form.addRow("exp (corr exp):", self.te_exp)
         outer.addWidget(te_group)
 
-        # ── Cell distribution group ──
-        cd_group = QtWidgets.QGroupBox("Cell distribution")
-        cd_form = QtWidgets.QFormLayout(cd_group)
-        cd_form.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        self.cd_type = QtWidgets.QComboBox()
-        self.cd_type.addItem("1: Uniform", 1)
-        self.cd_type.addItem("2: Linear", 2)
-        self.cd_type.addItem("3: Proportional to chord", 3)
-        self.cd_type.setCurrentIndex(2)
-        self.cd_type.currentIndexChanged.connect(self._on_dist_type_changed)
-        self.cd_coef = self._make_spin(0.6, 0.0, 1.0, 3)
-        cd_form.addRow("Type:", self.cd_type)
-        cd_form.addRow("Coefficient (xk):", self.cd_coef)
-        outer.addWidget(cd_group)
-
         outer.addStretch()
 
         self._restore_from_shape()
-        self._on_dist_type_changed(self.cd_type.currentIndex())
 
     def _make_spin(self, default: float, lo: float, hi: float, decimals: int) -> QtWidgets.QDoubleSpinBox:
         sb = QtWidgets.QDoubleSpinBox()
@@ -432,13 +415,13 @@ class LeparaglidingPanel(QtWidgets.QGroupBox):
 
     def _restore_from_shape(self) -> None:
         """Populate widget values from shape's leparagliding params (if any)."""
-        params = self.project.glider.shape.get_leparagliding_params()
-        if params is None:
+        shape = self.project.glider.shape
+        if not isinstance(shape, LeparaglidingShape):
             return
+        params = shape.params
         self._updating = True
         le = params.leading_edge
         te = params.trailing_edge
-        cd = params.cells
         self.le_a1.setValue(le.a1)
         self.le_b1.setValue(le.b1)
         self.le_x1.setValue(le.x1)
@@ -454,9 +437,6 @@ class LeparaglidingPanel(QtWidgets.QGroupBox):
         self.te_c0.setValue(te.c0)
         self.te_y0.setValue(te.y0)
         self.te_exp.setValue(te.exp)
-        idx = {1: 0, 2: 1, 3: 2}.get(cd.dist_type, 2)
-        self.cd_type.setCurrentIndex(idx)
-        self.cd_coef.setValue(cd.coefficient)
         self._updating = False
 
     def _reset_defaults(self) -> None:
@@ -464,7 +444,6 @@ class LeparaglidingPanel(QtWidgets.QGroupBox):
         defaults = LeparaglidingShapeParams()
         le = defaults.leading_edge
         te = defaults.trailing_edge
-        cd = defaults.cells
         self.le_a1.setValue(le.a1)
         self.le_b1.setValue(le.b1)
         self.le_x1.setValue(le.x1)
@@ -480,16 +459,8 @@ class LeparaglidingPanel(QtWidgets.QGroupBox):
         self.te_c0.setValue(te.c0)
         self.te_y0.setValue(te.y0)
         self.te_exp.setValue(te.exp)
-        self.cd_type.setCurrentIndex(2)
-        self.cd_coef.setValue(cd.coefficient)
         self._updating = False
         self._on_value_changed()
-
-    def _on_dist_type_changed(self, _index: int) -> None:
-        dist_type = self.cd_type.currentData()
-        self.cd_coef.setEnabled(dist_type in (2, 3))
-        if not self._updating:
-            self._on_value_changed()
 
     def collect_params(self) -> LeparaglidingShapeParams:
         return LeparaglidingShapeParams(
@@ -513,17 +484,249 @@ class LeparaglidingPanel(QtWidgets.QGroupBox):
                 y0=self.te_y0.value(),
                 exp=self.te_exp.value(),
             ),
-            cells=CellDistribution(
-                dist_type=int(self.cd_type.currentData()),
-                cell_num=int(self.project.glider.shape.cell_num),
-                coefficient=self.cd_coef.value(),
-            ),
         )
 
     def _on_value_changed(self) -> None:
         if self._updating:
             return
         self.params_changed.emit()
+
+
+class CellWidthSlidersPanel(QtWidgets.QWidget):
+    """Row of vertical sliders + spinboxes — one per half-cell, centre to tip.
+
+    Each slider controls a cell-width coefficient (0.1–3.0); 1.0 = equal width.
+    Ported from openglider_lines.
+    """
+
+    widths_changed = QtCore.Signal()
+    SLIDER_SCALE = 100
+
+    def __init__(self, project: GliderProject):
+        super().__init__()
+        self.project = project
+        self._updating = False
+
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        header = QtWidgets.QHBoxLayout()
+        header.addWidget(QtWidgets.QLabel("Centre"))
+        header.addStretch()
+        lbl_tip = QtWidgets.QLabel("Wingtip -->")
+        lbl_tip.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+        header.addWidget(lbl_tip)
+        outer.addLayout(header)
+
+        self.slider_layout = QtWidgets.QHBoxLayout()
+        self.slider_layout.setSpacing(2)
+        outer.addLayout(self.slider_layout, stretch=1)
+        self.spin_layout = QtWidgets.QHBoxLayout()
+        self.spin_layout.setSpacing(2)
+        outer.addLayout(self.spin_layout)
+
+        self.sliders: list[QtWidgets.QSlider] = []
+        self.spinboxes: list[QtWidgets.QDoubleSpinBox] = []
+        self._build()
+
+    def _clear(self) -> None:
+        for w in self.sliders + self.spinboxes:
+            w.deleteLater()
+        self.sliders.clear()
+        self.spinboxes.clear()
+        for layout in (self.slider_layout, self.spin_layout):
+            while layout.count():
+                item = layout.takeAt(0)
+                if item is not None:
+                    widget = item.widget()
+                    if widget is not None:
+                        widget.deleteLater()
+
+    def _build(self) -> None:
+        self._clear()
+        for w in self.project.glider.shape._get_cell_widths():
+            slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Vertical)
+            slider.setRange(int(0.1 * self.SLIDER_SCALE), int(3.0 * self.SLIDER_SCALE))
+            slider.setValue(int(w * self.SLIDER_SCALE))
+            slider.setMinimumHeight(60)
+            slider.valueChanged.connect(self._on_slider_changed)
+            self.slider_layout.addWidget(slider)
+            self.sliders.append(slider)
+
+            sb = QtWidgets.QDoubleSpinBox()
+            sb.setRange(0.1, 3.0)
+            sb.setDecimals(2)
+            sb.setSingleStep(0.05)
+            sb.setValue(w)
+            sb.setFixedWidth(60)
+            sb.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            sb.valueChanged.connect(self._on_spin_changed)
+            self.spin_layout.addWidget(sb)
+            self.spinboxes.append(sb)
+
+    def _on_slider_changed(self) -> None:
+        if self._updating:
+            return
+        self._updating = True
+        for slider, sb in zip(self.sliders, self.spinboxes):
+            sb.setValue(slider.value() / self.SLIDER_SCALE)
+        self._updating = False
+        self._emit()
+
+    def _on_spin_changed(self) -> None:
+        if self._updating:
+            return
+        self._updating = True
+        for slider, sb in zip(self.sliders, self.spinboxes):
+            slider.setValue(int(sb.value() * self.SLIDER_SCALE))
+        self._updating = False
+        self._emit()
+
+    def _emit(self) -> None:
+        widths = [sb.value() for sb in self.spinboxes]
+        self.project.glider.shape.apply_cell_widths(widths)
+        self.widths_changed.emit()
+
+    def refresh(self) -> None:
+        self._updating = True
+        widths = self.project.glider.shape._get_cell_widths()
+        if len(widths) != len(self.sliders):
+            self._build()
+        else:
+            for slider, sb, w in zip(self.sliders, self.spinboxes, widths):
+                sb.setValue(w)
+                slider.setValue(int(w * self.SLIDER_SCALE))
+        self._updating = False
+
+
+class RibSpacingPanel(QtWidgets.QGroupBox):
+    """Compute cell-width coefficients from spacing presets (Equal / Proportional
+    to chord / Constant area). Ported from openglider_lines."""
+
+    applied = QtCore.Signal()
+    _SLIDER_SCALE = 100
+
+    MODE_EQUAL = "Equal spacing"
+    MODE_PROPORTIONAL = "Proportional to chord"
+    MODE_CONST_AREA = "Constant area"
+
+    def __init__(self, project: GliderProject):
+        super().__init__("Rib spacing")
+        self.project = project
+
+        layout = QtWidgets.QVBoxLayout(self)
+        self.mode_combo = QtWidgets.QComboBox()
+        self.mode_combo.addItems([self.MODE_EQUAL, self.MODE_PROPORTIONAL, self.MODE_CONST_AREA])
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        layout.addWidget(self.mode_combo)
+
+        self.prop_widget = QtWidgets.QWidget()
+        prop_layout = QtWidgets.QVBoxLayout(self.prop_widget)
+        prop_layout.setContentsMargins(0, 0, 0, 0)
+        self.prop_label = QtWidgets.QLabel("Factor: 0.60")
+        self.prop_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        prop_layout.addWidget(self.prop_label)
+        self.prop_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.prop_slider.setRange(0, self._SLIDER_SCALE)
+        self.prop_slider.setValue(int(0.6 * self._SLIDER_SCALE))
+        self.prop_slider.valueChanged.connect(self._on_prop_slider_changed)
+        prop_layout.addWidget(self.prop_slider)
+        layout.addWidget(self.prop_widget)
+        self.prop_widget.setVisible(False)
+
+        self.apply_btn = QtWidgets.QPushButton("Apply to sliders")
+        self.apply_btn.clicked.connect(self._apply)
+        layout.addWidget(self.apply_btn)
+
+    def _on_mode_changed(self, _index: int) -> None:
+        self.prop_widget.setVisible(self.mode_combo.currentText() == self.MODE_PROPORTIONAL)
+
+    def _on_prop_slider_changed(self, value: int) -> None:
+        self.prop_label.setText(f"Factor: {value / self._SLIDER_SCALE:.2f}")
+
+    def _sample_cell_chords(self) -> list[float]:
+        shape = self.project.glider.shape
+        span = shape.span
+        num = shape._num_cell_widths
+        num_interp = shape.num_shape_interpolation
+        front_int = openglider.rs.vector.Interpolation(shape.front_curve.get_sequence(num_interp).nodes)
+        back_int = openglider.rs.vector.Interpolation(shape.back_curve.get_sequence(num_interp).nodes)
+        chords: list[float] = []
+        for i in range(num):
+            if shape.has_center_cell and i == 0:
+                x = span / (2 * num) / 2
+            else:
+                x = ((i / num) + ((i + 1) / num)) / 2 * span
+            x = min(x, span)
+            chords.append(max(abs(back_int.get_value(x) - front_int.get_value(x)), 1e-6))
+        return chords
+
+    def _compute_equal(self) -> list[float]:
+        return [1.0] * self.project.glider.shape._num_cell_widths
+
+    def _compute_proportional(self, factor: float) -> list[float]:
+        """Match LE-Paragliding's iterative chord-proportional distribution.
+
+        ``factor`` has the pre-processor's xk semantics: 0 is fully proportional
+        to chord and 1 approaches equal spacing.
+        """
+        shape = self.project.glider.shape
+        half_span = shape.span
+        full_span = 2.0 * half_span
+        cell_num = shape.cell_num
+        num_coeffs = shape._num_cell_widths
+        uniform_width = full_span / cell_num
+        widths = [uniform_width] * num_coeffs
+
+        num_interp = shape.num_shape_interpolation
+        front_int = openglider.rs.vector.Interpolation(
+            shape.front_curve.get_sequence(num_interp).nodes
+        )
+        back_int = openglider.rs.vector.Interpolation(
+            shape.back_curve.get_sequence(num_interp).nodes
+        )
+
+        def chord_at(x: float) -> float:
+            return abs(back_int.get_value(x) - front_int.get_value(x))
+
+        chord_max = chord_at(0.0)
+        for _ in range(5):
+            positions = [widths[0] / 2.0]
+            for width in widths[1:]:
+                positions.append(positions[-1] + width)
+
+            new_widths = []
+            for x in positions:
+                chord = chord_at(min(x, half_span))
+                coefficient = ((chord_max - chord) * factor + chord) / chord_max
+                new_widths.append(max(uniform_width * coefficient, 1e-6))
+
+            half_width_sum = sum(new_widths)
+            if shape.has_center_cell:
+                half_width_sum -= new_widths[0] / 2.0
+            scale = half_span / half_width_sum
+            widths = [width * scale for width in new_widths]
+
+        mean = sum(widths) / len(widths)
+        return [width / mean for width in widths]
+
+    def _compute_const_area(self) -> list[float]:
+        chords = self._sample_cell_chords()
+        inv = [1.0 / c for c in chords]
+        mean_inv = sum(inv) / len(inv)
+        return [max(min(v / mean_inv, 3.0), 0.1) for v in inv]
+
+    def _apply(self) -> None:
+        mode = self.mode_combo.currentText()
+        if mode == self.MODE_EQUAL:
+            widths = self._compute_equal()
+        elif mode == self.MODE_PROPORTIONAL:
+            widths = self._compute_proportional(self.prop_slider.value() / self._SLIDER_SCALE)
+        elif mode == self.MODE_CONST_AREA:
+            widths = self._compute_const_area()
+        else:
+            return
+        self.project.glider.shape.apply_cell_widths(widths)
+        self.applied.emit()
 
 
 class ShapeWizard(GliderSelectionWizard):
@@ -536,8 +739,19 @@ class ShapeWizard(GliderSelectionWizard):
         self.shape_input = ShapeInput(self.project)
         self.distribution_input = RibDistInput(self.project.glider.shape)
         self.distribution_input.on_change.append(lambda x, y: self.shape_input.redraw())
+
+        # The upper part of the editor is either the rib-distribution spline or
+        # the full-width row of cell-width sliders. Keeping both in a stack makes
+        # changing cell-distribution mode replace the editor instead of trying to
+        # squeeze the sliders into the settings column.
+        self.distribution_canvas = self.distribution_input.get_widget()
+        self.cell_width_sliders = CellWidthSlidersPanel(self.project)
+        self.cell_distribution_stack = QtWidgets.QStackedWidget()
+        self.cell_distribution_stack.addWidget(self.distribution_canvas)
+        self.cell_distribution_stack.addWidget(self.cell_width_sliders)
+
         #self.canvas_controls = CanvasControls(self.shape_input, vertical=True)
-        self.main_widget.addWidget(self.distribution_input.get_widget())
+        self.main_widget.addWidget(self.cell_distribution_stack)
         self.main_widget.addWidget(self.shape_input.get_widget())
 
         self.main_widget.setSizes([300, 700])
@@ -545,20 +759,20 @@ class ShapeWizard(GliderSelectionWizard):
         self.shape_settings_widget = ShapeSettingsWidget(self.project.glider.shape)
         self.settings = self.shape_settings_widget.settings
 
-        # Mode toggle: spline (draggable curves) <-> parametric (leparagliding)
+        # Shape mode is independent from the cell-distribution mode below.
         self.mode_toggle = QtWidgets.QGroupBox("Shape mode")
         mode_layout = QtWidgets.QHBoxLayout(self.mode_toggle)
         self.mode_combo = QtWidgets.QComboBox()
         self.mode_combo.addItem("Spline", self.MODE_SPLINE)
-        self.mode_combo.addItem("Parametric (leparagliding)", self.MODE_PARAMETRIC)
+        self.mode_combo.addItem("Leparagliding", self.MODE_PARAMETRIC)
         mode_layout.addWidget(QtWidgets.QLabel("Mode:"))
         mode_layout.addWidget(self.mode_combo, stretch=1)
 
         self.leparagliding_panel = LeparaglidingPanel(self.project)
         self.leparagliding_panel.params_changed.connect(self._on_parametric_changed)
 
-        # Initial mode from the shape (parametric if it has saved params)
-        if self.shape.get_leparagliding_params() is not None:
+        # Initial mode from the shape type (parametric if it's a LeparaglidingShape)
+        if isinstance(self.shape, LeparaglidingShape):
             self.mode_combo.setCurrentIndex(1)
             self.leparagliding_panel.setVisible(True)
             self._set_handles_visible(False)
@@ -569,11 +783,37 @@ class ShapeWizard(GliderSelectionWizard):
 
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
 
+        # Cell-distribution toggle: rib-distribution spline curve <-> cell-width sliders
+        self.cell_dist_toggle = QtWidgets.QGroupBox("Cell distribution")
+        cd_layout = QtWidgets.QVBoxLayout(self.cell_dist_toggle)
+        cd_row = QtWidgets.QHBoxLayout()
+        self.cell_dist_combo = QtWidgets.QComboBox()
+        self.cell_dist_combo.addItem("Spline", "spline")
+        self.cell_dist_combo.addItem("Sliders", "sliders")
+        cd_row.addWidget(QtWidgets.QLabel("Mode:"))
+        cd_row.addWidget(self.cell_dist_combo, stretch=1)
+        cd_layout.addLayout(cd_row)
+
+        self.rib_spacing_panel = RibSpacingPanel(self.project)
+        cd_layout.addWidget(self.rib_spacing_panel)
+
+        # Restore files saved with explicit cell widths directly in sliders mode,
+        # independently of how the leading/trailing edges are represented.
+        sliders_mode = self.shape.cell_widths is not None
+        if sliders_mode:
+            self.cell_dist_combo.setCurrentIndex(1)
+        self._set_cell_dist_widgets_visible(sliders_mode)
+        self._apply_cell_dist_handle_visibility()
+        self.cell_dist_combo.currentIndexChanged.connect(self._on_cell_dist_mode_changed)
+        self.cell_width_sliders.widths_changed.connect(self._on_cell_widths_changed)
+        self.rib_spacing_panel.applied.connect(self._on_rib_spacing_applied)
+
         settings_column = QtWidgets.QWidget()
         settings_column_layout = QtWidgets.QVBoxLayout(settings_column)
         settings_column_layout.setContentsMargins(0, 0, 0, 0)
         settings_column_layout.addWidget(self.mode_toggle)
         settings_column_layout.addWidget(self.leparagliding_panel)
+        settings_column_layout.addWidget(self.cell_dist_toggle)
         settings_column_layout.addWidget(self.shape_settings_widget)
         settings_column_layout.addStretch()
 
@@ -591,42 +831,110 @@ class ShapeWizard(GliderSelectionWizard):
     def shape(self) -> ParametricShape:
         return self.project.glider.shape
 
-    # ── Mode toggle: spline <-> parametric ──
+    # ── Shape mode toggle: spline <-> leparagliding ──
     def _set_handles_visible(self, visible: bool) -> None:
-        """Show or hide the draggable control-point overlays."""
+        """Show or hide only the planform's draggable control points."""
         self.shape_input.front.setVisible(visible)
         self.shape_input.back.setVisible(visible)
-        self.distribution_input.set_handle_visible(visible)
+
+    def _set_shape(self, new_shape: ParametricShape) -> None:
+        """Replace the project's shape, keeping the input widgets' cached
+        references in sync (they hold ``glider_shape`` from construction)."""
+        self.project.glider.shape = new_shape
+        self.shape_input.glider_shape = new_shape
+        self.distribution_input.glider_shape = new_shape
+
+    def _to_spline_shape(self) -> ParametricShape:
+        """Change only the planform representation, preserving cell distribution."""
+        s = self.shape
+        return ParametricShape(
+            s.front_curve.copy(), s.back_curve.copy(), s.rib_distribution.copy(),
+            s.cell_num, config=s.config,
+            cell_widths=None if s.cell_widths is None else list(s.cell_widths),
+        )
+
+    def _to_leparagliding_shape(
+        self, params: LeparaglidingShapeParams, cell_num: int | None = None
+    ) -> LeparaglidingShape:
+        """Change only the planform representation, preserving cell distribution."""
+        shape = self.shape
+        target_cell_num = shape.cell_num if cell_num is None else cell_num
+        widths = None if shape.cell_widths is None else list(shape.cell_widths)
+        if widths is not None:
+            needed = target_cell_num // 2 + (target_cell_num % 2)
+            widths = (widths + [1.0] * max(0, needed - len(widths)))[:needed]
+        return LeparaglidingShape(
+            params,
+            shape.config,
+            rib_distribution=shape.rib_distribution.copy(),
+            cell_num=target_cell_num,
+            cell_widths=widths,
+        )
 
     def _on_mode_changed(self, _index: int) -> None:
         mode = self.mode_combo.currentData()
         if mode == self.MODE_PARAMETRIC:
-            # Spline -> parametric: apply the panel's current values.
+            # Spline -> Leparagliding changes LE/TE only.
             params = self.leparagliding_panel.collect_params()
-            params.cells.cell_num = self.shape.cell_num
-            self.shape.apply_leparagliding_params(params)
+            self._set_shape(self._to_leparagliding_shape(params))
             self.leparagliding_panel._restore_from_shape()
             self.leparagliding_panel.setVisible(True)
             self._set_handles_visible(False)
             self._update()
         else:
-            # Parametric -> spline: keep the generated curves; drop the
-            # parametric metadata so manual edits aren't overwritten.
-            self.shape.clear_parametric_params()
+            # Leparagliding -> spline keeps the generated LE/TE and the current
+            # independent spline/sliders cell distribution.
+            self._set_shape(self._to_spline_shape())
             self.leparagliding_panel.setVisible(False)
             self._set_handles_visible(True)
             self._update()
 
     def _on_parametric_changed(self) -> None:
         params = self.leparagliding_panel.collect_params()
-        self.shape.apply_leparagliding_params(params)
+        self._set_shape(self._to_leparagliding_shape(params))
         self._update()
 
     def _on_spline_dragged(self, _shape: ParametricShape) -> None:
-        """User dragged a control point in spline mode -> the shape no longer
-        matches the leparagliding values, so drop the stale metadata."""
-        if self.mode_combo.currentData() == self.MODE_SPLINE:
-            self.shape.clear_parametric_params()
+        """User dragged a control point in spline mode. If the shape is still a
+        parametric subclass, demote it to a plain spline shape so the edit sticks."""
+        if self.mode_combo.currentData() == self.MODE_SPLINE and type(self.shape) is not ParametricShape:
+            self._set_shape(self._to_spline_shape())
+
+    # ── Cell-distribution toggle: rib-distribution spline <-> cell-width sliders ──
+    def _set_cell_dist_widgets_visible(self, visible: bool) -> None:
+        """Replace the upper spline editor with sliders and show their presets."""
+        target = self.cell_width_sliders if visible else self.distribution_canvas
+        self.cell_distribution_stack.setCurrentWidget(target)
+        self.rib_spacing_panel.setVisible(visible)
+
+    def _apply_cell_dist_handle_visibility(self) -> None:
+        """Rib-distribution handles depend only on cell-distribution mode."""
+        self.distribution_input.set_handle_visible(
+            self.cell_dist_combo.currentData() == "spline"
+        )
+
+    def _on_cell_dist_mode_changed(self, _index: int) -> None:
+        if self.cell_dist_combo.currentData() == "sliders":
+            # Seed the widths from the current distribution, then edit via sliders.
+            self.shape.apply_cell_widths(self.shape._current_cell_widths())
+            self.cell_width_sliders.refresh()
+            self._set_cell_dist_widgets_visible(True)
+        else:
+            # Back to a free rib-distribution curve.
+            self.shape.cell_widths = None
+            self._set_cell_dist_widgets_visible(False)
+        self._apply_cell_dist_handle_visibility()
+        self.distribution_input.refresh_from_shape()
+        self.shape_input.redraw()
+
+    def _on_cell_widths_changed(self) -> None:
+        self.distribution_input.refresh_from_shape()
+        self.shape_input.redraw()
+
+    def _on_rib_spacing_applied(self) -> None:
+        self.cell_width_sliders.refresh()
+        self.distribution_input.refresh_from_shape()
+        self.shape_input.redraw()
 
     def set_sweep(self, value: float) -> None:
         self.shape.set_sweep(value)
@@ -658,13 +966,16 @@ class ShapeWizard(GliderSelectionWizard):
                     new_span / old_span,
                     (new_area / new_span) / (old_area / old_span),
                 )
-            params.cells.cell_num = settings.cell_count
-            shape.apply_leparagliding_params(params)
+            self._set_shape(self._to_leparagliding_shape(params, settings.cell_count))
             self.leparagliding_panel._restore_from_shape()
         else:
             shape.set_area(settings.area)
             shape.set_aspect_ratio(settings.aspect_ratio)
             shape.cell_num = settings.cell_count
+            if shape.cell_widths is not None:
+                # Keep the explicit distribution authoritative and resize it when
+                # the number of cells changes while sliders mode is active.
+                shape.apply_cell_widths(shape._get_cell_widths())
 
             if self.settings.sweep != settings.sweep:
                 self.shape.set_sweep(settings.sweep)
@@ -676,6 +987,8 @@ class ShapeWizard(GliderSelectionWizard):
         self.shape_input.front.set_controlpoints(self.shape.front_curve.controlpoints.nodes)
         self.shape_input.back.set_controlpoints(self.shape.back_curve.controlpoints.nodes)
         self.distribution_input.refresh_from_shape()
+        if self.cell_dist_combo.currentData() == "sliders":
+            self.cell_width_sliders.refresh()
         self.shape_settings_widget.update_shape(self.shape)
         self.shape_input.redraw()
 

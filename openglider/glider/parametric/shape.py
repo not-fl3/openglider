@@ -24,11 +24,10 @@ class ParametricShape:
     rib_distribution: CurveType
     cell_num: int
     config: ParametricGliderConfig
-    # When set, the shape was last generated from leparagliding pre-processor
-    # parameters. The curves + rib_distribution above stay authoritative (they
-    # are the result of fitting the parametric curves); this dict is only
-    # restoration metadata for the shape wizard's parametric mode.
-    parametric_params: dict[str, Any] | None = None
+    # Optional cell-width coefficients (cell-distribution "sliders" mode).
+    # These values are used directly for rib positions; ``rib_distribution`` is
+    # only authoritative when this is ``None`` (spline mode).
+    cell_widths: list[float] | None = None
 
     num_shape_interpolation = 50
     num_distribution_interpolation = 50
@@ -44,6 +43,15 @@ class ParametricShape:
     def __post_init__(self) -> None:
         self.rescale_curves()
 
+    @classmethod
+    def __from_json__(cls, front_curve: Any, back_curve: Any, rib_distribution: Any,
+                      cell_num: int, config: Any, cell_widths: list[float] | None = None,
+                      **_legacy: Any) -> ParametricShape:
+        # ``**_legacy`` tolerates fields from older saves (e.g. parametric_params),
+        # which now load as a plain spline shape.
+        return cls(front_curve, back_curve, rib_distribution, cell_num,
+                   config=config, cell_widths=cell_widths)
+
     def __repr__(self) -> str:
         return "{}\n\tcells: {}\n\tarea: {:.2f}\n\taspect_ratio: {:.2f}".format(
             super().__repr__(),
@@ -51,117 +59,77 @@ class ParametricShape:
             self.area,
             self.aspect_ratio
         )
-    
+
     def copy(self) -> ParametricShape:
-        return self.__class__(
+        return ParametricShape(
             self.front_curve.copy(),
             self.back_curve.copy(),
             self.rib_distribution.copy(),
             self.cell_num,
             config=self.config,
-            parametric_params=(
-                None if self.parametric_params is None else dict(self.parametric_params)
-            ),
+            cell_widths=None if self.cell_widths is None else list(self.cell_widths),
         )
 
-    def apply_leparagliding_params(
-        self, params: LeparaglidingShapeParams, num_curve_samples: int = 200
-    ) -> None:
-        """Rebuild front/back curves and rib distribution from leparagliding params.
+    @property
+    def _num_cell_widths(self) -> int:
+        """Number of cell-width coefficients for the half-wing (no stabi cell)."""
+        return self.cell_num // 2 + self.has_center_cell
 
-        The front/back BSplines are *fit* through the analytical LE/TE curves.
-        Unit convention: leparagliding values are in cm, openglider stores metres,
-        so sampled curves are scaled by ``LEPARAGLIDING_UNIT_SCALE`` (1/100).
-        Coordinate note: leparagliding measures chord with y=0 at the leading
-        edge and y increasing towards the trailing edge; openglider's planview
-        points the other way, so sampled y values are negated before fitting.
+    def _get_cell_widths(self) -> list[float]:
+        """Current cell-width coefficients, padded/trimmed to the cell count.
+
+        Falls back to the coefficients implied by the current rib distribution
+        (so switching to cell-width "sliders" mode preserves the shape), then to
+        uniform. Ported from openglider_lines' ``ParametricShape._get_cell_widths``.
         """
-        scale = self.LEPARAGLIDING_UNIT_SCALE
-        le_pts = params.sample_le(num_curve_samples)
-        te_pts = params.sample_te(num_curve_samples)
-
-        front_polyline = openglider.rs.vector.PolyLine2D(
-            [[x * scale, -y * scale] for x, y in le_pts]
+        needed = self._num_cell_widths
+        coeffs = (
+            list(self.cell_widths)
+            if self.cell_widths is not None
+            else self._current_cell_widths()
         )
-        back_polyline = openglider.rs.vector.PolyLine2D(
-            [[x * scale, -y * scale] for x, y in te_pts]
-        )
+        if len(coeffs) < needed:
+            coeffs.extend([1.0] * (needed - len(coeffs)))
+        elif len(coeffs) > needed:
+            coeffs = coeffs[:needed]
+        return coeffs
 
-        front_cls = type(self.front_curve)
-        back_cls = type(self.back_curve)
-        num_cp_front = max(len(self.front_curve.controlpoints), 5)
-        num_cp_back = max(len(self.back_curve.controlpoints), 5)
+    def _current_cell_widths(self) -> list[float]:
+        """Cell-width coefficients (mean ~1) implied by the current rib
+        distribution."""
+        x_abs = [abs(x) for x in self.rib_x_values]
+        positions = ([0.0] + x_abs[1:]) if self.has_center_cell else list(x_abs)
+        widths = [positions[i + 1] - positions[i] for i in range(len(positions) - 1)]
+        if self.has_center_cell and widths:
+            widths[0] *= 2.0  # centre coefficient is a full cell
+        mean = (sum(widths) / len(widths)) if widths else 1.0
+        return [w / (mean or 1.0) for w in widths]
 
-        self.front_curve = front_cls.fit(front_polyline, num_cp_front)  # type: ignore
-        self.back_curve = back_cls.fit(back_polyline, num_cp_back)  # type: ignore
+    def apply_cell_widths(self, widths: list[float]) -> None:
+        """Set cell-width coefficients (sliders mode) and rederive the rib
+        distribution from them."""
+        self.cell_widths = list(widths)
 
-        self.cell_num = params.cells.cell_num
-        self.rib_distribution = self._rib_distribution_from_cell_widths(
-            params.compute_cell_widths()
-        )
-        self.parametric_params = params.to_dict()
-        self.rescale_curves()
+    def _cell_width_positions(self) -> list[float]:
+        """Exact right-half rib positions, normalized to the half-span.
 
-    def _rib_distribution_from_cell_widths(self, coeffs: list[float]) -> CurveType:
-        """Build a rib-distribution curve (span-fraction -> cumulative rib
-        fraction) from per-half-cell width coefficients.
-
-        Mirrors the construction in ``import_ods.get_geometry_explicit`` but
-        derives rib positions from width coefficients instead of explicit
-        geometry. For an odd cell count the first coefficient is a *full* centre
-        cell of which only half sits in the half-wing, so it is halved.
+        For an odd cell count the first slider represents the full centre cell,
+        so only half of that width lies on the right half-wing.
         """
-        has_center = self.has_center_cell
-        if not coeffs:
-            coeffs = [1.0]
-
-        if has_center:
-            half_widths = [coeffs[0] * 0.5] + list(coeffs[1:])
+        coeffs = self._get_cell_widths()
+        if self.has_center_cell:
+            half_widths = [coeffs[0] * 0.5] + coeffs[1:]
+            positions = [half_widths[0]]
+            for width in half_widths[1:]:
+                positions.append(positions[-1] + width)
         else:
-            half_widths = list(coeffs)
+            half_widths = coeffs
+            positions = [0.0]
+            for width in half_widths:
+                positions.append(positions[-1] + width)
 
-        total = sum(half_widths) or 1.0
-        widths = [w / total for w in half_widths]
-
-        # Cumulative right-half rib span-fractions (last == 1.0).
-        if has_center:
-            span_fracs = [widths[0]]
-            for w in widths[1:]:
-                span_fracs.append(span_fracs[-1] + w)
-        else:
-            span_fracs = [0.0]
-            for w in widths:
-                span_fracs.append(span_fracs[-1] + w)
-
-        num_ribs = len(span_fracs)
-        start = (1.0 / self.cell_num) if has_center else 0.0
-        cum_fracs = list(linspace(start, 1.0, num_ribs))
-
-        # Anchor the wing centre (span 0 -> cumulative 0) so the fit passes
-        # through the origin; for a centre rib this point already exists.
-        points = list(zip(span_fracs, cum_fracs))
-        if has_center:
-            points = [(0.0, 0.0)] + points
-
-        dist_int = openglider.rs.vector.Interpolation([[sf, cf] for sf, cf in points])
-        samples = openglider.rs.vector.PolyLine2D(
-            [[x, dist_int.get_value(x)] for x in linspace(0.0, 1.0, 30)]
-        )
-        # 7 control points keeps the fitted distribution within ~0.2% of span of
-        # the exact cell-width positions; fewer over-smooths, more barely helps.
-        num_cp = min(7, len(samples.nodes))
-        return openglider.rs.spline.BSplineCurve.fit(samples, num_cp)  # type: ignore
-
-    def get_leparagliding_params(self) -> LeparaglidingShapeParams | None:
-        """Return the last-saved leparagliding params, or None if not in that mode."""
-        if not self.parametric_params:
-            return None
-        if self.parametric_params.get("mode") != "leparagliding":
-            return None
-        return LeparaglidingShapeParams.from_dict(self.parametric_params)
-
-    def clear_parametric_params(self) -> None:
-        self.parametric_params = None
+        total = sum(half_widths)
+        return [position / total for position in positions]
 
     @property
     def baseline(self) -> openglider.rs.vector.PolyLine2D:
@@ -198,14 +166,16 @@ class ParametricShape:
 
     @property
     def rib_dist_interpolation(self) -> list[tuple[float, float]]:
-        """
-        Interpolate Cell-distribution
-        """
-        data = self.rib_distribution.get_sequence(self.num_distribution_interpolation)
-        interpolation = openglider.rs.vector.Interpolation([[p[1], p[0]] for p in data])
+        """Return normalized rib positions and their distribution coordinates."""
         start = self.has_center_cell / self.cell_num
         num = self.cell_num // 2 + 1
-        return [(interpolation.get_value(i), i) for i in linspace(start, 1, num)]
+        distribution_values = list(linspace(start, 1, num))
+        if self.cell_widths is not None:
+            return list(zip(self._cell_width_positions(), distribution_values))
+
+        data = self.rib_distribution.get_sequence(self.num_distribution_interpolation)
+        interpolation = openglider.rs.vector.Interpolation([[p[1], p[0]] for p in data])
+        return [(interpolation.get_value(i), i) for i in distribution_values]
 
     # besser mit spezieller bezier?
     @property
@@ -503,3 +473,151 @@ class ParametricShape:
             self.scale(x=span/span_0, y=span/span_0)
         else:
             self.scale(x=span/span_0, y=1)
+
+
+class LeparaglidingShape(ParametricShape):
+    """Planform whose leading and trailing edges use Leparagliding parameters.
+
+    Cell distribution is independent: it can still be an editable spline or a
+    list of explicit cell-width coefficients, just like on a spline planform.
+    """
+
+    _NUM_CURVE_SAMPLES = 200
+    _NUM_CP = 7
+
+    def __init__(
+        self,
+        params: LeparaglidingShapeParams,
+        config: ParametricGliderConfig,
+        cell_num: int,
+        rib_distribution: CurveType | None = None,
+        cell_widths: list[float] | None = None,
+    ) -> None:
+        front, back = self._compile_planform(params)
+
+        if rib_distribution is None:
+            if cell_widths is None:
+                raise ValueError(
+                    "LeparaglidingShape requires a rib distribution or cell widths"
+                )
+            # Slider mode uses cell_widths directly. This linear curve is only a
+            # dormant placeholder required by the common ParametricShape API.
+            rib_distribution = openglider.rs.spline.BSplineCurve(
+                [[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]]
+            )
+
+        super().__init__(
+            front, back, rib_distribution, cell_num,
+            config=config,
+            cell_widths=None if cell_widths is None else list(cell_widths),
+        )
+        self.params = params
+
+    def __json__(self) -> dict[str, Any]:
+        return {
+            "params": self.params.to_dict(),
+            "config": self.config,
+            "rib_distribution": self.rib_distribution,
+            "cell_num": self.cell_num,
+            "cell_widths": self.cell_widths,
+        }
+
+    @classmethod
+    def __from_json__(  # type: ignore[override]
+        cls,
+        params: dict[str, Any],
+        config: Any,
+        cell_num: int,
+        rib_distribution: CurveType | None = None,
+        cell_widths: list[float] | None = None,
+    ) -> LeparaglidingShape:
+        return cls(
+            LeparaglidingShapeParams.from_dict(params), config,
+            rib_distribution=rib_distribution,
+            cell_num=cell_num,
+            cell_widths=cell_widths,
+        )
+
+    def copy(self) -> LeparaglidingShape:
+        return LeparaglidingShape(
+            LeparaglidingShapeParams.from_dict(self.params.to_dict()),
+            self.config,
+            rib_distribution=self.rib_distribution.copy(),
+            cell_num=self.cell_num,
+            cell_widths=None if self.cell_widths is None else list(self.cell_widths),
+        )
+
+    @classmethod
+    def _compile_planform(cls, params: LeparaglidingShapeParams) -> tuple[Any, Any]:
+        """Fit front/back curves from the analytic LE/TE.
+
+        Unit convention: leparagliding values are in cm, openglider stores metres,
+        so sampled curves are scaled by ``LEPARAGLIDING_UNIT_SCALE`` (1/100).
+        leparagliding measures chord with y=0 at the LE and y increasing towards
+        the TE; openglider's planview points the other way, so y is negated.
+        """
+        scale = ParametricShape.LEPARAGLIDING_UNIT_SCALE
+        le_pts = params.sample_le(cls._NUM_CURVE_SAMPLES)
+        te_pts = params.sample_te(cls._NUM_CURVE_SAMPLES)
+        front_pl = openglider.rs.vector.PolyLine2D([[x * scale, -y * scale] for x, y in le_pts])
+        back_pl = openglider.rs.vector.PolyLine2D([[x * scale, -y * scale] for x, y in te_pts])
+        front = openglider.rs.spline.SymmetricBSplineCurve.fit(front_pl, cls._NUM_CP)  # type: ignore
+        back = openglider.rs.spline.SymmetricBSplineCurve.fit(back_pl, cls._NUM_CP)  # type: ignore
+        return front, back
+
+
+class ExplicitShape(ParametricShape):
+    """Planform defined by explicit per-rib front/back points (half-wing).
+
+    ``front_points`` / ``back_points`` are [x, y] per rib (LE / TE positions).
+    Front/back curves are fit through them and the rib distribution is built from
+    the rib span positions — no separate cell-width data (spacing is implicit).
+    """
+
+    _NUM_CP = 3
+
+    def __init__(self, front_points: list[list[float]], back_points: list[list[float]],
+                 cell_num: int, config: ParametricGliderConfig) -> None:
+        front, back, rib_dist = self._compile(front_points, back_points)
+        super().__init__(front, back, rib_dist, cell_num, config=config, cell_widths=None)
+        self.front_points = [list(p) for p in front_points]
+        self.back_points = [list(p) for p in back_points]
+
+    def __json__(self) -> dict[str, Any]:
+        return {"front_points": self.front_points, "back_points": self.back_points,
+                "cell_num": self.cell_num, "config": self.config}
+
+    @classmethod
+    def __from_json__(  # type: ignore[override]
+        cls, front_points: list[list[float]], back_points: list[list[float]],
+        cell_num: int, config: Any
+    ) -> ExplicitShape:
+        return cls(front_points, back_points, cell_num, config)
+
+    def copy(self) -> ExplicitShape:
+        return ExplicitShape([list(p) for p in self.front_points],
+                             [list(p) for p in self.back_points], self.cell_num, self.config)
+
+    @classmethod
+    def _compile(cls, front_points: list[list[float]], back_points: list[list[float]]) -> tuple[Any, Any, Any]:
+        front_pl = openglider.rs.vector.PolyLine2D([list(p) for p in front_points])
+        back_pl = openglider.rs.vector.PolyLine2D([list(p) for p in back_points])
+        front = openglider.rs.spline.SymmetricBSplineCurve.fit(front_pl, cls._NUM_CP)  # type: ignore
+        back = openglider.rs.spline.SymmetricBSplineCurve.fit(back_pl, cls._NUM_CP)  # type: ignore
+        rib_dist = cls._rib_distribution_from_points(front_points)
+        return front, back, rib_dist
+
+    @staticmethod
+    def _rib_distribution_from_points(front_points: list[list[float]]) -> CurveType:
+        """Build the rib-distribution curve from per-rib span positions
+        (mirrors ``import_ods.get_geometry_explicit``)."""
+        has_center = not (front_points[0][0] == 0)
+        cell_no = (len(front_points) - 1) * 2 + has_center
+        start = (2 - has_center) / cell_no
+        const_arr = [0.0] + list(linspace(start, 1, len(front_points) - (not has_center)))
+        rib_pos = [0.0] + [p[0] for p in front_points[(not has_center):]]
+        rib_pos_int = openglider.rs.vector.Interpolation(list(zip(rib_pos, const_arr)))
+        samples = openglider.rs.vector.PolyLine2D(
+            [[i, rib_pos_int.get_value(i)] for i in linspace(0, rib_pos[-1], 30)]
+        )
+        return openglider.rs.spline.BSplineCurve.fit(samples, 3)  # type: ignore

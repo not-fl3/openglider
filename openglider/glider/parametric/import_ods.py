@@ -10,10 +10,10 @@ from packaging.version import Version
 import openglider.rs
 from openglider.airfoil import Profile2D
 
-from openglider.glider.parametric.arc import ArcCurve
+from openglider.glider.parametric.arc import ArcCurve, ExplicitArc, LeparaglidingArc
 from openglider.glider.parametric.config import ParametricGliderConfig, SewingAllowanceConfig
 from openglider.glider.parametric.leparagliding import LeparaglidingShapeParams
-from openglider.glider.parametric.shape import ParametricShape
+from openglider.glider.parametric.shape import ExplicitShape, LeparaglidingShape, ParametricShape
 from openglider.glider.parametric.table import GliderTables
 from openglider.glider.parametric.table.attachment_points import AttachmentPointTable, CellAttachmentPointTable
 from openglider.glider.parametric.table.ballooning import BallooningTable, transpose_columns
@@ -69,8 +69,37 @@ def _parse_leparagliding_column(table: Table, column: int) -> dict[str, Any]:
     return result
 
 
-def _shape_from_leparagliding(flat: dict[str, Any], cell_num: int, config: ParametricGliderConfig) -> ParametricShape:
-    """Regenerate a ParametricShape from flattened leparagliding params."""
+def _parse_explicit_points(table: Table, column: int) -> list[list[float]]:
+    """Read [x, y] rows of an 'explicit'-typed Parametric column."""
+    points: list[list[float]] = []
+    for row in range(1, table.num_rows):
+        x = table[row, column]
+        if x is None:
+            continue
+        y = table[row, column + 1]
+        points.append([float(x), float(y) if y is not None else 0.0])
+    return points
+
+
+def _parse_explicit_values(table: Table, column: int) -> list[float]:
+    """Read the single-value-per-row data of an 'explicit'-typed column."""
+    values: list[float] = []
+    for row in range(1, table.num_rows):
+        v = table[row, column]
+        if v is None:
+            continue
+        values.append(float(v))
+    return values
+
+
+def _shape_from_leparagliding(
+    flat: dict[str, Any],
+    cell_num: int,
+    config: ParametricGliderConfig,
+    rib_distribution: Any = None,
+    cell_widths: list[float] | None = None,
+) -> LeparaglidingShape:
+    """Build a LeparaglidingShape with an independent cell distribution."""
     le_keys = ("a1", "b1", "x1", "x2", "xm", "c01", "ex1", "c02", "ex2")
     te_keys = ("a1", "b1", "x1", "c0", "y0", "exp")
 
@@ -81,38 +110,22 @@ def _shape_from_leparagliding(flat: dict[str, Any], cell_num: int, config: Param
         except (TypeError, ValueError):
             return default
 
-    explicit_raw = flat.get("cell_explicit_widths")
-    if isinstance(explicit_raw, list):
-        explicit = [float(v) for v in explicit_raw]
-    elif isinstance(explicit_raw, (int, float)):
-        explicit = [float(explicit_raw)]
-    else:
-        explicit = []
-
     params = LeparaglidingShapeParams.from_dict({
         "mode": str(flat.get("mode", "leparagliding")),
         "leading_edge": {k: _f(f"le_{k}") for k in le_keys},
         "trailing_edge": {**{k: _f(f"te_{k}") for k in te_keys}, "xm": _f("le_xm")},
-        "cells": {
-            "dist_type": int(_f("cell_dist_type", 3.0)),
-            "cell_num": cell_num,
-            "coefficient": _f("cell_coefficient", 0.6),
-            "explicit_widths": explicit,
-        },
     })
-
-    # Base shape with placeholder curves; apply_leparagliding_params rebuilds
-    # front/back/rib_distribution from the params (which fully define the shape).
-    front = openglider.rs.spline.SymmetricBSplineCurve([[0., 0.], [0.25, -0.1], [0.5, -0.3], [0.75, -0.6], [1., -1.]])
-    back = openglider.rs.spline.SymmetricBSplineCurve([[0., -0.1], [0.25, -0.3], [0.5, -0.5], [0.75, -0.8], [1., -1.2]])
-    rib_distribution = openglider.rs.spline.BSplineCurve([[0., 0.], [0.5, 0.5], [1., 1.]])
-    shape = ParametricShape(front, back, rib_distribution, cell_num, config=config)
-    shape.apply_leparagliding_params(params)
-    return shape
+    return LeparaglidingShape(
+        params,
+        config,
+        rib_distribution=rib_distribution,
+        cell_num=cell_num,
+        cell_widths=cell_widths,
+    )
 
 
-def _arc_from_leparagliding(flat: dict[str, Any], x_values: list[float]) -> ArcCurve:
-    """Regenerate an ArcCurve (vault generator) from flattened params."""
+def _arc_from_leparagliding(flat: dict[str, Any], x_values: list[float]) -> LeparaglidingArc:
+    """Build a LeparaglidingArc (vault generator) from flattened params."""
     mode = str(flat.get("mode", ""))
 
     def _f(k: str, default: float) -> float:
@@ -122,30 +135,18 @@ def _arc_from_leparagliding(flat: dict[str, Any], x_values: list[float]) -> ArcC
             return default
 
     if mode == "vault_ellipse":
-        params: dict[str, Any] = {
-            "mode": mode,
-            "a_ratio": _f("a_ratio", 0.78),
-            "b_ratio": _f("b_ratio", 0.44),
-            "x1_ratio": _f("x1_ratio", 0.53),
-            "c1_ratio": _f("c1_ratio", 0.043),
-        }
-        arc = ArcCurve.from_vault_ellipse(
-            x_values,
-            a_ratio=params["a_ratio"], b_ratio=params["b_ratio"],
-            x1_ratio=params["x1_ratio"], c1_ratio=params["c1_ratio"],
+        return LeparaglidingArc.generate(
+            x_values, "vault_ellipse",
+            a_ratio=_f("a_ratio", 0.78), b_ratio=_f("b_ratio", 0.44),
+            x1_ratio=_f("x1_ratio", 0.53), c1_ratio=_f("c1_ratio", 0.043),
         )
-    elif mode == "vault_circles":
+    if mode == "vault_circles":
         radii = flat.get("radii")
         arc_angles = flat.get("arc_angles")
         radii = [float(v) for v in radii] if isinstance(radii, list) else [640.56, 480.47, 229.50, 99.26]
         arc_angles = [float(v) for v in arc_angles] if isinstance(arc_angles, list) else [20.35, 21.367, 18.925, 28.349]
-        params = {"mode": mode, "radii": radii, "arc_angles": arc_angles}
-        arc = ArcCurve.from_vault_circles(x_values, radii=radii, arc_angles=arc_angles)
-    else:
-        raise ValueError(f"unknown leparagliding arc mode: {mode!r}")
-
-    arc.arc_generator_params = params
-    return arc
+        return LeparaglidingArc.generate(x_values, "vault_circles", radii=radii, arc_angles=arc_angles)
+    raise ValueError(f"unknown leparagliding arc mode: {mode!r}")
 
 
 def import_ods_2d(cls: type[ParametricGlider], filename: str) -> ParametricGlider:
@@ -220,7 +221,13 @@ def import_ods_glider(cls: type[ParametricGlider], tables: list[Table]) -> Param
                          config=config,
                          speed=config.speed,
                          glide=config.glide,
-                         **geometry.model_dump())
+                         # pass the geometry objects directly; model_dump() would
+                         # serialize the shape/arc and lose their subclass type.
+                         shape=geometry.shape,
+                         arc=geometry.arc,
+                         aoa=geometry.aoa,
+                         profile_merge_curve=geometry.profile_merge_curve,
+                         ballooning_merge_curve=geometry.ballooning_merge_curve)
 
     return glider_2d
 
@@ -311,8 +318,7 @@ def get_geometry_explicit(sheet: Table, config: ParametricGliderConfig) -> Geome
 
 def get_geometry_parametric(table: Table, cell_num: int, config: ParametricGliderConfig) -> Geometry:
     data = {}
-    # name -> flattened params, for columns whose type is "leparagliding"
-    leparagliding: dict[str, dict[str, Any]] = {}
+    columns: dict[str, tuple[Any, int]] = {}  # name -> (type_str, column index)
     curve_types = {
         "front": openglider.rs.spline.SymmetricBSplineCurve,
         "back": openglider.rs.spline.SymmetricBSplineCurve,
@@ -328,9 +334,9 @@ def get_geometry_parametric(table: Table, cell_num: int, config: ParametricGlide
         if key is None:
             continue
         type_str = table[0, column+1]
-        if type_str == "leparagliding":
-            # Parameter column: the curve is regenerated from these below.
-            leparagliding[key] = _parse_leparagliding_column(table, column)
+        columns[key] = (type_str, column)
+        if type_str in ("leparagliding", "explicit"):
+            # source columns (params / raw data): handled per-key below.
             continue
         if key not in curve_types:
             if key == "zrot":
@@ -352,22 +358,55 @@ def get_geometry_parametric(table: Table, cell_num: int, config: ParametricGlide
 
         data[key] = curve_type(points)
 
-    if "front" in leparagliding:
-        # Shape is fully described by the leparagliding params in the front
-        # column (back is an empty marker); regenerate front/back/rib_distribution.
-        parametric_shape = _shape_from_leparagliding(leparagliding["front"], cell_num, config)
-        data.pop("rib_distribution", None)
-    else:
-        parametric_shape = ParametricShape(
-            data.pop("front"),
-            data.pop("back"),
-            data.pop("rib_distribution"),
+    # Cell distribution is parsed independently from the planform source.
+    rib_type, rib_col = columns.get("rib_distribution", (None, None))
+    cell_widths = None
+    rib_distribution = data.pop("rib_distribution", None)
+    if rib_type == "explicit":
+        assert rib_col is not None
+        cell_widths = _parse_explicit_values(table, rib_col)
+
+    front_type, front_col = columns.get("front", (None, None))
+    if front_type == "leparagliding":
+        assert front_col is not None
+        # LE/TE come from Leparagliding parameters; rib distribution comes from
+        # its own spline/explicit column. Missing columns retain legacy fallback.
+        parametric_shape: ParametricShape = _shape_from_leparagliding(
+            _parse_leparagliding_column(table, front_col),
             cell_num,
-            config=config,
+            config,
+            rib_distribution=rib_distribution,
+            cell_widths=cell_widths,
+        )
+    elif front_type == "explicit":
+        _, back_col = columns.get("back", (None, None))
+        assert front_col is not None
+        assert back_col is not None
+        parametric_shape = ExplicitShape(
+            _parse_explicit_points(table, front_col),
+            _parse_explicit_points(table, back_col),
+            cell_num, config,
+        )
+    else:
+        if rib_type == "explicit":
+            # Placeholder is replaced from cell_widths in __post_init__.
+            rib_distribution = openglider.rs.spline.BSplineCurve(
+                [[0., 0.], [0.5, 0.5], [1., 1.]]
+            )
+        parametric_shape = ParametricShape(
+            data.pop("front"), data.pop("back"), rib_distribution,
+            cell_num, config=config, cell_widths=cell_widths,
         )
 
-    if "arc" in leparagliding:
-        arc_curve = _arc_from_leparagliding(leparagliding["arc"], parametric_shape.rib_x_values)
+    arc_type, arc_col = columns.get("arc", (None, None))
+    if arc_type == "leparagliding":
+        assert arc_col is not None
+        arc_curve: ArcCurve = _arc_from_leparagliding(
+            _parse_leparagliding_column(table, arc_col), parametric_shape.rib_x_values)
+    elif arc_type == "explicit":
+        assert arc_col is not None
+        arc_curve = ExplicitArc.from_angles(
+            _parse_explicit_values(table, arc_col), parametric_shape.rib_x_values)
     else:
         arc_curve = ArcCurve(data.pop("arc"))
 
