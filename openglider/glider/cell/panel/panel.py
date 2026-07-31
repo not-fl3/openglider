@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import Enum
 import logging
 import math
@@ -380,10 +381,10 @@ class Panel(BaseModel):
         polygons: list[tuple[tuple[int, ...], dict[str, Any]]] = []
 
         # helper functions
-        def left_triangle(l_i: int, r_i: int) -> list[tuple[tuple[int, int, int], dict[str, Any]]]:
+        def left_triangle(l_i: int, r_i: int) -> list[tuple[tuple[int, ...], dict[str, Any]]]:
             return [((l_i+1, l_i, r_i), {})]
 
-        def right_triangle(l_i: int, r_i: int) -> list[tuple[tuple[int, int, int], dict[str, Any]]]:
+        def right_triangle(l_i: int, r_i: int) -> list[tuple[tuple[int, ...], dict[str, Any]]]:
             return [((r_i+1, l_i, r_i), {})]
 
         def quad(l_i: int, r_i: int) -> list[tuple[tuple[int, ...], dict[str, Any]]]:
@@ -437,7 +438,7 @@ class Panel(BaseModel):
 
                     polygons += poly
 
-        mesh_data = {
+        mesh_data: dict[str, Sequence[tuple[Any, Any]]] = {
             f"panel_{self.material}#{self.material.color_code}": polygons,
         }
 

@@ -25,7 +25,7 @@ class GliderActors:
         self.actors = {}
         self.config = None
         
-    def get_panels(self, numribs: int):
+    def get_panels(self, numribs: int) -> openglider.rs.wgpu.MeshActor:
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
 
@@ -41,7 +41,7 @@ class GliderActors:
 
         return openglider.rs.wgpu.MeshActor(panel_mesh, draw_edges=False)
     
-    def get_ribs(self, hole_numpoints: int):
+    def get_ribs(self, hole_numpoints: int) -> openglider.rs.wgpu.MeshActor:
         ribs_mesh = openglider.mesh.Mesh()
 
         if self.glider_3d is None:
@@ -63,7 +63,7 @@ class GliderActors:
 
         return openglider.rs.wgpu.MeshActor(ribs_mesh, draw_edges=True, boundary_only=True)
 
-    def get_lines(self, numpoints: int=3):
+    def get_lines(self, numpoints: int=3) -> openglider.rs.wgpu.MeshActor:
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
 
@@ -71,7 +71,7 @@ class GliderActors:
         mesh = mesh_lineset + mesh_lineset.copy().mirror("y")
         return openglider.rs.wgpu.MeshActor(mesh)
     
-    def get_diagonals(self, hole_numpoints: int, numribs: int):
+    def get_diagonals(self, hole_numpoints: int, numribs: int) -> openglider.rs.wgpu.MeshActor:
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
 
@@ -86,7 +86,7 @@ class GliderActors:
         
         return openglider.rs.wgpu.MeshActor(mesh, draw_edges=True, boundary_only=True)
 
-    def get_straps(self, numribs: int):
+    def get_straps(self, numribs: int) -> openglider.rs.wgpu.MeshActor:
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
             
@@ -108,7 +108,7 @@ class GliderActors:
         
         return openglider.rs.wgpu.MeshActor(mesh, draw_edges=True, boundary_only=True)
     
-    def get_miniribs(self):
+    def get_miniribs(self) -> openglider.rs.wgpu.MeshActor:
         if self.glider_3d is None:
             raise ValueError("Glider3D not set")
             

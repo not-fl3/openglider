@@ -60,12 +60,12 @@ class Action():
 class MainWindow(QtWidgets.QMainWindow):
     # actions need to be saved in a dict (prevent garbage collection)
     action_store: dict[str, Action]
-    glider_preview: GliderPreview | None = None
-    task_queue: QTaskQueue | None = None
-    overview: QtWidgets.QSplitter | None = None
-    glider_list: GliderListWidget | None = None
-    console: ConsoleWidget | None = None
-    log_filter_panel: LogFilterPanel | None = None
+    glider_preview: GliderPreview
+    task_queue: QTaskQueue
+    overview: QtWidgets.QSplitter
+    glider_list: GliderListWidget
+    console: ConsoleWidget
+    log_filter_panel: LogFilterPanel
 
     def __init__(self, app: GliderApp):
         super().__init__()
@@ -122,6 +122,8 @@ class MainWindow(QtWidgets.QMainWindow):
         #self.diff_view = DiffView(self, self.state)
         #self.top_panel.addTab(self.diff_view, "Diff")
 
+        if self.app.task_queue is None:
+            raise RuntimeError("application task queue is not initialized")
         self.task_queue = QTaskQueue(self, self.app.task_queue)
         self.top_panel.addTab(self.task_queue, "Tasks")
 
@@ -256,7 +258,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def get_opened_tabs(self) -> Iterator[QtWidgets.QWidget]:
         for i in range(2, self.top_panel.count()):
-            yield self.top_panel.widget(i)
+            widget = self.top_panel.widget(i)
+            if widget is not None:
+                yield widget
 
     def update_menu(self) -> None:
         num_gliders = self.glider_list.count()
@@ -297,6 +301,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 suffix = pathlib.Path(fname).suffix.lower()
                 if suffix == ".obj":
                     preview = self.glider_preview.view_3d
+                    if preview is None:
+                        raise RuntimeError("3D preview is not initialized")
                     preview.import_obj(fname)
                     self.top_panel.setCurrentIndex(0)
                     self.glider_preview.tabs_widget.setCurrentIndex(self.glider_preview.tab_names.index("3D"))
@@ -423,12 +429,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.top_panel.blockSignals(True)
             self.top_panel.clear()
             self.top_panel.blockSignals(False)
-            self.glider_preview = None
-            self.task_queue = None
-            self.overview = None
-            self.glider_list = None
-            self.console = None
-            self.log_filter_panel = None
             self.app.quit()
         
         

@@ -29,4 +29,4 @@ jobs:
           mypy --config-file mypy.ini openglider
       - name: test
         run: |
-          python testall.py
+          python tests/testall.py

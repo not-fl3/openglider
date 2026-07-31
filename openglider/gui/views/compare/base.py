@@ -19,3 +19,7 @@ class CompareView(metaclass=MixinMeta):
     @abc.abstractmethod
     def update_view(self) -> None:
         raise NotImplementedError()
+
+    def close(self) -> bool:
+        """Provided by the QWidget side of concrete compare views."""
+        raise NotImplementedError()

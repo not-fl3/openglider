@@ -230,6 +230,8 @@ class PlotWizzard(Wizard):
             raise ValueError(f"Direcotry {self.directory} is not empty")
 
         task = PatternTask(self.patterns, self.directory)
+        if self.app.task_queue is None:
+            raise RuntimeError("task queue is not initialized")
         self.app.task_queue.append(task)
 
         self.close()
