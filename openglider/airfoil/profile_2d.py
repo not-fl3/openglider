@@ -42,6 +42,11 @@ class Profile2D:
     def curve(self) -> openglider.rs.vector.PolyLine2D:
         return self._curve
 
+    @curve.setter
+    def curve(self, value: openglider.rs.vector.PolyLine2D) -> None:
+        self._curve = value
+        self._setup()
+
     def _setup(self) -> None:
         i = 0
         data = self.curve.nodes
@@ -381,7 +386,7 @@ class Profile2D:
         return result
 
     def apply_function(self, fn: Callable[[openglider.rs.vector.Vector2D, bool], openglider.rs.vector.Vector2D]) -> Self:
-        return type(self)([fn(p, upper=i<self.noseindex) for i, p in enumerate(self.curve.nodes)])
+        return type(self)([fn(p, i < self.noseindex) for i, p in enumerate(self.curve.nodes)])
 
     @classmethod
     def fetch(cls, name: str='atr72sm', base_url: str='http://m-selig.ae.illinois.edu/ads/coord/{name}.dat') -> Self:

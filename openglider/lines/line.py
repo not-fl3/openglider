@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 import logging
 import math
@@ -217,7 +218,7 @@ class Line(BaseModel):
         else:
             poly_name = "lines"
 
-        line_poly = {
+        line_poly: dict[str, Sequence[tuple[Any, Any]]] = {
             poly_name: [
                 ((i, i + 1), attributes)
                 for i in range(len(line_points) - 1)

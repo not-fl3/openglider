@@ -98,6 +98,8 @@ class GliderApp(QtWidgets.QApplication):
     def reload_code(self) -> None:
         self.reloading = True
         try:
+            if self.main_window is None:
+                raise RuntimeError("main window is not initialized")
             self.main_window.close()
             self.state.dump()
 

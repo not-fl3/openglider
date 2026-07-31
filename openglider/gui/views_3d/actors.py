@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 import openglider.rs
 from openglider.mesh import Mesh
@@ -70,6 +71,13 @@ class _MeshActorWrapper:
 	actor: openglider.rs.wgpu.MeshActor
 
 
+def _mesh_polygons(
+	polygons: Mapping[str, Sequence[tuple[Any, Any]]],
+) -> dict[str, Sequence[tuple[Any, Any]]]:
+	"""Convert covariant polygon mappings to the concrete Rust API type."""
+	return dict(polygons)
+
+
 class MeshView(_MeshActorWrapper):
 	"""Backward-compatible mesh wrapper used by View3D.show_actor()."""
 
@@ -87,7 +95,7 @@ class MeshView(_MeshActorWrapper):
 			recolored.setdefault(f"mesh{color_hex}", []).extend(
 				[(tuple(indices), dict(attrs)) for indices, attrs in layer]
 			)
-		return Mesh.from_indexed(vertices, recolored, boundaries=boundaries, name=mesh.name)
+		return Mesh.from_indexed(vertices, _mesh_polygons(recolored), boundaries=boundaries, name=mesh.name)
 
 	def draw_mesh(self, mesh: Mesh) -> None:
 		self.mesh = mesh
@@ -130,7 +138,12 @@ class MeshDataView(MeshView):
 				key = f"{layer_name}{color_hex}"
 				recolored.setdefault(key, []).append((tuple(indices), dict(attrs)))
 
-		return Mesh.from_indexed(vertices, recolored, boundaries=boundaries, name=f"{mesh.name}_colored")
+		return Mesh.from_indexed(
+			vertices,
+			_mesh_polygons(recolored),
+			boundaries=boundaries,
+			name=f"{mesh.name}_colored",
+		)
 
 
 class Arrow(_MeshActorWrapper):
@@ -148,7 +161,9 @@ class Arrow(_MeshActorWrapper):
 		_ = tip
 		color_hex = _default_color_hex(color or (1.0, 0.0, 0.0))
 		points = [p1.copy(), p2.copy()]
-		polygons = {f"arrow{color_hex}": [((0, 1), {})]}
-		mesh = Mesh.from_indexed(points, polygons, name="arrow")
+		polygons: dict[str, list[tuple[tuple[int, ...], dict[str, object]]]] = {
+			f"arrow{color_hex}": [((0, 1), {})]
+		}
+		mesh = Mesh.from_indexed(points, _mesh_polygons(polygons), name="arrow")
 		super().__init__(openglider.rs.wgpu.MeshActor(mesh, draw_edges=True, boundary_only=False))
 
