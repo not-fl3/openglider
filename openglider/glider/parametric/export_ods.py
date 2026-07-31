@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 import openglider.rs
 import ezodf
 
+from openglider.glider.parametric.arc import ExplicitArc, LeparaglidingArc
+from openglider.glider.parametric.shape import ExplicitShape, LeparaglidingShape
 from openglider.glider.parametric.table.ballooning import BallooningTable
 from openglider.utils.table import Table
 from openglider.utils.types import CurveType
@@ -178,17 +180,11 @@ def _shape_param_rows(params: dict) -> list[tuple[str, object]]:
     """
     le = params.get("leading_edge", {})
     te = params.get("trailing_edge", {})
-    cells = params.get("cells", {})
     rows: list[tuple[str, object]] = []
     for k in ("a1", "b1", "x1", "x2", "xm", "c01", "ex1", "c02", "ex2"):
         rows.append((f"le_{k}", le.get(k, 0.0)))
     for k in ("a1", "b1", "x1", "c0", "y0", "exp"):
         rows.append((f"te_{k}", te.get(k, 0.0)))
-    rows.append(("cell_dist_type", cells.get("dist_type", 3)))
-    rows.append(("cell_coefficient", cells.get("coefficient", 0.6)))
-    explicit = cells.get("explicit_widths") or []
-    if explicit:
-        rows.append(("cell_explicit_widths", ",".join(str(v) for v in explicit)))
     return rows
 
 
@@ -207,6 +203,8 @@ def _arc_param_rows(params: dict) -> list[tuple[str, object]]:
 
 def get_parametric_sheet(glider : ParametricGlider) -> Table:
     table = Table(name="Parametric")
+    shape = glider.shape
+    arc = glider.arc
 
     def add_curve(name: str, curve: CurveType, column_no: int) -> None:
         #sheet.append_columns(2)
@@ -217,7 +215,7 @@ def get_parametric_sheet(glider : ParametricGlider) -> Table:
             table[i+1, column_no+1] = p[1]
 
     def add_leparagliding(name: str, rows: list[tuple[str, object]], column_no: int) -> None:
-        # A "leparagliding" curve stores parameter key/value rows instead of
+        # A "leparagliding" column stores parameter key/value rows instead of
         # control points; the curve is regenerated from these on import.
         table[0, column_no] = name
         table[0, column_no+1] = "leparagliding"
@@ -225,23 +223,48 @@ def get_parametric_sheet(glider : ParametricGlider) -> Table:
             table[i+1, column_no] = key
             table[i+1, column_no+1] = value
 
-    shape_params = glider.shape.parametric_params
-    if shape_params and shape_params.get("mode") == "leparagliding":
+    def add_explicit_points(name: str, points: list[list[float]], column_no: int) -> None:
+        # "explicit" column with raw [x, y] rows.
+        table[0, column_no] = name
+        table[0, column_no+1] = "explicit"
+        for i, p in enumerate(points):
+            table[i+1, column_no] = p[0]
+            table[i+1, column_no+1] = p[1]
+
+    def add_explicit_values(name: str, values: list[float], column_no: int) -> None:
+        # "explicit" column with a single value per row (col+1 empty).
+        table[0, column_no] = name
+        table[0, column_no+1] = "explicit"
+        for i, v in enumerate(values):
+            table[i+1, column_no] = v
+
+    # ── planform (front/back) ──
+    if isinstance(shape, LeparaglidingShape):
         # front carries all the planform params; back is an empty marker.
-        add_leparagliding("front", _shape_param_rows(shape_params), 0)
+        add_leparagliding("front", _shape_param_rows(shape.params.to_dict()), 0)
         table[0, 2] = "back"
         table[0, 3] = "leparagliding"
+    elif isinstance(shape, ExplicitShape):
+        add_explicit_points("front", shape.front_points, 0)
+        add_explicit_points("back", shape.back_points, 2)
     else:
-        add_curve("front", glider.shape.front_curve, 0)
-        add_curve("back", glider.shape.back_curve, 2)
+        add_curve("front", shape.front_curve, 0)
+        add_curve("back", shape.back_curve, 2)
 
-    add_curve("rib_distribution", glider.shape.rib_distribution, 4)
+    # ── rib distribution ──
+    # Cell distribution is independent from spline/Leparagliding planform mode.
+    if not isinstance(shape, ExplicitShape) and shape.cell_widths is not None:
+        add_explicit_values("rib_distribution", list(shape.cell_widths), 4)
+    elif not isinstance(shape, ExplicitShape):
+        add_curve("rib_distribution", shape.rib_distribution, 4)
 
-    arc_params = glider.arc.arc_generator_params
-    if arc_params and arc_params.get("mode") in ("vault_ellipse", "vault_circles"):
-        add_leparagliding("arc", _arc_param_rows(arc_params), 6)
+    # ── arc ──
+    if isinstance(arc, LeparaglidingArc):
+        add_leparagliding("arc", _arc_param_rows({"mode": arc.mode, **arc.params}), 6)
+    elif isinstance(arc, ExplicitArc):
+        add_explicit_values("arc", list(arc.cell_angles), 6)
     else:
-        add_curve("arc", glider.arc.curve, 6)
+        add_curve("arc", arc.curve, 6)
 
     add_curve("aoa", glider.aoa, 8)
     add_curve("ballooning_merge_curve", glider.ballooning_merge_curve, 10)

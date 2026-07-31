@@ -6,7 +6,7 @@ import pyqtgraph
 import openglider.rs
 
 from openglider.glider.project import GliderProject
-from openglider.glider.parametric.arc import ArcCurve
+from openglider.glider.parametric.arc import ArcCurve, LeparaglidingArc, SplineArc
 from openglider.gui.qt import QtWidgets, QtCore
 from openglider.gui.views_2d import Canvas, DraggableLine
 from openglider.gui.wizzards.base import GliderSelectionWizard
@@ -319,12 +319,13 @@ class ArcGeneratorPanel(QtWidgets.QWidget):
         return spin
 
     def _restore_from_params(self) -> None:
-        """Restore widget values + mode from arc.arc_generator_params, without
+        """Restore widget values + mode from the current arc's type, without
         regenerating (the stored arc curve is authoritative)."""
-        params = self.project.glider.arc.arc_generator_params
-        mode_idx = self.NAME_TO_MODE.get(params["mode"]) if params and "mode" in params else None
+        arc = self.project.glider.arc
+        params = arc.params if isinstance(arc, LeparaglidingArc) else None
+        mode_idx = self.NAME_TO_MODE.get(arc.mode) if isinstance(arc, LeparaglidingArc) else None
         if mode_idx is None:
-            # No generator was used: default to spline mode so the draggable
+            # Plain spline / explicit arc: default to spline mode so the draggable
             # control points stay visible and the loaded arc can be fine-tuned.
             self.mode_combo.blockSignals(True)
             self.mode_combo.setCurrentIndex(self.MODE_SPLINE)
@@ -332,6 +333,7 @@ class ArcGeneratorPanel(QtWidgets.QWidget):
             self.mode_combo.blockSignals(False)
             return
 
+        assert params is not None
         self._updating = True
         if mode_idx == self.MODE_VAULT_ELLIPSE:
             self.ve_a.setValue(float(params.get("a_ratio", 0.78)))
@@ -346,8 +348,6 @@ class ArcGeneratorPanel(QtWidgets.QWidget):
                     self.vc_radii[i].setValue(float(radii[i]))
                 for i in range(min(4, len(angles), len(self.vc_angles))):
                     self.vc_angles[i].setValue(float(angles[i]))
-        elif mode_idx == self.MODE_SPLINE:
-            self.sp_num_cp.setValue(int(params.get("num_cp", 4)))
 
         self.mode_combo.blockSignals(True)
         self.mode_combo.setCurrentIndex(mode_idx)
@@ -376,35 +376,22 @@ class ArcGeneratorPanel(QtWidgets.QWidget):
         mode = self.mode_combo.currentIndex()
 
         if mode == self.MODE_VAULT_ELLIPSE:
-            params = {
-                "mode": self.MODE_NAMES[mode],
-                "a_ratio": self.ve_a.value(),
-                "b_ratio": self.ve_b.value(),
-                "x1_ratio": self.ve_x1.value(),
-                "c1_ratio": self.ve_c1.value(),
-            }
-            new_arc = ArcCurve.from_vault_ellipse(
+            new_arc: SplineArc = ArcCurve.from_vault_ellipse(
                 x_values,
-                a_ratio=params["a_ratio"],
-                b_ratio=params["b_ratio"],
-                x1_ratio=params["x1_ratio"],
-                c1_ratio=params["c1_ratio"],
+                a_ratio=self.ve_a.value(),
+                b_ratio=self.ve_b.value(),
+                x1_ratio=self.ve_x1.value(),
+                c1_ratio=self.ve_c1.value(),
             )
         elif mode == self.MODE_VAULT_CIRCLES:
             radii = [sb.value() for sb in self.vc_radii]
             angles = [sb.value() for sb in self.vc_angles]
-            params = {
-                "mode": self.MODE_NAMES[mode],
-                "radii": radii,
-                "arc_angles": angles,
-            }
             new_arc = ArcCurve.from_vault_circles(x_values, radii=radii, arc_angles=angles)
         else:
             self._updating = False
             return
 
-        self.project.glider.arc.curve = new_arc.curve
-        self.project.glider.arc.arc_generator_params = params
+        self.project.glider.arc = new_arc
         self._updating = False
         self.params_changed.emit()
 
@@ -415,15 +402,8 @@ class ArcGeneratorPanel(QtWidgets.QWidget):
 
         x_values = self.project.glider.shape.rib_x_values
         num_cp = self.sp_num_cp.value()
-        new_arc = ArcCurve._arc_from_all_cell_angles(
-            self._spline_source_angles, x_values, num_cp=num_cp
-        )
-
-        self.project.glider.arc.curve = new_arc.curve
-        self.project.glider.arc.arc_generator_params = {
-            "mode": self.MODE_NAMES[self.MODE_SPLINE],
-            "num_cp": num_cp,
-        }
+        curve = SplineArc._fit_curve(self._spline_source_angles, x_values, num_cp=num_cp)
+        self.project.glider.arc = SplineArc(curve)
         self._updating = False
         self.params_changed.emit()
 
