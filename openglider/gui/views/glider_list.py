@@ -61,7 +61,8 @@ class GliderListWidgetItemWidget(ListItemWidget[GliderProject]):
     def save(self) -> str | None:
         filters = {
             "OpenGlider ods (*.ods)": ".ods",
-            "OpenGlider json (*.json)": ".json"
+            "OpenGlider json (*.json)": ".json",
+            "OpenGlider markdown (*.og.md)": ".og.md"
         }
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(
             self,
@@ -73,7 +74,7 @@ class GliderListWidgetItemWidget(ListItemWidget[GliderProject]):
         if not filename:
             return None
 
-        if not filename.endswith(".json") and not filename.endswith(".ods"):
+        if not filename.endswith((".json", ".ods", ".og.md")):
             filename += filters[extension]
 
         self.list_item.element.save(filename)
@@ -110,8 +111,11 @@ class GliderListWidget(GenericListWidget[GliderProject, GliderListWidgetItemWidg
 
     @staticmethod
     def import_glider(filename: str) -> GliderProject:
-        if filename.endswith(".ods"):
+        name_lower = filename.lower()
+        if name_lower.endswith(".ods"):
             glider = openglider.glider.project.GliderProject.import_ods(filename)
+        elif name_lower.endswith(".og.md"):
+            glider = openglider.glider.project.GliderProject.import_markdown(filename)
         else:
             glider = openglider.load(filename)
 

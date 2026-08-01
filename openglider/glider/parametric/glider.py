@@ -19,7 +19,7 @@ from openglider.glider.cell.panel import Panel, PanelCut, PANELCUT_TYPES
 from openglider.glider.glider import Glider
 from openglider.glider.parametric.arc import ArcCurve
 from openglider.glider.parametric.export_ods import export_ods_2d
-from openglider.glider.parametric.import_ods import import_ods_2d
+from openglider.glider.parametric.import_ods import import_markdown_2d, import_ods_2d
 from openglider.glider.parametric.shape import ParametricShape
 from openglider.glider.parametric.table import GliderTables
 from openglider.glider.rib import Rib, SingleSkinRib
@@ -61,6 +61,10 @@ class ParametricGlider:
     @classmethod
     def import_ods(cls, path: str) -> ParametricGlider:
         return import_ods_2d(cls, path)
+
+    @classmethod
+    def import_markdown(cls, path: str) -> ParametricGlider:
+        return import_markdown_2d(cls, path)
 
     export_ods = export_ods_2d
 

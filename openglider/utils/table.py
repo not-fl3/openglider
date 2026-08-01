@@ -250,6 +250,53 @@ class Table:
         
         return table
 
+    @staticmethod
+    def _parse_markdown_value(value: str) -> Any:
+        value = value.strip()
+        if value == "":
+            return None
+        if value.lower() in {"true", "false"}:
+            return value.lower() == "true"
+        if re.fullmatch(r"-?\d+", value):
+            return int(value)
+        if re.fullmatch(r"-?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?", value):
+            return float(value)
+        return value
+
+    @classmethod
+    def loads_markdown(cls, text: str) -> list[Table]:
+        tables: list[Table] = []
+        current_table: Table | None = None
+
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith("# "):
+                continue
+            if line.startswith("## "):
+                if current_table is not None:
+                    tables.append(current_table)
+                current_table = cls(name=line[3:].strip())
+                continue
+            if current_table is None:
+                continue
+            if not line.startswith("|"):
+                continue
+
+            cells = [cls._parse_markdown_value(cell) for cell in line.strip("|").split("|")]
+            current_table.insert_row(cells)
+
+        if current_table is not None:
+            tables.append(current_table)
+
+        return tables
+
+    @classmethod
+    def load_markdown(cls, path: str) -> list[Table]:
+        with open(path, encoding="utf-8") as infile:
+            return cls.loads_markdown(infile.read())
+
     def get_markdown_table(self) -> str:
         table = self.copy()
         column_widths = []

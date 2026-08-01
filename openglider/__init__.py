@@ -18,6 +18,8 @@ def load(filename: str) -> Any:
     """
     if filename.endswith(".ods"):
         res = openglider.glider.GliderProject.import_ods(filename)
+    elif filename.lower().endswith(".og.md"):
+        res = openglider.glider.GliderProject.import_markdown(filename)
     elif filename.lower().endswith(".fcstd") or filename.lower().endswith(".fcstd1"):
         res = openglider.glider.GliderProject.import_freecad(filename)
     else:

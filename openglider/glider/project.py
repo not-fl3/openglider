@@ -9,7 +9,7 @@ from typing import Any
 
 from openglider.glider.glider import Glider
 from openglider.glider.parametric import ParametricGlider
-from openglider.glider.parametric.import_ods import import_ods_glider
+from openglider.glider.parametric.import_ods import import_markdown_glider, import_ods_glider
 from openglider.glider.parametric.import_freecad import import_freecad
 from openglider.glider.parametric.export_ods import export_ods_project, get_split_tables
 from openglider.utils.dataclass import dataclass, Field
@@ -134,6 +134,7 @@ class GliderProject:
         tables = get_split_tables(self)
         data = f"# {self.name}"
 
+
         for table in tables:
             data += f"\n\n## {table.name}\n\n"
 
@@ -188,6 +189,32 @@ class GliderProject:
         filename = os.path.split(path)[-1]
         name, ext = os.path.splitext(filename)
         return cls(glider=glider_2d, name=name, changelog=changelog)
+
+    @classmethod
+    def import_markdown(cls, path: str) -> GliderProject:
+        tables = openglider.utils.table.Table.load_markdown(path)
+        table_dct = {t.name: t for t in tables}
+        changelog = []
+
+        if "Changelog" in table_dct:
+            changelog_table = table_dct["Changelog"]
+
+            for row in range(1, changelog_table.num_rows):
+                if changelog_table[row, 0]:
+                    dt = datetime.datetime.fromisoformat(changelog_table[row, 0])
+
+                    changelog.append((
+                        dt, changelog_table[row, 1], changelog_table[row, 2]
+                    ))
+
+        glider_2d = import_markdown_glider(ParametricGlider, tables)
+
+        with open(path, encoding="utf-8") as infile:
+            title = next((line[2:].strip() for line in infile if line.startswith("# ")), None)
+
+        filename = os.path.split(path)[-1]
+        name, ext = os.path.splitext(filename)
+        return cls(glider=glider_2d, name=title or name, changelog=changelog)
     
     @classmethod
     def import_freecad(cls, path: str) -> GliderProject:

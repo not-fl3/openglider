@@ -56,7 +56,11 @@ class TestGlider(GliderTestCase):
             glider = jsonify.load(outfile)['data']
         self.assertEqualGlider2D(self.parametric_glider, glider)
 
-
+    def test_export_import_markdown(self) -> None:
+        path = self.tempfile("kite.og.md")
+        self.project.save(path)
+        reloaded = self.project.__class__.import_markdown(path)
+        self.assertEqualGlider2D(self.parametric_glider, reloaded.glider)
 
 
 if __name__ == '__main__':

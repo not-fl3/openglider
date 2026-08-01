@@ -355,7 +355,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def open_dialog(self) -> None:
         home = os.path.expanduser("~")
-        filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, "load glider", home, filter="Openglider (*.ods *.json)")
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "load glider",
+            home,
+            filter="Openglider (*.ods *.json *.og.md)"
+        )
 
         if filename:
             asyncio.ensure_future(self.load_glider(filename))

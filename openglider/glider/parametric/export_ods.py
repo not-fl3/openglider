@@ -29,6 +29,7 @@ def export_ods_project(glider: GliderProject, filename: str) -> None:
 def get_split_tables(project: GliderProject) -> list[Table]:
     tables = []
     tables.append(get_changelog_table(project))
+    tables.append(get_geom_sheet(project.glider))
     tables.append(get_parametric_sheet(project.glider))
     tables.append(get_airfoil_sheet(project.glider))
     tables.append(BallooningTable.from_list(project.glider.balloonings).table)

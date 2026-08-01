@@ -50,6 +50,70 @@ def import_ods_2d(cls: type[ParametricGlider], filename: str) -> ParametricGlide
     return import_ods_glider(cls, tables)
 
 
+def import_markdown_2d(cls: type[ParametricGlider], filename: str) -> ParametricGlider:
+    logger.info(f"Import markdown file: {filename}")
+    tables = Table.load_markdown(filename)
+    table_dct: dict[str, Table] = {table.name: table for table in tables}
+
+    return import_markdown_glider(cls, table_dct)
+
+
+def import_markdown_glider(cls: type[ParametricGlider], tables: list[Table] | dict[str, Table]) -> ParametricGlider:
+    if isinstance(tables, list):
+        table_dct = {table.name: table for table in tables}
+    else:
+        table_dct = tables
+
+    if "geometry" not in table_dct:
+        raise ValueError("Markdown import requires a geometry table")
+
+    config = ParametricGliderConfig.read_table(table_dct.get(ParametricGliderConfig.table_name, Table()))
+    sewing_allowances = SewingAllowanceConfig.read_table(table_dct.get(SewingAllowanceConfig.table_name, Table()))
+
+    profiles = [Profile2D(profile, name).normalized() for name, profile in transpose_columns(table_dct.get("Airfoils", Table()))]
+    geometry = get_geometry_explicit(table_dct["geometry"], config)
+    geometry_parametric = get_geometry_parametric(table_dct.get(TableNames.parametric_data, Table()), geometry.shape.cell_no, config)
+    balloonings = BallooningTable(table=table_dct.get(BallooningTable.table_name, Table()))
+
+    attachment_points_lower = config.get_lower_attachment_points()
+    lineset_table = LineSetTable(table=table_dct.get(LineSetTable.table_name, Table()), lower_attachment_points=attachment_points_lower)
+
+    glider_tables = GliderTables()
+    glider_tables.curves = CurveTable(table_dct.get("Curves", None), config.version)
+
+    cell_sheet = table_dct.get(TableNames.cell_sheet, Table())
+    rib_sheet = table_dct.get(TableNames.rib_sheet, Table())
+    migrate_header = cell_sheet[0, 0] is not None and cell_sheet[0, 0] < "V4"
+
+    # Prefer separated markdown tables; fall back to legacy combined sheets.
+    glider_tables.cuts = CutTable(table_dct.get("cuts", None) or cell_sheet, migrate_header=migrate_header)
+    glider_tables.ballooning_modifiers = BallooningModifierTable(table_dct.get("ballooning_modifiers", None) or cell_sheet, migrate_header=migrate_header)
+    glider_tables.holes = HolesTable(table_dct.get("holes", None) or rib_sheet, migrate_header=migrate_header)
+    glider_tables.diagonals = DiagonalTable(table_dct.get("diagonals", None) or cell_sheet, migrate_header=migrate_header)
+    glider_tables.rigidfoils_rib = RibRigidTable(table_dct.get("rigidfoils_rib", None) or rib_sheet, migrate_header=migrate_header)
+    glider_tables.rigidfoils_cell = CellRigidTable(table_dct.get("rigidfoils_cell", None) or cell_sheet, migrate_header=migrate_header)
+    glider_tables.straps = StrapTable(table_dct.get("straps", None) or cell_sheet, migrate_header=migrate_header)
+    glider_tables.material_cells = CellClothTable(table_dct.get("material_cells", None) or cell_sheet, migrate_header=migrate_header)
+    glider_tables.material_ribs = RibClothTable(table_dct.get("material_ribs", None) or rib_sheet, migrate_header=migrate_header)
+    glider_tables.miniribs = MiniRibTable(table_dct.get("miniribs", None) or cell_sheet, migrate_header=migrate_header)
+    glider_tables.rib_modifiers = SingleSkinTable(table_dct.get("rib_modifiers", None) or rib_sheet, migrate_header=migrate_header)
+    glider_tables.profile_modifiers = ProfileModifierTable(table_dct.get("profile_modifiers", None) or rib_sheet, migrate_header=migrate_header)
+    glider_tables.attachment_points_rib = AttachmentPointTable(table_dct.get("attachment_points_rib", None) or rib_sheet, migrate_header=migrate_header)
+    glider_tables.attachment_points_cell = CellAttachmentPointTable(table_dct.get("attachment_points_cell", None) or cell_sheet, migrate_header=migrate_header)
+    glider_tables.lines = lineset_table
+
+    glider_2d = cls(tables=glider_tables,
+                         profiles=profiles,
+                         balloonings=balloonings.get(),
+                         allowances=sewing_allowances,
+                         config=config,
+                         speed=config.speed,
+                         glide=config.glide,
+                         **geometry_parametric.model_dump())
+
+    return glider_2d
+
+
 def import_ods_glider(cls: type[ParametricGlider], tables: list[Table]) -> ParametricGlider:
     table_dct: dict[str, Table] = {
         TableNames.cell_sheet: tables[1],
