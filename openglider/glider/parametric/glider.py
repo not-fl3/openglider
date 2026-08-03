@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Self
 from collections.abc import Callable
 
 from openglider.airfoil.profile_2d import Profile2D
+from openglider.glider.shape import Shape
 import openglider.rs
 from openglider.glider.parametric.config import ParametricGliderConfig, SewingAllowanceConfig
 from openglider.glider.parametric.table.base.parser import Parser
@@ -20,7 +21,7 @@ from openglider.glider.glider import Glider
 from openglider.glider.parametric.arc import ArcCurve
 from openglider.glider.parametric.export_ods import export_ods_2d
 from openglider.glider.parametric.import_ods import import_markdown_2d, import_ods_2d
-from openglider.glider.parametric.shape import ParametricShape
+from openglider.glider.parametric.shape import LeparaglidingShape, ParametricShape
 from openglider.glider.parametric.table import GliderTables
 from openglider.glider.rib import Rib, SingleSkinRib
 from openglider.utils import ZipCmp
@@ -42,7 +43,7 @@ class ParametricGlider:
     """
     A parametric (2D) Glider object used for gui input
     """
-    shape: ParametricShape
+    shape: Shape | ParametricShape | LeparaglidingShape
     arc: ArcCurve
     aoa: SymmetricCurveType
     profiles: list[Profile2D]
@@ -71,35 +72,6 @@ class ParametricGlider:
     def copy(self) -> ParametricGlider:
         return copy.deepcopy(self)
 
-    def get_geomentry_table(self) -> Table:
-        table = Table()
-        table.insert_row(["", "Ribs", "Chord", "X", "Y", "%", "Arc", "Arc_diff", "AOA", "Z-rotation", "Y-rotation", "profile-merge", "ballooning-merge"])
-        shape = self.shape.get_half_shape()
-        for rib_no in range(self.shape.half_rib_num):
-            table[1+rib_no, 1] = rib_no+1
-
-        for rib_no, chord in enumerate(shape.chords):
-            table[1+rib_no, 2] = chord
-
-        for rib_no, p in enumerate(self.shape.baseline):
-            table[1+rib_no, 3] = p[0]
-            table[1+rib_no, 4] = p[1]
-            table[1+rib_no, 5] = self.config.baseline_pct
-
-        last_angle = 0.
-        for cell_no, angle in enumerate(self.get_arc_angles()):
-            angle = angle * 180 / math.pi
-            table[1+cell_no, 6] = angle
-            table[1+cell_no, 7] = angle - last_angle
-            last_angle = angle
-
-        for rib_no, aoa in enumerate(self.get_aoa()):
-            table[1+rib_no, 8] = aoa * 180 / math.pi
-            table[1+rib_no, 9] = 0
-            table[1+rib_no, 10] = 0
-
-        return table
-    
     def randomize(self) -> ParametricGlider:
         new = self.copy()
 
@@ -140,14 +112,22 @@ class ParametricGlider:
         new.arc.curve.controlpoints = randomize_nodes(new.arc.curve.controlpoints, 0.02)
 
         # change shape
-        new.shape.front_curve.controlpoints = randomize_nodes(new.shape.front_curve.controlpoints, 0.02)
-        new.shape.back_curve.controlpoints = randomize_nodes(new.shape.back_curve.controlpoints, 0.02)
-
-        new.shape.rib_dist_controlpoints = randomize_nodes(new.shape.rib_dist_controlpoints, 0.02, (True, True), (True, True)).nodes
+        if isinstance(new.shape, ParametricShape):
+            new.shape.front_curve.controlpoints = randomize_nodes(new.shape.front_curve.controlpoints, 0.02)
+            new.shape.back_curve.controlpoints = randomize_nodes(new.shape.back_curve.controlpoints, 0.02)
+            new.shape.rib_dist_controlpoints = randomize_nodes(new.shape.rib_dist_controlpoints, 0.02, (True, True), (True, True)).nodes
 
         new.aoa.controlpoints = randomize_nodes(new.aoa.controlpoints, 0.1, (False, True), (False, True))
 
         return new
+
+    def get_shape(self) -> Shape:
+        if isinstance(self.shape, Shape):
+            return self.shape
+        elif isinstance(self.shape, LeparaglidingShape):
+            return self.shape.get_half_shape()
+        elif isinstance(self.shape, ParametricShape):
+            return self.shape.get_half_shape()
 
     def get_arc_angles(self) -> list[float]:
         """
@@ -185,7 +165,7 @@ class ParametricGlider:
         return airfoil
 
     def get_curves(self) -> dict[str, GliderCurveType]:
-        return self.tables.curves.get_curves(self.shape.get_half_shape())
+        return self.tables.curves.get_curves(self.get_shape())
 
     def get_panels(self, glider_3d: Glider | None=None) -> list[list[Panel]]:
         """

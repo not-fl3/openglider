@@ -210,7 +210,7 @@ class CurveWizard(Wizard):
         self.right_widget = QtWidgets.QWidget()
         self.right_widget.setLayout(QtWidgets.QVBoxLayout())
 
-        self.shape = self.project.glider.shape.get_half_shape()
+        self.shape = self.project.glider.get_shape()
 
         self.curve_list = SelectionList[GliderCurveType, SelectionListItem[GliderCurveType]]()
         self.curve_list_selector = ListWidget(self, self.curve_list)

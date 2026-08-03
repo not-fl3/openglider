@@ -7,7 +7,7 @@ import openglider.rs
 import ezodf
 
 from openglider.glider.parametric.arc import ExplicitArc, LeparaglidingArc
-from openglider.glider.parametric.shape import ExplicitShape, LeparaglidingShape
+from openglider.glider.parametric.shape import ExplicitShape, LeparaglidingShape, ParametricShape
 from openglider.glider.parametric.table.ballooning import BallooningTable
 from openglider.utils.table import Table
 from openglider.utils.types import CurveType
@@ -116,27 +116,28 @@ def get_geom_sheet(glider_2d: ParametricGlider) -> Table:
 
     # rib_nos
     table[0, 0] = "Ribs"
-
-    shape = glider_2d.shape.get_half_shape()    
+  
     center_cell = glider_2d.shape.has_center_cell
 
+    ribs = glider_2d.shape.ribs
+    chords = glider_2d.shape.chords
+    rib_x_values = glider_2d.shape.rib_x_values
+
     table[0, 1] = "Chord"
-    for i, chord in enumerate(shape.chords[center_cell:]):
+    for i, chord in enumerate(chords[center_cell:]):
         table[i+1, 1] = chord
 
     table[0, 2] = "Le x (m)"
     table[0, 3] = "Le y (m)"
-    for i, p in enumerate(shape.front.nodes[center_cell:]):
-        table[i+1, 2] = p[0]
-        table[i+1, 3] = -p[1]
+    for i, (front, back) in enumerate(ribs[center_cell:]):
+        table[i+1, 2] = front[0]
+        table[i+1, 3] = -front[1]
 
-    for i, x in enumerate(glider_2d.shape.rib_x_values[center_cell:]):
-        table[i+1, 3] = x
     # set arc values
     table[0, 4] = "Arc"
     last_angle = 0.
-    cell_angles = glider_2d.arc.get_cell_angles(glider_2d.shape.rib_x_values)
-    if glider_2d.shape.has_center_cell:
+    cell_angles = glider_2d.arc.get_cell_angles(rib_x_values)
+    if center_cell:
         cell_angles = cell_angles[1:]
     for i, angle in enumerate(cell_angles + [cell_angles[-1]]):
         this_angle = angle * 180/math.pi
@@ -165,7 +166,7 @@ def get_geom_sheet(glider_2d: ParametricGlider) -> Table:
         table[rib_no+1, 8] = profile_int.get_value(x)
         table[rib_no+1, 9] = ballooning_int.get_value(x)
     
-    if glider_2d.shape.config.has_stabicell:
+    if isinstance(glider_2d.shape, ParametricShape) and glider_2d.shape.config.has_stabicell:
         table = table.get_rows(0, table.num_rows-1)
 
     return table
@@ -247,9 +248,11 @@ def get_parametric_sheet(glider : ParametricGlider) -> Table:
     elif isinstance(shape, ExplicitShape):
         add_explicit_points("front", shape.front_points, 0)
         add_explicit_points("back", shape.back_points, 2)
-    else:
+    elif isinstance(shape, ParametricShape):
         add_curve("front", shape.front_curve, 0)
         add_curve("back", shape.back_curve, 2)
+    else:
+        raise ValueError(f"Unknown shape type: {type(shape)}")
 
     # ── rib distribution ──
     # Cell distribution is independent from spline/Leparagliding planform mode.

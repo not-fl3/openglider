@@ -7,6 +7,7 @@ import numbers
 from typing import TYPE_CHECKING, Any
 from packaging.version import Version
 
+from openglider.glider.shape import Shape
 import openglider.rs
 from openglider.airfoil import Profile2D
 
@@ -297,7 +298,7 @@ def import_ods_glider(cls: type[ParametricGlider], tables: list[Table]) -> Param
 
 
 class Geometry(BaseModel):
-    shape: ParametricShape
+    shape: Shape | ParametricShape | LeparaglidingShape
     arc: ArcCurve
     aoa: SymmetricCurveType
     profile_merge_curve: SymmetricCurveType
@@ -431,11 +432,12 @@ def get_geometry_parametric(table: Table, cell_num: int, config: ParametricGlide
         cell_widths = _parse_explicit_values(table, rib_col)
 
     front_type, front_col = columns.get("front", (None, None))
+    parametric_shape: Shape | ParametricShape | LeparaglidingShape
     if front_type == "leparagliding":
         assert front_col is not None
         # LE/TE come from Leparagliding parameters; rib distribution comes from
         # its own spline/explicit column. Missing columns retain legacy fallback.
-        parametric_shape: ParametricShape = _shape_from_leparagliding(
+        parametric_shape = _shape_from_leparagliding(
             _parse_leparagliding_column(table, front_col),
             cell_num,
             config,

@@ -93,20 +93,26 @@ class ShapePlot:
             else:
                 config = ShapePlotConfig()
 
+        def get_shape(rot: bool) -> tuple[Shape, Shape]:
+            shape_r = self.glider_2d.get_shape()
+            if rot:
+                zrot = [rib.zrot for rib in self.glider_3d.ribs]
+                if any(zrot):
+                    shape_r = shape_r.apply_zrot(zrot, self.glider_2d.config.baseline_pct)
+            shape_l = shape_r.copy().scale(x=-1)
+
+            return shape_r, shape_l
+
+
         if config.apply_zrot:
             if force or self.shapes_rot is None:
-                zrot = [rib.zrot for rib in self.glider_3d.ribs]
-                shape_r = self.glider_2d.shape.get_half_shape(zrot=zrot)
-                shape_l = shape_r.copy().scale(x=-1)
-                self.shapes_rot = (shape_r, shape_l)
+                self.shapes_rot = get_shape(rot=True)
             
             return self.shapes_rot
         
         else:
             if force or self.shapes is None:
-                shape_r = self.glider_2d.shape.get_half_shape(zrot=None)
-                shape_l = shape_r.copy().scale(x=-1)
-                self.shapes = (shape_r, shape_l)
+                self.shapes = get_shape(rot=False)
 
             return self.shapes
     

@@ -3,11 +3,12 @@ from __future__ import annotations
 import logging
 import math
 from typing import TYPE_CHECKING, Any, Self, TypeAlias
+import abc
 
 import openglider.rs
 from openglider.utils.dataclass import BaseModel
 from openglider.vector.drawing import Layout, PlotPart
-from openglider.vector.unit import Percentage
+from openglider.vector.unit import Angle, Percentage
 
 if TYPE_CHECKING:
     from openglider.glider.cell.panel import Panel
@@ -17,13 +18,50 @@ logger = logging.getLogger(__name__)
 
 V2: TypeAlias = openglider.rs.vector.Vector2D
 
-class Shape(BaseModel):
+class ShapeBase(abc.ABC):
+    @property
+    def has_center_cell(self) -> bool:
+        raise NotImplementedError()
+    
+    def get_point(self, x: float | int, y: float | Percentage) -> openglider.rs.vector.Vector2D:
+        raise NotImplementedError()
+
+    def get_baseline(self, position: Percentage) -> openglider.rs.vector.PolyLine2D:
+        raise NotImplementedError()
+    
+    @property
+    def cell_no(self) -> int:
+        raise NotImplementedError()
+
+    @property
+    def rib_no(self) -> int:
+        raise NotImplementedError()
+
+    @property
+    def ribs(self) -> list[tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]]:
+        raise NotImplementedError()
+
+    @property
+    def rib_x_values(self) -> list[float]:
+        raise NotImplementedError()
+    
+    @property
+    def span(self) -> float:
+        raise NotImplementedError()
+    
+    @property
+    def chords(self) -> list[float]:
+        raise NotImplementedError()
+    
+
+class Shape(ShapeBase, BaseModel):
     front: openglider.rs.vector.PolyLine2D
     back: openglider.rs.vector.PolyLine2D
 
     @property
     def has_center_cell(self) -> bool:
         return abs(self.front.nodes[0][0]) > 1e-5 and abs(self.back.nodes[0][0]) > 1e-5
+
 
     def get_point(self, x: float | int, y: float | Percentage) -> openglider.rs.vector.Vector2D:
         front = self.front.get(x)
@@ -49,28 +87,24 @@ class Shape(BaseModel):
         return p1, p2, p3, p4
 
     @property
+    def half_cell_num(self) -> int:
+        return len(self.front.nodes) // 2 + self.has_center_cell
+
+    @property
     def cell_no(self) -> int:
-        return len(self.front) - 1
+        return 2 * (len(self.front.nodes) - 1) - self.has_center_cell
 
     @property
     def rib_no(self) -> int:
-        return len(self.front)
+        return 2 * len(self.front.nodes) - 1 + self.has_center_cell
 
     @property
     def ribs(self) -> list[tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]]:
-        return [(self.front.get(x), self.back.get(x)) for x in range(len(self.front))]
-
-    @property
-    def ribs_front_back(self) -> tuple[
-        list[tuple[V2, V2]],
-        openglider.rs.vector.PolyLine2D,
-        openglider.rs.vector.PolyLine2D    
-    ]:
-        return (self.ribs, self.front, self.back)
+        return [(self.front.get(x), self.back.get(x)) for x in range(len(self.front.nodes))]
 
     @property
     def span(self) -> float:
-        return self.front.nodes[-1][0]
+        return self.front.nodes[-1][0] * 2
     
     @span.setter
     def span(self, span: float) -> None:
@@ -80,7 +114,7 @@ class Shape(BaseModel):
 
     @property
     def chords(self) -> list[float]:
-        return [(p1-p2).length() for p1, p2 in zip(self.front, self.back)]
+        return [(p1-p2).length() for p1, p2 in zip(self.front.nodes, self.back.nodes)]
 
     @property
     def cell_widths(self) -> list[float]:
@@ -90,9 +124,12 @@ class Shape(BaseModel):
     def area(self) -> float:
         front, back = self.front, self.back
         area = 0.
-        for i in range(len(self.front) - 1):
-            l = (front.get(i)[1] - back.get(i)[1]) + (front.get(i+1)[1] - back.get(i+1)[1])
-            area += l * (front.get(i+1)[0] - front.get(i)[0]) / 2
+        for cell_no in range(len(self.front.nodes) - 1):
+            l = (front.get(cell_no)[1] - back.get(cell_no)[1]) + (front.get(cell_no+1)[1] - back.get(cell_no+1)[1])
+            cell_area = l * (front.get(cell_no+1)[0] - front.get(cell_no)[0]) / 2
+            if not (cell_no == 0 and self.has_center_cell):
+                cell_area *= 2
+            area += cell_area
         return area
     
     @area.setter
@@ -181,6 +218,29 @@ class Shape(BaseModel):
                 result[name] = closed_area.copy() if closed_area is not None else None
 
         return result
+
+    def apply_zrot(self, zrot: list[Angle | None], baseline_pct: Percentage) -> Shape:
+        baseline = self.get_baseline(baseline_pct).nodes
+        front_new: list[openglider.rs.vector.Vector2D] = []
+        back_new: list[openglider.rs.vector.Vector2D] = []
+
+        for rib_no, angle in enumerate(zrot):
+            if angle is None:
+                front_new.append(openglider.rs.vector.Vector2D(self.front.nodes[rib_no]))
+                back_new.append(openglider.rs.vector.Vector2D(self.back.nodes[rib_no]))
+            else:
+                rotation = openglider.rs.vector.Rotation2D(angle.si)
+                front_new.append(
+                    baseline[rib_no] + rotation.apply(self.front.nodes[rib_no]-baseline[rib_no])
+                )
+                back_new.append(
+                    baseline[rib_no] + rotation.apply(self.back.nodes[rib_no]-baseline[rib_no])
+                )
+        
+        return Shape(
+            front=openglider.rs.vector.PolyLine2D(front_new),
+            back=openglider.rs.vector.PolyLine2D(back_new)
+        )
 
     def _repr_svg_(self) -> str:
         da = Layout()

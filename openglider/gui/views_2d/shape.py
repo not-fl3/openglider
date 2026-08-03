@@ -47,7 +47,7 @@ class Shape2D(QtWidgets.QGraphicsObject):
         self.glider_shape = shape
         self.glider_shape_r = shape.get_half_shape()
         self.glider_shape_l = self.glider_shape_r.copy().scale(x=-1)
-        self.glider_shape_both = self.glider_shape.get_shape()
+        self.glider_shape_both = self.glider_shape_r.copy_complete()
 
         self.glider_shapes = [self.glider_shape_r, self.glider_shape_l]
 

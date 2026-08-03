@@ -8,7 +8,7 @@ import openglider.rs
 
 from openglider.glider.parametric.config import ParametricGliderConfig
 from openglider.glider.parametric.leparagliding import LeparaglidingShapeParams
-from openglider.glider.shape import Shape
+from openglider.glider.shape import Shape, ShapeBase
 from openglider.utils import linspace
 from openglider.utils.dataclass import dataclass
 from openglider.utils.types import CurveType, SymmetricCurveType
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ParametricShape:
+class ParametricShape(ShapeBase):
     front_curve: SymmetricCurveType
     back_curve: SymmetricCurveType
     rib_distribution: CurveType
@@ -246,36 +246,10 @@ class ParametricShape:
             p2[0] = - p2[0]
             back.insert(0, p2)
 
-        base_shape = Shape(
+        return Shape(
             front=openglider.rs.vector.PolyLine2D(front),
             back=openglider.rs.vector.PolyLine2D(back)
         )
-
-        if zrot is None:
-            return base_shape
-        
-        baseline = base_shape.get_baseline(self.config.baseline_pct or Percentage(0.)).nodes
-        front_new: list[openglider.rs.vector.Vector2D] = []
-        back_new: list[openglider.rs.vector.Vector2D] = []
-
-        for rib_no, angle in enumerate(zrot):
-            if angle is None:
-                front_new.append(openglider.rs.vector.Vector2D(front[rib_no]))
-                back_new.append(openglider.rs.vector.Vector2D(back[rib_no]))
-            else:
-                rotation = openglider.rs.vector.Rotation2D(angle.si)
-                front_new.append(
-                    baseline[rib_no] + rotation.apply(base_shape.front.nodes[rib_no]-baseline[rib_no])
-                )
-                back_new.append(
-                    baseline[rib_no] + rotation.apply(base_shape.back.nodes[rib_no]-baseline[rib_no])
-                )
-        
-        return Shape(
-            front=openglider.rs.vector.PolyLine2D(front_new),
-            back=openglider.rs.vector.PolyLine2D(back_new)
-        )
-
 
     def get_shape(self) -> Shape:
         """
