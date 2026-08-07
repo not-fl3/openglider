@@ -156,7 +156,7 @@ class ParametricShape(ShapeBase):
         return self.half_cell_num + 1 - self.has_center_cell + self.config.has_stabicell
 
     def rescale_curves(self) -> None:
-        span = self.span
+        span = self.span / 2
 
         dist_scale = 1 / self.rib_distribution.controlpoints.nodes[-1][0]
         self.rib_distribution.controlpoints = self.rib_distribution.controlpoints.scale(
@@ -193,12 +193,12 @@ class ParametricShape(ShapeBase):
 
     @property
     def rib_x_values(self) -> list[float]:
-        xvalues = [p[0]*self.span for p in self.rib_dist_interpolation]
+        xvalues = [p[0]*self.span/2 for p in self.rib_dist_interpolation]
 
         if self.config.has_stabicell:
             width = self.config.stabi_cell_width * (xvalues[-1] - xvalues[-2])
             xvalues.append(xvalues[-1] + width)
-            xvalues = [p*self.span/xvalues[-1] for p in xvalues]
+            xvalues = [p*self.span/2/xvalues[-1] for p in xvalues]
         
         if self.has_center_cell:
             xvalues.insert(0, -xvalues[0])
@@ -300,7 +300,7 @@ class ParametricShape(ShapeBase):
         Return A(x)
         """
         num = self.num_depth_integral
-        x_values = linspace(0, self.span, num)
+        x_values = linspace(0, self.span/2, num)
         front_int = openglider.rs.vector.Interpolation(self.front_curve.get_sequence(num).nodes)
         back_int = openglider.rs.vector.Interpolation(self.back_curve.get_sequence(num).nodes)
         integrated_depth = [0.]
@@ -309,7 +309,7 @@ class ParametricShape(ShapeBase):
             integrated_depth.append(integrated_depth[-1] + 1. / depth)
         y_values = [i / integrated_depth[-1] for i in integrated_depth]
 
-        x_values_normalized = [x/self.span for x in x_values]
+        x_values_normalized = [x/(self.span/2) for x in x_values]
         return list(zip(x_values_normalized, y_values))
 
     def set_const_cell_dist(self) -> None:
@@ -419,7 +419,7 @@ class ParametricShape(ShapeBase):
 
     @property
     def span(self) -> float:
-        span = self.front_curve.controlpoints.nodes[-1][0]
+        span = 2 * self.front_curve.controlpoints.nodes[-1][0]
         return span
 
     @span.setter

@@ -259,7 +259,7 @@ class ShapePlot:
             openglider.rs.vector.Vector2D((dist, front[1]))
         ])
 
-        diff = openglider.rs.vector.Vector2D([self.glider_2d.shape.span*0.05, 0])
+        diff = openglider.rs.vector.Vector2D([self.glider_2d.shape.span*0.05/2, 0])
 
         part.layers["marks"] +=  [
             collapse_side_50,

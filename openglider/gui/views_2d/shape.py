@@ -171,6 +171,6 @@ class Shape2D(QtWidgets.QGraphicsObject):
         span = self.glider_shape.span
         chord = self.glider_shape.get_rib_point(0, 1)[1]
         if self.half_wing:
-            return QtCore.QRectF(0, 0, span, chord)
+            return QtCore.QRectF(0, 0, span/2, chord)
         else:
             return QtCore.QRectF(-span/2, 0, span, chord)
