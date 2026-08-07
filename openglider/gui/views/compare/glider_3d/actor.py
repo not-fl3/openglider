@@ -7,9 +7,8 @@ from openglider.glider.glider import Glider
 from openglider.glider.project import GliderProject
 from openglider.glider.uv_map import SVGTexture, UVMap, UVMapMode
 from openglider.gui.views_3d.widgets import View3D
-from openglider.mesh import Mesh
 from openglider.gui.views.compare.glider_3d.config import GliderViewConfig
-from openglider.rs.wgpu import MeshActor
+
 
 
 logger = logging.getLogger(__name__)
@@ -70,7 +69,7 @@ class GliderActors:
 
         return openglider.rs.wgpu.MeshActor(panel_mesh, draw_edges=False)
 
-    def get_panels_textured(self, numribs: int) -> MeshActor:
+    def get_panels_textured(self, numribs: int) -> openglider.rs.wgpu.MeshActor:
         if self._cached_uv_map is None:
             self._cached_uv_map = UVMap(self.project.glider)
         uv_map = self._cached_uv_map
