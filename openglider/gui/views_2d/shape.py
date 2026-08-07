@@ -39,7 +39,9 @@ class Shape2D(QtWidgets.QGraphicsObject):
     def from_glider(cls, glider: ParametricGlider, **kwargs: Any) -> Shape2D:
         panels = glider.get_panels()
         shape = glider.shape.copy()
-        shape._clean()
+
+        if isinstance(shape, ParametricShape):
+            shape._clean()
         return cls(shape, panels, **kwargs)
 
     def __init__(self, shape: ParametricShape, panels: list[list[Panel]]=None, color: tuple[int, int, int]=None, alpha: int=160, config: ShapeConfig=None) -> None:
@@ -171,4 +173,4 @@ class Shape2D(QtWidgets.QGraphicsObject):
         if self.half_wing:
             return QtCore.QRectF(0, 0, span, chord)
         else:
-            return QtCore.QRectF(-span, 0, 2 * span, chord)
+            return QtCore.QRectF(-span/2, 0, span, chord)

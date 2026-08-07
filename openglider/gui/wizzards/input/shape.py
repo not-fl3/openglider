@@ -181,10 +181,13 @@ class RibDistInput(Canvas):
             self.shapes = []
 
         for project, color in projects:
-            distribution = project.glider.shape.rib_distribution
-            curve = Line2D(distribution.get_sequence(100).nodes, color=color)
-            self.addItem(curve)
-            self.shapes.append(curve)
+            if isinstance(project.glider.shape, ParametricShape):
+                distribution = project.glider.shape.rib_distribution
+                curve = Line2D(distribution.get_sequence(100).nodes, color=color)
+                self.addItem(curve)
+                self.shapes.append(curve)
+            else:
+                raise NotImplementedError("Rib distribution only implemented for parametric shapes (TODO!)")
 
         self.update()
     
@@ -194,7 +197,7 @@ class RibDistInput(Canvas):
         curve.data["pos"][node_index][0] = max(0, curve.data["pos"][node_index][0])
 
         if node_index == len(curve.controlpoints) - 1:
-            curve.data["pos"][node_index][0] = self.glider_shape.span
+            curve.data["pos"][node_index][0] = self.glider_shape.span / 2
             curve.data["pos"][node_index][1] = 1
         elif node_index == 0:
             curve.data["pos"][0] = [0, 0]

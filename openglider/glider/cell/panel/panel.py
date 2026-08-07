@@ -372,9 +372,15 @@ class Panel(BaseModel):
 
         for rib_no in range(numribs + 2):
             y = rib_no / max(numribs+1, 1)
-            span_x = x_span_left + y * (x_span_right - x_span_left) if x_span_left is not None else None
-            chord_y = (chord_left + y * (chord_right - chord_left)
-                       if chord_left is not None else None)
+            if x_span_left is None or x_span_right is None:
+                span_x = None
+            else:
+                span_x = x_span_left + y * (x_span_right - x_span_left)
+
+            if chord_left is None or chord_right is None:
+                chord_y = None
+            else:
+                chord_y = chord_left + y * (chord_right - chord_left)
 
             front, back = ik_values[rib_no]
 

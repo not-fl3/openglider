@@ -144,6 +144,10 @@ class ParametricShape(ShapeBase):
         return self.cell_num % 2 > 0
 
     @property
+    def cell_no(self) -> int:
+        return self.cell_num + 2 * self.config.has_stabicell
+
+    @property
     def half_cell_num(self) -> int:
         return self.cell_num // 2 + self.has_center_cell + self.config.has_stabicell
 
@@ -200,17 +204,6 @@ class ParametricShape(ShapeBase):
             xvalues.insert(0, -xvalues[0])
 
         return xvalues
-
-
-    @property
-    def cell_x_values(self) -> list[float]:
-        ribs = self.rib_x_values
-
-        cells = []
-        for x1, x2 in zip(ribs[:-1], ribs[1:]):
-            cells.append((x1+x2)/2)
-
-        return cells
 
     def get_half_shape(self, zrot: list[Angle | None] | None = None) -> Shape:
         """
@@ -416,11 +409,6 @@ class ParametricShape(ShapeBase):
         self.back_curve.controlpoints = self.back_curve.controlpoints.move(openglider.rs.vector.Vector2D([0, -y0]))
         
         return self.get_sweep()
-
-    @property
-    def aspect_ratio(self) -> float:
-        # todo: span -> half span, area -> full area???
-        return (2*self.span) ** 2 / self.area
 
     def set_aspect_ratio(self, ar: float, fixed: Literal["span"] | Literal["area"]="span") -> None:
         ar0 = self.aspect_ratio

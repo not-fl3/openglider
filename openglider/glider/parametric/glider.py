@@ -295,7 +295,7 @@ class ParametricGlider:
         return result
 
     def get_rib_positions(self) -> list[openglider.rs.vector.Vector3D]:
-        rib_positions = self.shape.baseline
+        rib_positions = self.shape.get_baseline(self.config.baseline_pct).nodes
         shape_ribs = self.shape.ribs
         x_values = self.shape.rib_x_values
         arc_pos = self.arc.get_arc_positions(x_values).nodes
@@ -610,7 +610,7 @@ class ParametricGlider:
         return self.shape.aspect_ratio
 
     def rescale_curves(self) -> None:
-        span = self.shape.span
+        span = self.shape.span / 2
 
         def rescale(curve: CurveType) -> None:
             span_orig = curve.controlpoints.nodes[-1][0]

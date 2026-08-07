@@ -46,12 +46,30 @@ class ShapeBase(abc.ABC):
         raise NotImplementedError()
     
     @property
+    def cell_x_values(self) -> list[float]:
+        ribs = self.rib_x_values
+
+        cells = []
+        for x1, x2 in zip(ribs[:-1], ribs[1:]):
+            cells.append((x1+x2)/2)
+
+        return cells
+    
+    @property
     def span(self) -> float:
         raise NotImplementedError()
     
     @property
     def chords(self) -> list[float]:
+        raise NotImplementedError()#
+    
+    @property
+    def area(self) -> float:
         raise NotImplementedError()
+    
+    @property
+    def aspect_ratio(self) -> float:
+        return self.span ** 2 / self.area
     
 
 class Shape(ShapeBase, BaseModel):
@@ -226,8 +244,8 @@ class Shape(ShapeBase, BaseModel):
 
         for rib_no, angle in enumerate(zrot):
             if angle is None:
-                front_new.append(openglider.rs.vector.Vector2D(self.front.nodes[rib_no]))
-                back_new.append(openglider.rs.vector.Vector2D(self.back.nodes[rib_no]))
+                front_new.append(self.front.nodes[rib_no].copy())
+                back_new.append(self.back.nodes[rib_no].copy())
             else:
                 rotation = openglider.rs.vector.Rotation2D(angle.si)
                 front_new.append(

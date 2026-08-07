@@ -101,7 +101,7 @@ class GliderProject:
         table["A7"] = "Flattening"
         table["B7"] = f"{flattening:.01f} %"
         table["A8"] = "Cells"
-        table["B8"] = str(self.glider.shape.cell_num)
+        table["B8"] = str(self.glider.shape.cell_no)
 
         table["A9"] = "Attachment point x"
         table["A10"] = "Attachment point z"

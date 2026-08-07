@@ -242,7 +242,10 @@ class SVGTexture:
         color = image.getpixel((px, py))
         if isinstance(color, tuple) and len(color) >= 3:
             return (int(color[0]), int(color[1]), int(color[2]))
-        return (int(color), int(color), int(color))
+        elif isinstance(color, int):
+            return (int(color), int(color), int(color))
+        else:
+            raise ValueError(f"unexpected pixel color format: {color}")
 
 class UVMap:
     def __init__(self, glider: glider.ParametricGlider) -> None:
@@ -359,7 +362,7 @@ class UVMap:
         toward TE (always non-negative before lower-side stacking offset).
         """
         if shape is None:
-            shape = self.glider.shape.get_half_shape()
+            shape = self.glider.get_shape()
 
         if panel.is_lower():
             def normalize_x(val: float | Percentage) -> float:
@@ -390,7 +393,7 @@ class UVMap:
         that remap_uvs_stacked and the SVG layout are consistent.
         """
         if half_shape is None:
-            half_shape = self.glider.shape.get_half_shape()
+            half_shape = self.glider.get_shape()
         upper_polys: list[openglider.rs.vector.PolyLine2D] = []
         lower_polys: list[openglider.rs.vector.PolyLine2D] = []
         for cell_no, cell in enumerate(self.glider3d.cells):
@@ -415,7 +418,7 @@ class UVMap:
         shifted upward by the computed gap so the exported SVG remains visually
         stacked instead of overlapping at the origin.
         """
-        half_shape = self.glider.shape.get_half_shape()
+        half_shape = self.glider.get_shape()
         uv_poly_map: dict[tuple[int, int], openglider.rs.vector.PolyLine2D] = {}
         for cell_no, cell in enumerate(self.glider3d.cells):
             for panel_idx, panel in enumerate(cell.panels):
@@ -471,7 +474,7 @@ class UVMap:
                 )
                 panel_mesh += mesh_temp
 
-                if do_mirror:
+                if do_mirror and mesh_for_mirror is not None:
                     mirrored = mesh_for_mirror.mirror("y")
                     mpts = list(uv_poly.mirror())
                     mirrored.remap_uvs_bilinear(
