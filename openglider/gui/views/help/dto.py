@@ -32,7 +32,7 @@ class DtoChooser(QtWidgets.QWidget):
 
         self.table_chooser = AutoComplete(table_names)
         self.element_chooser = AutoComplete([])
-        self.copy_header_button = QtWidgets.QPushButton(text="Copy Header")
+        self.copy_header_button = QtWidgets.QPushButton("Copy Header")
 
         self.table_chooser.changed.connect(self.update_choices)
         self.element_chooser.changed.connect(self.changed.emit)

@@ -3,16 +3,17 @@ from __future__ import annotations
 import dataclasses
 import logging
 import math
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 from collections.abc import Callable
 
 import openglider.rs
-from openglider.glider.parametric.shape import LeparaglidingShape, ParametricShape
-from openglider.glider.parametric.leparagliding import (
+from openglider.glider.parametric.leparagliding_shape import (
     LeadingEdgeParams,
+    LeparaglidingShape,
     LeparaglidingShapeParams,
     TrailingEdgeParams,
 )
+from openglider.glider.parametric.parametric_shape import ParametricShape
 from openglider.glider.project import GliderProject
 from openglider.gui.qt import QtWidgets, QtCore
 from openglider.gui.views_2d import Canvas, DraggableLine, Line2D
@@ -27,24 +28,35 @@ if TYPE_CHECKING:
     from openglider.gui.app.main_window import MainWindow
 
 logger = logging.getLogger(__name__)
+
+EditableShape: TypeAlias = ParametricShape | LeparaglidingShape
+
+
+def as_editable_shape(shape: object) -> EditableShape:
+    if isinstance(shape, (ParametricShape, LeparaglidingShape)):
+        return shape
+    raise TypeError(f"Shape editor requires an editable planform, got {type(shape)}")
+
+
 # TODO: Show & change data: Area, Aspect ratio, Span, Tip Chord, Tip center
 
 
 class ShapeInput(Canvas):
     locked_aspect_ratio = True
 
-    glider_shape: ParametricShape
-    on_change: list[Callable[[ParametricShape], None]]
+    glider_shape: EditableShape
+    on_change: list[Callable[[EditableShape], None]]
     glider_shapes: list[LayoutGraphics]
 
     def __init__(self, project: GliderProject):
         super().__init__(parent=None)
         self.on_change = []
         self.project = project
-        self.glider_shape = project.glider.shape
+        self.glider_shape = as_editable_shape(project.glider.shape)
+        spline_shape = self._spline_shape_for_controls()
 
-        self.front = DraggableLine(self.glider_shape.front_curve.controlpoints.nodes)
-        self.back = DraggableLine(self.glider_shape.back_curve.controlpoints.nodes)
+        self.front = DraggableLine(spline_shape.front_curve.controlpoints.nodes)
+        self.back = DraggableLine(spline_shape.back_curve.controlpoints.nodes)
 
         self.front.on_node_move.append(self.on_node_move)
         self.back.on_node_move.append(self.on_node_move)
@@ -119,9 +131,10 @@ class ShapeInput(Canvas):
         self.update()
     
     def redraw(self) -> None:
-        self.glider_shape.front_curve.controlpoints = self.front.controlpoints
-        self.glider_shape.back_curve.controlpoints = self.back.controlpoints
-        self.glider_shape.rescale_curves()
+        if isinstance(self.glider_shape, ParametricShape):
+            self.glider_shape.front_curve.controlpoints = self.front.controlpoints
+            self.glider_shape.back_curve.controlpoints = self.back.controlpoints
+            self.glider_shape.rescale_curves()
 
         self.removeItem(self.glider_shape_2d)
         self.glider_shape_2d = LayoutGraphics(self.shape_drawing.redraw(self.config, force=True))
@@ -135,10 +148,22 @@ class ShapeInput(Canvas):
             f(self.glider_shape)
         self.update()
     
+    def _spline_shape_for_controls(self) -> ParametricShape:
+        if isinstance(self.glider_shape, ParametricShape):
+            return self.glider_shape
+        if isinstance(self.glider_shape, LeparaglidingShape):
+            return ParametricShape.from_shape(self.glider_shape)
+        raise TypeError(f"Shape editor requires a planform shape, got {type(self.glider_shape)}")
+
+    def refresh_from_shape(self) -> None:
+        spline_shape = self._spline_shape_for_controls()
+        self.front.set_controlpoints(spline_shape.front_curve.controlpoints.nodes)
+        self.back.set_controlpoints(spline_shape.back_curve.controlpoints.nodes)
+
     def _update_curves(self) -> None:
-        self.glider_shape._clean()
-        self.front.set_controlpoints(self.glider_shape.front_curve.controlpoints.nodes)
-        self.back.set_controlpoints(self.glider_shape.back_curve.controlpoints.nodes)
+        if isinstance(self.glider_shape, ParametricShape):
+            self.glider_shape._clean()
+            self.refresh_from_shape()
         #self.update()
             
 
@@ -146,7 +171,7 @@ class RibDistInput(Canvas):
     shapes: list[Line2D]
     on_change: list[Callable]
 
-    def __init__(self, shape: ParametricShape):
+    def __init__(self, shape: EditableShape):
         super().__init__()
         self.glider_shape = shape
         
@@ -234,7 +259,7 @@ class ShapeSettings:
 
 class ShapeSettingsWidget(QtWidgets.QWidget):
     changed = QtCore.Signal()
-    def __init__(self, shape: ParametricShape):
+    def __init__(self, shape: EditableShape):
         super().__init__()
         layout = QtWidgets.QVBoxLayout()
 
@@ -313,7 +338,7 @@ class ShapeSettingsWidget(QtWidgets.QWidget):
         self.input_zrot.setChecked(self.settings.zrot)
         self.changed.emit()
     
-    def update_shape(self, shape: ParametricShape) -> None:
+    def update_shape(self, shape: EditableShape) -> None:
         self.input_area.set_value(shape.area, propagate=True)
         self.input_aspect_ratio.set_value(shape.aspect_ratio, propagate=True)
         self.input_sweep.set_value(shape.get_sweep(), propagate=True)
@@ -546,7 +571,7 @@ class CellWidthSlidersPanel(QtWidgets.QWidget):
 
     def _build(self) -> None:
         self._clear()
-        for w in self.project.glider.shape._get_cell_widths():
+        for w in as_editable_shape(self.project.glider.shape)._get_cell_widths():
             slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Vertical)
             slider.setRange(int(0.1 * self.SLIDER_SCALE), int(3.0 * self.SLIDER_SCALE))
             slider.setValue(int(w * self.SLIDER_SCALE))
@@ -586,12 +611,12 @@ class CellWidthSlidersPanel(QtWidgets.QWidget):
 
     def _emit(self) -> None:
         widths = [sb.value() for sb in self.spinboxes]
-        self.project.glider.shape.apply_cell_widths(widths)
+        as_editable_shape(self.project.glider.shape).apply_cell_widths(widths)
         self.widths_changed.emit()
 
     def refresh(self) -> None:
         self._updating = True
-        widths = self.project.glider.shape._get_cell_widths()
+        widths = as_editable_shape(self.project.glider.shape)._get_cell_widths()
         if len(widths) != len(self.sliders):
             self._build()
         else:
@@ -647,12 +672,9 @@ class RibSpacingPanel(QtWidgets.QGroupBox):
         self.prop_label.setText(f"Factor: {value / self._SLIDER_SCALE:.2f}")
 
     def _sample_cell_chords(self) -> list[float]:
-        shape = self.project.glider.shape
-        span = shape.span
+        shape = as_editable_shape(self.project.glider.shape)
+        span = shape.span / 2
         num = shape._num_cell_widths
-        num_interp = shape.num_shape_interpolation
-        front_int = openglider.rs.vector.Interpolation(shape.front_curve.get_sequence(num_interp).nodes)
-        back_int = openglider.rs.vector.Interpolation(shape.back_curve.get_sequence(num_interp).nodes)
         chords: list[float] = []
         for i in range(num):
             if shape.has_center_cell and i == 0:
@@ -660,11 +682,11 @@ class RibSpacingPanel(QtWidgets.QGroupBox):
             else:
                 x = ((i / num) + ((i + 1) / num)) / 2 * span
             x = min(x, span)
-            chords.append(max(abs(back_int.get_value(x) - front_int.get_value(x)), 1e-6))
+            chords.append(max(shape.chord_at(x), 1e-6))
         return chords
 
     def _compute_equal(self) -> list[float]:
-        return [1.0] * self.project.glider.shape._num_cell_widths
+        return [1.0] * as_editable_shape(self.project.glider.shape)._num_cell_widths
 
     def _compute_proportional(self, factor: float) -> list[float]:
         """Match LE-Paragliding's iterative chord-proportional distribution.
@@ -672,26 +694,15 @@ class RibSpacingPanel(QtWidgets.QGroupBox):
         ``factor`` has the pre-processor's xk semantics: 0 is fully proportional
         to chord and 1 approaches equal spacing.
         """
-        shape = self.project.glider.shape
-        half_span = shape.span
-        full_span = 2.0 * half_span
+        shape = as_editable_shape(self.project.glider.shape)
+        full_span = shape.span
+        half_span = full_span / 2
         cell_num = shape.cell_num
         num_coeffs = shape._num_cell_widths
         uniform_width = full_span / cell_num
         widths = [uniform_width] * num_coeffs
 
-        num_interp = shape.num_shape_interpolation
-        front_int = openglider.rs.vector.Interpolation(
-            shape.front_curve.get_sequence(num_interp).nodes
-        )
-        back_int = openglider.rs.vector.Interpolation(
-            shape.back_curve.get_sequence(num_interp).nodes
-        )
-
-        def chord_at(x: float) -> float:
-            return abs(back_int.get_value(x) - front_int.get_value(x))
-
-        chord_max = chord_at(0.0)
+        chord_max = shape.chord_at(0.0)
         for _ in range(5):
             positions = [widths[0] / 2.0]
             for width in widths[1:]:
@@ -699,7 +710,7 @@ class RibSpacingPanel(QtWidgets.QGroupBox):
 
             new_widths = []
             for x in positions:
-                chord = chord_at(min(x, half_span))
+                chord = shape.chord_at(min(x, half_span))
                 coefficient = ((chord_max - chord) * factor + chord) / chord_max
                 new_widths.append(max(uniform_width * coefficient, 1e-6))
 
@@ -728,7 +739,7 @@ class RibSpacingPanel(QtWidgets.QGroupBox):
             widths = self._compute_const_area()
         else:
             return
-        self.project.glider.shape.apply_cell_widths(widths)
+        as_editable_shape(self.project.glider.shape).apply_cell_widths(widths)
         self.applied.emit()
 
 
@@ -740,7 +751,7 @@ class ShapeWizard(GliderSelectionWizard):
         super().__init__(app=app, project=project)
         self.shape_backup = self.shape.copy()
         self.shape_input = ShapeInput(self.project)
-        self.distribution_input = RibDistInput(self.project.glider.shape)
+        self.distribution_input = RibDistInput(self.shape)
         self.distribution_input.on_change.append(lambda x, y: self.shape_input.redraw())
 
         # The upper part of the editor is either the rib-distribution spline or
@@ -759,7 +770,7 @@ class ShapeWizard(GliderSelectionWizard):
 
         self.main_widget.setSizes([300, 700])
 
-        self.shape_settings_widget = ShapeSettingsWidget(self.project.glider.shape)
+        self.shape_settings_widget = ShapeSettingsWidget(self.shape)
         self.settings = self.shape_settings_widget.settings
 
         # Shape mode is independent from the cell-distribution mode below.
@@ -831,8 +842,8 @@ class ShapeWizard(GliderSelectionWizard):
         self.shape_settings_widget.changed.connect(self.apply_settings)
 
     @property
-    def shape(self) -> ParametricShape:
-        return self.project.glider.shape
+    def shape(self) -> EditableShape:
+        return as_editable_shape(self.project.glider.shape)
 
     # ── Shape mode toggle: spline <-> leparagliding ──
     def _set_handles_visible(self, visible: bool) -> None:
@@ -840,21 +851,22 @@ class ShapeWizard(GliderSelectionWizard):
         self.shape_input.front.setVisible(visible)
         self.shape_input.back.setVisible(visible)
 
-    def _set_shape(self, new_shape: ParametricShape) -> None:
+    def _set_shape(self, new_shape: EditableShape) -> None:
         """Replace the project's shape, keeping the input widgets' cached
         references in sync (they hold ``glider_shape`` from construction)."""
         self.project.glider.shape = new_shape
         self.shape_input.glider_shape = new_shape
+        self.shape_input.refresh_from_shape()
         self.distribution_input.glider_shape = new_shape
 
     def _to_spline_shape(self) -> ParametricShape:
         """Change only the planform representation, preserving cell distribution."""
-        s = self.shape
-        return ParametricShape(
-            s.front_curve.copy(), s.back_curve.copy(), s.rib_distribution.copy(),
-            s.cell_num, config=s.config,
-            cell_widths=None if s.cell_widths is None else list(s.cell_widths),
-        )
+        shape = self.shape
+        if isinstance(shape, LeparaglidingShape):
+            return ParametricShape.from_shape(shape)
+        if isinstance(shape, ParametricShape):
+            return shape.copy()
+        raise TypeError(f"Cannot convert {type(shape)} to a spline shape")
 
     def _to_leparagliding_shape(
         self, params: LeparaglidingShapeParams, cell_num: int | None = None
@@ -897,9 +909,9 @@ class ShapeWizard(GliderSelectionWizard):
         self._set_shape(self._to_leparagliding_shape(params))
         self._update()
 
-    def _on_spline_dragged(self, _shape: ParametricShape) -> None:
-        """User dragged a control point in spline mode. If the shape is still a
-        parametric subclass, demote it to a plain spline shape so the edit sticks."""
+    def _on_spline_dragged(self, _shape: EditableShape) -> None:
+        """User dragged a control point in spline mode. If the shape still uses
+        another representation, convert it to a spline shape so the edit sticks."""
         if self.mode_combo.currentData() == self.MODE_SPLINE and type(self.shape) is not ParametricShape:
             self._set_shape(self._to_spline_shape())
 
@@ -940,14 +952,15 @@ class ShapeWizard(GliderSelectionWizard):
         self.shape_input.redraw()
 
     def set_sweep(self, value: float) -> None:
-        self.shape.set_sweep(value)
-        self._update()
+        if isinstance(self.shape, ParametricShape):
+            self.shape.set_sweep(value)
+            self._update()
     
     def apply_settings(self) -> None:
         settings = self.shape_settings_widget.settings
         self.shape_input.config.apply_zrot = settings.zrot
 
-        shape: ParametricShape = self.shape
+        shape: EditableShape = self.shape
 
         if self.mode_combo.currentData() == self.MODE_PARAMETRIC:
             # Scale the leparagliding params to reach the requested area / aspect
@@ -965,7 +978,8 @@ class ShapeWizard(GliderSelectionWizard):
             ):
                 old_span = math.sqrt(old_ar * old_area)
                 new_span = math.sqrt(new_ar * new_area)
-                params.scale(
+                LeparaglidingShape.scale_params(
+                    params,
                     new_span / old_span,
                     (new_area / new_span) / (old_area / old_span),
                 )
@@ -980,15 +994,14 @@ class ShapeWizard(GliderSelectionWizard):
                 # the number of cells changes while sliders mode is active.
                 shape.apply_cell_widths(shape._get_cell_widths())
 
-            if self.settings.sweep != settings.sweep:
-                self.shape.set_sweep(settings.sweep)
+            if self.settings.sweep != settings.sweep and isinstance(shape, ParametricShape):
+                shape.set_sweep(settings.sweep)
 
         self.settings = dataclasses.replace(settings)
         self._update()
 
     def _update(self) -> None:
-        self.shape_input.front.set_controlpoints(self.shape.front_curve.controlpoints.nodes)
-        self.shape_input.back.set_controlpoints(self.shape.back_curve.controlpoints.nodes)
+        self.shape_input.refresh_from_shape()
         self.distribution_input.refresh_from_shape()
         if self.cell_dist_combo.currentData() == "sliders":
             self.cell_width_sliders.refresh()

@@ -97,7 +97,8 @@ class GliderLineSetTable(QtWidgets.QWidget, CompareView):
         copied = ''
         for row in range(0, self.table.num_rows):
             for col in range(0, self.table.num_columns):
-                copied += self.table_widget.item(row, col).text() + '\t'
+                item = self.table_widget.item(row, col)
+                copied += (item.text() if item is not None else "") + '\t'
             copied = copied[:-1] + '\n'
         
         clipboard = self.app.clipboard()

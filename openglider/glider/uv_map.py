@@ -386,7 +386,7 @@ class UVMap:
 
     def _stacked_params(
         self,
-        half_shape: object | None = None,
+        half_shape: Shape | None = None,
     ) -> tuple[float, float, float, float]:
         """Return (max_upper_y, max_lower_y, upper_offset, y_min) in Shape units.
 
@@ -492,7 +492,7 @@ class UVMap:
             scale = min(_MAX_TEX / image.width, _MAX_TEX / image.height)
             image = image.resize(
                 (max(1, int(image.width * scale)), max(1, int(image.height * scale))),
-                Image.LANCZOS,
+                Image.Resampling.LANCZOS,
             )
         panel_mesh.set_texture_rgba(image.width, image.height, image.tobytes())
         return openglider.rs.wgpu.MeshActor(panel_mesh, draw_edges=draw_edges, boundary_only=boundary_only)

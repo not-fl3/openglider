@@ -40,7 +40,8 @@ class QTable(QtWidgets.QTableWidget):
 
         for row_no in range(self.rowCount()):
             for column_no in range(self.columnCount()):
-                table[(row_no, column_no)] = self.item(row_no, column_no).text()
+                item = self.item(row_no, column_no)
+                table[(row_no, column_no)] = item.text() if item is not None else ""
 
         return table
 
