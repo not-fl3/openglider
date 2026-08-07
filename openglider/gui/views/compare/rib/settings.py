@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
+from openglider.utils.types import expect_value
 from openglider.glider.project import GliderProject
 from openglider.gui.qt import QtCore, QtWidgets
 from openglider.gui.widgets.flow_layout import FlowLayout
@@ -37,7 +38,7 @@ class RibCompareSettings(QtWidgets.QWidget):
         self.setLayout(FlowLayout())
 
         self.slider = Slider(self, "Rib")
-        self.layout().addWidget(self.slider)
+        expect_value(self.layout()).addWidget(self.slider)
         self.slider.on_change(self.set_rib)
         self.slider.setMinimumWidth(500)
 
@@ -57,7 +58,7 @@ class RibCompareSettings(QtWidgets.QWidget):
             checkbox.setChecked(getattr(self.config.layers, layer_name))
             checkbox.setText(f"show {layer_name}")
             checkbox.clicked.connect(get_clickhandler(layer_name))
-            self.layout().addWidget(checkbox)
+            expect_value(self.layout()).addWidget(checkbox)
             self.checkboxes[layer_name] = checkbox
         
     def set_rib(self, rib_no: int) -> None:

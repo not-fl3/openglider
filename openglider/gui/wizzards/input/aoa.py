@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any, TYPE_CHECKING
 
+from openglider.utils.types import expect_value
 import openglider.rs
 from openglider.glider.project import GliderProject
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
@@ -145,8 +146,8 @@ class AOAWizard(GliderSelectionWizard):
         self.main_widget.addWidget(self.shape_input.get_widget())
         self.glide_input = NumberInput(self, "Glide", default=project.glider.glide, places=2)
         self.glide_input.on_changed.append(self.change_glide)
-        self.right_widget.layout().addWidget(self.glide_input)
-        #self.right_widget.layout().insertWidget(0, self.canvas_controls)
+        expect_value(self.right_widget.layout()).addWidget(self.glide_input)
+        #expect_value(self.right_widget.layout()).insertWidget(0, self.canvas_controls)
         self._selection_changed()
         self._selection_changed()
 

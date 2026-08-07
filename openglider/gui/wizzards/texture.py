@@ -14,6 +14,7 @@ from openglider.gui.views.compare.glider_3d.view import Glider3DCache
 from openglider.gui.views_2d.mpl.canvas import PlotCanvas
 from openglider.gui.views_3d.widgets import View3D
 from openglider.gui.wizzards.base import Wizard
+from openglider.utils.types import expect_value
 
 if TYPE_CHECKING:
     from openglider.gui.app.main_window import MainWindow
@@ -33,8 +34,8 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         self._auto_reload = False
 
         self.setLayout(QtWidgets.QVBoxLayout())
-        self.layout().setContentsMargins(8, 8, 8, 8)
-        self.layout().setSpacing(6)
+        expect_value(self.layout()).setContentsMargins(8, 8, 8, 8)
+        expect_value(self.layout()).setSpacing(6)
 
         path_layout = QtWidgets.QGridLayout()
         path_layout.setContentsMargins(0, 0, 0, 0)
@@ -68,7 +69,7 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         self._chk_auto_reload.toggled.connect(self._toggle_auto_reload)
         path_layout.addWidget(self._chk_auto_reload, 2, 0, 1, 5)
 
-        self.layout().addLayout(path_layout)
+        expect_value(self.layout()).addLayout(path_layout)
 
         style_layout = QtWidgets.QGridLayout()
         style_layout.setContentsMargins(0, 0, 0, 0)
@@ -90,7 +91,7 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         style_layout.addWidget(QtWidgets.QLabel("Texture precision:", self), 1, 0)
         style_layout.addWidget(self._precision, 1, 1)
 
-        self.layout().addLayout(style_layout)
+        expect_value(self.layout()).addLayout(style_layout)
 
     @property
     def svg_path(self) -> str | None:
@@ -184,7 +185,7 @@ class Texture3DPreview(QtWidgets.QWidget):
         self.view_3d = View3D(self)
         self.view_3d.show_axes = False
         self.view_3d.destroyed.connect(self._on_view_destroyed)
-        self.layout().addWidget(self.view_3d)
+        expect_value(self.layout()).addWidget(self.view_3d)
 
         self.view_3d.render_widget.destroyed.connect(self._on_view_destroyed)
 
@@ -249,7 +250,7 @@ class Texture2DPreview(QtWidgets.QWidget):
         self.canvas = PlotCanvas(zoom=True)
         self.canvas.grid = True
         self.canvas.update_settings()
-        self.layout().addWidget(self.canvas)
+        expect_value(self.layout()).addWidget(self.canvas)
 
     @staticmethod
     def _get_bbox(polylines: list[list[tuple[float, float]]]) -> tuple[float, float, float, float]:
@@ -310,11 +311,11 @@ class Texture2DPreview(QtWidgets.QWidget):
                 except Exception:
                     logger.exception("Failed to render 2D texture preview: %s", texture_path)
 
-        for polyline in panel_polys:
-            if not polyline:
+        for poly in panel_polys:
+            if not poly:
                 continue
-            x_values = [point[0] for point in polyline]
-            y_values = [point[1] for point in polyline]
+            x_values = [point[0] for point in poly]
+            y_values = [point[1] for point in poly]
             closed_x = x_values + [x_values[0]]
             closed_y = y_values + [y_values[0]]
             # High-contrast UV outline to stay visible on bright and dark texture areas.
@@ -341,16 +342,16 @@ class TextureWizard(Wizard):
 
         left_panel = QtWidgets.QWidget(self)
         left_panel.setLayout(QtWidgets.QVBoxLayout())
-        left_panel.layout().setContentsMargins(0, 0, 0, 0)
+        expect_value(left_panel.layout()).setContentsMargins(0, 0, 0, 0)
 
         self._texture_widget = TextureWizardWidget(left_panel, app)
         self._texture_widget.changed.connect(self._on_texture_settings_changed)
         self._texture_widget.reload_requested.connect(self._reload_texture_from_disk)
-        left_panel.layout().addWidget(self._texture_widget)
+        expect_value(left_panel.layout()).addWidget(self._texture_widget)
 
         self._status = QtWidgets.QLabel("", left_panel)
-        left_panel.layout().addWidget(self._status)
-        left_panel.layout().addStretch()
+        expect_value(left_panel.layout()).addWidget(self._status)
+        expect_value(left_panel.layout()).addStretch()
 
         self._tabs = QtWidgets.QTabWidget(self)
         self._preview_3d = Texture3DPreview(self._tabs, app)
@@ -363,7 +364,7 @@ class TextureWizard(Wizard):
         splitter.addWidget(left_panel)
         splitter.addWidget(self._tabs)
         splitter.setSizes([360, 980])
-        self.layout().addWidget(splitter)
+        expect_value(self.layout()).addWidget(splitter)
 
         self._apply_settings()
 

@@ -3,6 +3,7 @@ import math
 from pathlib import Path
 from collections.abc import Callable
 
+from openglider.utils.types import expect_value
 from openglider.mesh import Mesh
 import openglider.rs
 from openglider.gui.app.app import GliderApp
@@ -95,7 +96,7 @@ class Glider3DView(QtWidgets.QWidget, CompareView):
         
         self.config = GliderViewConfigWidget(self)
         self.config.changed.connect(self.update_config)
-        self.layout().addWidget(self.config)
+        expect_value(self.layout()).addWidget(self.config)
         self.actor_cache = Glider3DCache(app.state.projects)
 
         self.imported_mesh_actor: "openglider.rs.wgpu.MeshActor | None" = None
@@ -103,12 +104,12 @@ class Glider3DView(QtWidgets.QWidget, CompareView):
         self.clear_obj_button = QtWidgets.QPushButton("Remove OBJ", self)
         self.clear_obj_button.setVisible(False)
         self.clear_obj_button.clicked.connect(self.clear_imported_obj)
-        self.layout().addWidget(self.clear_obj_button)
+        expect_value(self.layout()).addWidget(self.clear_obj_button)
 
         self.view_3d = DropView3D(self, self.import_obj)
         self.view_3d.show_axes = False
         self.view_3d.clear()
-        self.layout().addWidget(self.view_3d)
+        expect_value(self.layout()).addWidget(self.view_3d)
 
     def import_obj(self, filename: str) -> None:
         try:

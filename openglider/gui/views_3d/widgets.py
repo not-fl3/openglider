@@ -5,6 +5,7 @@ import ctypes.util
 import os
 import sys
 
+from openglider.utils.types import expect_value
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.mesh import Mesh
 import openglider.rs
@@ -331,16 +332,16 @@ class View3D(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget=None) -> None:
         super().__init__(parent)
         self.setLayout(QtWidgets.QHBoxLayout(self))
-        self.layout().setContentsMargins(0, 0, 0, 0)
+        expect_value(self.layout()).setContentsMargins(0, 0, 0, 0)
         self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
 
         self.frame = QtWidgets.QFrame()
         self.frame.setLayout(QtWidgets.QVBoxLayout())
-        self.frame.layout().setContentsMargins(0, 0, 0, 0)
+        expect_value(self.frame.layout()).setContentsMargins(0, 0, 0, 0)
         self.frame.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-        self.layout().addWidget(self.frame)
+        expect_value(self.layout()).addWidget(self.frame)
         self.render_widget = WgpuRenderWidget(self.frame)
-        self.frame.layout().addWidget(self.render_widget)
+        expect_value(self.frame.layout()).addWidget(self.render_widget)
 
         # Backwards-compatible names used by drop handlers.
         self.render_window_interactor = self.render_widget

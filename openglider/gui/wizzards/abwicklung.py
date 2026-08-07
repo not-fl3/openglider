@@ -4,6 +4,7 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, TypeAlias
 
+from openglider.utils.types import expect_value
 from openglider.glider.project import GliderProject
 from openglider.glider.rib import SingleSkinRib
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
@@ -65,7 +66,7 @@ class PlotLayerSettings(QtWidgets.QWidget):
             checkbox.clicked.connect(get_clickhandler(layer_name))
             self.layer_buttons[layer_name] = checkbox
 
-            self.layout().addWidget(checkbox)
+            expect_value(self.layout()).addWidget(checkbox)
 
 
 class PlotWizzard(Wizard):

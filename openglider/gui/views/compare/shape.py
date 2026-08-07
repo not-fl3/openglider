@@ -1,9 +1,9 @@
 import enum
 import logging
 from collections.abc import Callable
-import typing
-
 import pyqtgraph
+
+from openglider.utils.types import expect_value
 from openglider.glider.project import GliderProject
 from openglider.gui.app.app import GliderApp
 from openglider.gui.state.glider_list import GliderCache
@@ -54,12 +54,12 @@ class ShapeConfigWidget(QtWidgets.QWidget):
                 checkbox.setChecked(getattr(self.config, prop))
                 checkbox.setText(f"{prop}")
                 checkbox.clicked.connect(get_clickhandler(prop))
-                self.layout().addWidget(checkbox)
+                expect_value(self.layout()).addWidget(checkbox)
                 self.checkboxes[prop] = checkbox
         
         self.selection = EnumSelection(ScaleOptions)
         self.selection.changed.connect(self.update_scale)
-        self.layout().addWidget(self.selection)
+        expect_value(self.layout()).addWidget(self.selection)
 
     def get_config(self) -> tuple[ShapePlotConfig, ShapePlotConfig]:
         upper = self.config.copy()
@@ -113,7 +113,7 @@ class ShapeView(QtWidgets.QWidget, CompareView):
         self.app = app
 
         self.config = ShapeConfigWidget()
-        self.layout().addWidget(self.config)
+        expect_value(self.layout()).addWidget(self.config)
 
         self.config.changed.connect(self.update_view)
 
@@ -134,8 +134,8 @@ class ShapeView(QtWidgets.QWidget, CompareView):
         self.cache = ShapePlotCache(app.state.projects)
 
         #self._layout.addWidget(self.buttons, 0, 1)
-        #self.layout().addWidget(self.plots)
-        self.layout().addWidget(self.plots)
+        #expect_value(self.layout()).addWidget(self.plots)
+        expect_value(self.layout()).addWidget(self.plots)
 
     def update_view(self) -> None:
         self.plot_lower.clear()

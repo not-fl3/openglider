@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import openglider
+from openglider.glider.shape import Shape
 import openglider.mesh
 import openglider.rs
 import svglib.svglib
@@ -350,7 +351,7 @@ class UVMap:
         self,
         cell_no: int,
         panel: Panel,
-        shape: object | None = None,
+        shape: Shape | None = None,
     ) -> openglider.rs.vector.PolyLine2D:
         """Panel corners using ShapePlot's planform-side projection.
 

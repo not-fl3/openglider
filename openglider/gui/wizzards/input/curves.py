@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, TypeVar
 from collections.abc import Callable
 
 import openglider.rs
@@ -21,6 +21,7 @@ from openglider.plots.sketches.shapeplot import ShapePlot
 from openglider.utils.table import Table
 
 from openglider.gui.app.main_window import MainWindow
+from openglider.utils.types import expect_value
 from openglider.vector.unit import Angle, Length, Percentage
 
 logger = logging.getLogger(__name__)
@@ -121,8 +122,10 @@ class CurveInput(Canvas):
     def get_widget(self) -> QtWidgets.QWidget:
         widget = QtWidgets.QWidget()
         widget.setLayout(QtWidgets.QVBoxLayout())
-        widget.layout().addWidget(self.shape_settings)
-        widget.layout().addWidget(super().get_widget())
+        layout = widget.layout()
+        assert layout is not None
+        layout.addWidget(self.shape_settings)
+        layout.addWidget(super().get_widget())
 
         return widget
 
@@ -148,11 +151,11 @@ class CurveSettings(QtWidgets.QWidget):
             self.curve_unit_selector.addItem(unit)
 
         self.curve_unit_selector.activated.connect(self.update_unit)
-        self.layout().addWidget(self.curve_type_selector)
-        self.layout().addWidget(self.curve_unit_selector)
+        expect_value(self.layout()).addWidget(self.curve_type_selector)
+        expect_value(self.layout()).addWidget(self.curve_unit_selector)
 
         self.nodes_table = QTable()
-        self.layout().addWidget(self.nodes_table)
+        expect_value(self.layout()).addWidget(self.nodes_table)
 
         self.update_curve()
 
@@ -195,7 +198,6 @@ class CurveSettings(QtWidgets.QWidget):
         
         self.changed.emit()
 
-
 class CurveWizard(Wizard):
     project: GliderProject
     def __init__(self, app: MainWindow, project: GliderProject):
@@ -205,7 +207,7 @@ class CurveWizard(Wizard):
 
         self.main_widget = QtWidgets.QSplitter()
         self.main_widget.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        self.layout().addWidget(self.main_widget)
+        expect_value(self.layout()).addWidget(self.main_widget)
 
         self.right_widget = QtWidgets.QWidget()
         self.right_widget.setLayout(QtWidgets.QVBoxLayout())
@@ -219,8 +221,8 @@ class CurveWizard(Wizard):
         self.curve_input = CurveInput(self.project, self.curve_list)
         self.curve_settings = CurveSettings(self)
 
-        self.right_widget.layout().addWidget(self.curve_list_selector)
-        self.right_widget.layout().addWidget(self.curve_settings)
+        expect_value(self.right_widget.layout()).addWidget(self.curve_list_selector)
+        expect_value(self.right_widget.layout()).addWidget(self.curve_settings)
 
         self.curves = project.glider.get_curves()
 
@@ -229,7 +231,7 @@ class CurveWizard(Wizard):
 
         self.curve_add_button = QtWidgets.QPushButton("Add Curve")
         self.curve_add_button.clicked.connect(self.add_curve)
-        self.right_widget.layout().addWidget(self.curve_add_button)
+        expect_value(self.right_widget.layout()).addWidget(self.curve_add_button)
         
         self.curve_list_selector.render()
         self.curve_list_selector.changed.connect(self.selection_changed)
@@ -239,7 +241,7 @@ class CurveWizard(Wizard):
         self.button_apply = QtWidgets.QPushButton("Apply")
         self.button_apply.clicked.connect(self.apply)
 
-        self.right_widget.layout().addWidget(self.button_apply)
+        expect_value(self.right_widget.layout()).addWidget(self.button_apply)
 
 
         self.main_widget.addWidget(self.curve_input.get_widget())

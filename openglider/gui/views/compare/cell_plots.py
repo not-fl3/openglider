@@ -8,6 +8,7 @@ from openglider.gui.state.glider_list import GliderCache
 from openglider.utils.dataclass import BaseModel
 
 from openglider.gui.views.compare.base import CompareView
+from openglider.utils.types import expect_value
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +51,8 @@ class CellPlotView(QtWidgets.QWidget, CompareView):
         self.config = ConfigWidget(CellPlotConfig, self)
         self.config.changed.connect(self.update_view)
         
-        self.layout().addWidget(self.config)
-        self.layout().addWidget(self.plot)
+        expect_value(self.layout()).addWidget(self.config)
+        expect_value(self.layout()).addWidget(self.plot)
 
         self.plot_cache = CellPlotCache(app.state.projects)
 

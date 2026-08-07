@@ -1,5 +1,6 @@
 import logging
 
+from openglider.utils.types import expect_value
 from openglider.gui.app.app import GliderApp
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.gui.views.compare.arc import ArcView
@@ -67,7 +68,7 @@ class GliderPreview(QtWidgets.QWidget):
             self.tabs_widget.addTab(widget, name)  # type: ignore
 
         self.tabs_widget.currentChanged.connect(self.set_tab)
-        self.layout().addWidget(self.tabs_widget)
+        expect_value(self.layout()).addWidget(self.tabs_widget)
 
 
         #self._layout.addWidget(self.buttons, 0, 1)

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 import logging
 import asyncio
 
+from openglider.utils.types import expect_value
 from openglider.gui.qt import QtWidgets, QtCore
 from openglider.gui.icons import icon
 
@@ -48,10 +49,10 @@ class QTaskListWidget(QtWidgets.QWidget):
         else:
             self.button_view.clicked.connect(self.open_widget)
 
-        self.layout().addWidget(self.label_status)
-        self.layout().addWidget(self.label_name)
-        self.layout().addWidget(self.label_runtime)
-        self.layout().addWidget(self.button_view)
+        expect_value(self.layout()).addWidget(self.label_status)
+        expect_value(self.layout()).addWidget(self.label_name)
+        expect_value(self.layout()).addWidget(self.label_runtime)
+        expect_value(self.layout()).addWidget(self.button_view)
 
         self.update()
     
@@ -111,7 +112,7 @@ class QTaskQueue(QtWidgets.QWidget):
         self.list = QtWidgets.QListWidget(self)
         self.list.setDragEnabled(True)
         
-        self.layout().addWidget(self.list)
+        expect_value(self.layout()).addWidget(self.list)
         self.update_task = asyncio.ensure_future(self._update())
 
         self.tasks = []

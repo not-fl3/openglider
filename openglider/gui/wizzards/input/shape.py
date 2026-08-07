@@ -821,7 +821,7 @@ class ShapeWizard(GliderSelectionWizard):
         settings_column_layout.addStretch()
 
         self.right_widget_layout.insertWidget(0, settings_column)
-        #self.right_widget.layout().insertWidget(0, self.canvas_controls)
+        #expect_value(self.right_widget.layout()).insertWidget(0, self.canvas_controls)
         self._selection_changed()
 
         self.shape_input.on_change.append(self.shape_settings_widget.update_shape)

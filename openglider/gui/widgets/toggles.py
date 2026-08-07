@@ -1,5 +1,7 @@
 from typing import Any
 from collections.abc import Callable
+
+from openglider.utils.types import expect_value
 from openglider.gui.qt import QtCore, QtWidgets
 from openglider.utils.config import Config
 
@@ -31,5 +33,5 @@ class ToggleGroup(QtWidgets.QWidget):
             checkbox.setChecked(getattr(self.config, prop))
             checkbox.setText(f"{prop}")
             checkbox.clicked.connect(get_clickhandler(prop))
-            self.layout().addWidget(checkbox)
+            expect_value(self.layout()).addWidget(checkbox)
             self.checkboxes[prop] = checkbox

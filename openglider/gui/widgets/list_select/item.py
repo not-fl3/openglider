@@ -2,6 +2,7 @@ from __future__ import annotations
 import logging
 from typing import Any, TypeVar, Generic, TYPE_CHECKING
 
+from openglider.utils.types import expect_value
 from openglider.gui.icons import icon
 from openglider.gui.state.selection_list.list import SelectionListItem, ItemType
 from openglider.gui.widgets import InputLabel
@@ -35,8 +36,8 @@ class ListItemWidget(QtWidgets.QWidget, Generic[ItemType]):
         self.label_name = InputLabel()
         self.label_name.text = self.list_item.name
         self.label_name.on_change.append(self.update_name)
-        self.description_widget.layout().addWidget(self.label_name)
-        self.layout().addWidget(self.description_widget)
+        expect_value(self.description_widget.layout()).addWidget(self.label_name)
+        expect_value(self.layout()).addWidget(self.description_widget)
 
         self.update()
 
@@ -44,19 +45,19 @@ class ListItemWidget(QtWidgets.QWidget, Generic[ItemType]):
         self.button_active = QtWidgets.QPushButton()
         self.button_active.setFixedSize(30,30)
         self.update_active_icon()
-        self.layout().addWidget(self.button_active)
+        expect_value(self.layout()).addWidget(self.button_active)
         self.button_active.clicked.connect(self.toggle_active)
 
         self.button_color = QtWidgets.QPushButton()
         self.button_color.setIcon(icon("fa.edit"))
         self.button_color.setFixedSize(30, 30)
         self.button_color.clicked.connect(self.choose_color)
-        self.layout().addWidget(self.button_color)
+        expect_value(self.layout()).addWidget(self.button_color)
 
         self.button_remove = QtWidgets.QPushButton()
         self.button_remove.setIcon(icon("fa.trash"))
         self.button_remove.setFixedSize(30, 30)
-        self.layout().addWidget(self.button_remove)
+        expect_value(self.layout()).addWidget(self.button_remove)
 
     
     def toggle_active(self) -> None:

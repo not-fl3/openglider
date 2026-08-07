@@ -3,6 +3,7 @@ from openglider.gui.qt import QtWidgets, QtCore
 
 import logging
 
+from openglider.utils.types import expect_value
 from openglider.utils.dataclass import BaseModel
 logger = logging.getLogger(__name__)
 
@@ -35,5 +36,5 @@ class ConfigWidget(QtWidgets.QWidget):
             checkbox.setChecked(getattr(self.config, prop))
             checkbox.setText(f"{prop}")
             checkbox.clicked.connect(get_clickhandler(prop))
-            self.layout().addWidget(checkbox)
+            expect_value(self.layout()).addWidget(checkbox)
             self.checkboxes[prop] = checkbox

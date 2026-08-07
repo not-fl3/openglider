@@ -3,6 +3,8 @@ import math
 from openglider.gui.views_2d.dataframe import DataFramePlot
 from openglider.gui.widgets.config import ConfigWidget
 import pandas
+
+from openglider.utils.types import expect_value
 from openglider.gui.qt import QtWidgets
 from openglider.gui.app.app import GliderApp
 from openglider.gui.state.glider_list import GliderCache
@@ -55,8 +57,8 @@ class RibPlotView(QtWidgets.QWidget, CompareView):
         self.config = ConfigWidget(RibPlotConfig, self)
         self.config.changed.connect(self.update_view)
         
-        self.layout().addWidget(self.config)
-        self.layout().addWidget(self.plot)
+        expect_value(self.layout()).addWidget(self.config)
+        expect_value(self.layout()).addWidget(self.plot)
 
         self.plot_cache = RibPlotCache(app.state.projects)
 

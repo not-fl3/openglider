@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar
 
 if TYPE_CHECKING:
     import openglider.rs as rs
@@ -36,3 +36,11 @@ SymmetricCurveType: TypeAlias = (
 )
 
 CurveType: TypeAlias = AsymmetricCurveType | SymmetricCurveType
+
+
+T = TypeVar("T")
+
+def expect_value(value: T | None, message: str="Expected value, got None") -> T:
+    if value is None:
+        raise ValueError(message)
+    return value

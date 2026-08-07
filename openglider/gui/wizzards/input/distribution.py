@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import openglider.rs
 
+from openglider.utils.types import expect_value
 from openglider.glider.project import GliderProject
 from openglider.gui.app.main_window import MainWindow
 from openglider.gui.qt import QtCore, QtWidgets
@@ -62,7 +63,7 @@ class BallooningCurveWizard(Wizard):
         self.splitter.setOrientation(QtCore.Qt.Orientation.Horizontal)
 
         self.setLayout(QtWidgets.QHBoxLayout())
-        self.layout().addWidget(self.splitter)
+        expect_value(self.layout()).addWidget(self.splitter)
 
         self.right_widget = QtWidgets.QWidget()
         self.right_widget.setLayout(QtWidgets.QVBoxLayout())
@@ -70,7 +71,7 @@ class BallooningCurveWizard(Wizard):
         self.button_apply = QtWidgets.QPushButton("Apply")
         self.button_apply.clicked.connect(self.apply)
 
-        self.right_widget.layout().addWidget(self.button_apply)
+        expect_value(self.right_widget.layout()).addWidget(self.button_apply)
 
         self.splitter.addWidget(self.main_widget)
         self.splitter.addWidget(self.right_widget)

@@ -1,4 +1,5 @@
 import logging
+from openglider.utils.types import expect_value
 from openglider.gui.qt import QtWidgets
 from openglider.gui.app.app import GliderApp
 from openglider.gui.views_2d.canvas import Canvas
@@ -30,7 +31,7 @@ class ArcView(QtWidgets.QWidget, CompareView):
         self.plot.static = True
         self.plot.update_data()
         #self.plot.setBackground(None)
-        self.layout().addWidget(self.plot.get_widget())
+        expect_value(self.layout()).addWidget(self.plot.get_widget())
 
         self.arc_cache = ArcPlotCache(app.state.projects)
 

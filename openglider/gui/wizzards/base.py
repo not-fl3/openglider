@@ -6,6 +6,7 @@ from datetime import datetime
 from openglider.gui.qt import QtWidgets, QtGui, QtCore
 import logging
 
+from openglider.utils.types import expect_value
 from openglider.gui.views.window import GliderWindow
 from openglider.glider.project import GliderProject
 from openglider.utils.colors import Color, colorwheel
@@ -111,7 +112,7 @@ class SelectionWizard(Wizard):
         self.selection = QtWidgets.QWidget()
         self.selection.setLayout(QtWidgets.QVBoxLayout())
         self.selection.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
-        self.right_widget.layout().addWidget(self.selection)
+        expect_value(self.right_widget.layout()).addWidget(self.selection)
 
         self.selection_items: list[SelectionItem] = []
 
@@ -120,12 +121,12 @@ class SelectionWizard(Wizard):
             item.on_change.append(self._selection_changed)
             self.selection_items.append(item)
 
-            self.selection.layout().addWidget(item)
+            expect_value(self.selection.layout()).addWidget(item)
 
         self.button_apply = QtWidgets.QPushButton("Apply")
         self.button_apply.clicked.connect(self.apply)
 
-        self.selection.layout().addWidget(self.button_apply)
+        expect_value(self.selection.layout()).addWidget(self.button_apply)
 
         self.splitter.addWidget(self.main_widget)
         self.splitter.addWidget(self.right_widget)

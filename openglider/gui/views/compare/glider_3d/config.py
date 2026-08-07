@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-from openglider.gui.qt import QtCore, QtWidgets
 
+from openglider.utils.types import expect_value
+from openglider.gui.qt import QtCore, QtWidgets
 from openglider.utils.dataclass import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -90,4 +91,4 @@ class GliderViewConfigWidget(QtWidgets.QWidget):
         checkbox.setChecked(getattr(self.config, f"show_{name}"))
         checkbox.setText(f"show {name}")
         checkbox.clicked.connect(toggle)
-        self.layout().addWidget(checkbox)
+        expect_value(self.layout()).addWidget(checkbox)

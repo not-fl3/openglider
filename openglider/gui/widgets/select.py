@@ -1,8 +1,9 @@
 from typing import Any
-from openglider.gui.qt import QtWidgets, QtCore
 import enum
-
 import logging
+
+from openglider.utils.types import expect_value
+from openglider.gui.qt import QtWidgets, QtCore
 logger = logging.getLogger(__name__)
 
 class EnumSelection(QtWidgets.QWidget):
@@ -14,7 +15,7 @@ class EnumSelection(QtWidgets.QWidget):
         self.choices = choices
 
         self.selector = QtWidgets.QComboBox()
-        self.layout().addWidget(self.selector)
+        expect_value(self.layout()).addWidget(self.selector)
 
         self.choice_list = []
 
@@ -52,7 +53,7 @@ class AutoComplete(QtWidgets.QWidget):
         self.choices = choices
 
         self.selector = QtWidgets.QComboBox()
-        self.layout().addWidget(self.selector)
+        expect_value(self.layout()).addWidget(self.selector)
 
         for x in self.choices:
             self.selector.addItem(x)

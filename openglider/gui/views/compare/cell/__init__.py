@@ -1,6 +1,7 @@
 import logging
 from openglider.gui.state.glider_list import GliderCache
 
+from openglider.utils.types import expect_value
 from openglider.gui.qt import QtGui, QtCore, QtWidgets
 from openglider.gui.app.app import GliderApp
 from openglider.gui.views_2d.canvas import Canvas
@@ -27,7 +28,7 @@ class CellView(QtWidgets.QWidget, CompareView):
         self.app = app
 
         self.settings_widget = CellCompareSettings(self)
-        self.layout().addWidget(self.settings_widget)
+        expect_value(self.layout()).addWidget(self.settings_widget)
         self.settings_widget.changed.connect(self.update_view)
         self.plot = Canvas()
         self.plot.locked_aspect_ratio = True
@@ -35,7 +36,7 @@ class CellView(QtWidgets.QWidget, CompareView):
         self.plot.static = False
         self.plot.update_data()
         #self.plot.setBackground(None)
-        self.layout().addWidget(self.plot.get_widget())
+        expect_value(self.layout()).addWidget(self.plot.get_widget())
 
         self.cache = CellCache(app.state.projects)
 
