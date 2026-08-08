@@ -21,7 +21,8 @@ from openglider.glider.glider import Glider
 from openglider.glider.parametric.arc import ArcCurve
 from openglider.glider.parametric.export_ods import export_ods_2d
 from openglider.glider.parametric.import_ods import import_markdown_2d, import_ods_2d
-from openglider.glider.parametric.shape import LeparaglidingShape, ParametricShape
+from openglider.glider.parametric.leparagliding_shape import LeparaglidingShape
+from openglider.glider.parametric.parametric_shape import ParametricShape
 from openglider.glider.parametric.table import GliderTables
 from openglider.glider.rib import Rib, SingleSkinRib
 from openglider.utils import ZipCmp
@@ -124,10 +125,7 @@ class ParametricGlider:
     def get_shape(self) -> Shape:
         if isinstance(self.shape, Shape):
             return self.shape
-        elif isinstance(self.shape, LeparaglidingShape):
-            return self.shape.get_half_shape()
-        elif isinstance(self.shape, ParametricShape):
-            return self.shape.get_half_shape()
+        return self.shape.get_half_shape()
 
     def get_arc_angles(self) -> list[float]:
         """

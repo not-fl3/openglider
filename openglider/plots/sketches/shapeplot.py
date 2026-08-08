@@ -98,7 +98,8 @@ class ShapePlot:
             if rot:
                 zrot = [rib.zrot for rib in self.glider_3d.ribs]
                 if any(zrot):
-                    shape_r = shape_r.apply_zrot(zrot, self.glider_2d.config.baseline_pct)
+                    baseline_pct = self.glider_2d.config.baseline_pct or Percentage(0.0)
+                    shape_r = shape_r.apply_zrot(zrot, baseline_pct)
             shape_l = shape_r.copy().scale(x=-1)
 
             return shape_r, shape_l

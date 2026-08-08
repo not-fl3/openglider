@@ -33,9 +33,10 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         self._svg_path: str | None = None
         self._auto_reload = False
 
-        self.setLayout(QtWidgets.QVBoxLayout())
-        expect_value(self.layout()).setContentsMargins(8, 8, 8, 8)
-        expect_value(self.layout()).setSpacing(6)
+        main_layout = QtWidgets.QVBoxLayout()
+        self.setLayout(main_layout)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(6)
 
         path_layout = QtWidgets.QGridLayout()
         path_layout.setContentsMargins(0, 0, 0, 0)
@@ -69,7 +70,7 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         self._chk_auto_reload.toggled.connect(self._toggle_auto_reload)
         path_layout.addWidget(self._chk_auto_reload, 2, 0, 1, 5)
 
-        expect_value(self.layout()).addLayout(path_layout)
+        main_layout.addLayout(path_layout)
 
         style_layout = QtWidgets.QGridLayout()
         style_layout.setContentsMargins(0, 0, 0, 0)
@@ -91,7 +92,7 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         style_layout.addWidget(QtWidgets.QLabel("Texture precision:", self), 1, 0)
         style_layout.addWidget(self._precision, 1, 1)
 
-        expect_value(self.layout()).addLayout(style_layout)
+        main_layout.addLayout(style_layout)
 
     @property
     def svg_path(self) -> str | None:
@@ -341,17 +342,18 @@ class TextureWizard(Wizard):
         self.setLayout(QtWidgets.QHBoxLayout())
 
         left_panel = QtWidgets.QWidget(self)
-        left_panel.setLayout(QtWidgets.QVBoxLayout())
-        expect_value(left_panel.layout()).setContentsMargins(0, 0, 0, 0)
+        left_layout = QtWidgets.QVBoxLayout()
+        left_panel.setLayout(left_layout)
+        left_layout.setContentsMargins(0, 0, 0, 0)
 
         self._texture_widget = TextureWizardWidget(left_panel, app)
         self._texture_widget.changed.connect(self._on_texture_settings_changed)
         self._texture_widget.reload_requested.connect(self._reload_texture_from_disk)
-        expect_value(left_panel.layout()).addWidget(self._texture_widget)
+        left_layout.addWidget(self._texture_widget)
 
         self._status = QtWidgets.QLabel("", left_panel)
-        expect_value(left_panel.layout()).addWidget(self._status)
-        expect_value(left_panel.layout()).addStretch()
+        left_layout.addWidget(self._status)
+        left_layout.addStretch()
 
         self._tabs = QtWidgets.QTabWidget(self)
         self._preview_3d = Texture3DPreview(self._tabs, app)

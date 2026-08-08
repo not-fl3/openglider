@@ -1,4 +1,11 @@
 import unittest
+
+from openglider.glider.parametric.leparagliding_shape import (
+    LeparaglidingShape,
+    LeparaglidingShapeParams,
+)
+from openglider.glider.parametric.parametric_shape import ParametricShape
+from openglider.glider.parametric.shape import PlanformShape
 from tests.helpers import GliderTestCase
 
 
@@ -29,6 +36,30 @@ class GliderTestCase2D(GliderTestCase):
             [list(point) for point in shape.rib_distribution.controlpoints.nodes],
             original_distribution,
         )
+
+    def test_leparagliding_shape_is_not_a_parametric_shape(self) -> None:
+        source = self.parametric_glider.shape
+        shape = LeparaglidingShape(
+            LeparaglidingShapeParams(),
+            source.config,
+            source.cell_num,
+            rib_distribution=source.rib_distribution.copy(),
+        )
+
+        self.assertIsInstance(shape, PlanformShape)
+        self.assertFalse(issubclass(LeparaglidingShape, ParametricShape))
+        self.assertNotIsInstance(shape, ParametricShape)
+        self.assertFalse(hasattr(shape, "front_curve"))
+        self.assertFalse(hasattr(shape, "back_curve"))
+        self.assertEqual(len(shape.rib_x_values), len(source.rib_x_values))
+
+        half_shape = shape.get_half_shape()
+        first_positive = shape.has_center_cell
+        last = -1 if shape.config.has_stabicell else None
+        self.assertGreater(len(half_shape.front.nodes[first_positive:last]), 0)
+        # Slider normalization can put the tip a few floating-point ulps past xm.
+        self.assertIsInstance(shape._edge_at(shape.span / 2 + 5e-10, True), float)
+        self.assertIsInstance(shape.copy(), LeparaglidingShape)
 
     #def test_chords(self) -> None:
         # print(shape)

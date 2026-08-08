@@ -7,7 +7,9 @@ import openglider.rs
 import ezodf
 
 from openglider.glider.parametric.arc import ExplicitArc, LeparaglidingArc
-from openglider.glider.parametric.shape import ExplicitShape, LeparaglidingShape, ParametricShape
+from openglider.glider.parametric.leparagliding_shape import LeparaglidingShape
+from openglider.glider.parametric.parametric_shape import ParametricShape
+from openglider.glider.parametric.shape import PlanformShape
 from openglider.glider.parametric.table.ballooning import BallooningTable
 from openglider.utils.table import Table
 from openglider.utils.types import CurveType
@@ -166,7 +168,7 @@ def get_geom_sheet(glider_2d: ParametricGlider) -> Table:
         table[rib_no+1, 8] = profile_int.get_value(x)
         table[rib_no+1, 9] = ballooning_int.get_value(x)
     
-    if isinstance(glider_2d.shape, ParametricShape) and glider_2d.shape.config.has_stabicell:
+    if isinstance(glider_2d.shape, PlanformShape) and glider_2d.shape.config.has_stabicell:
         table = table.get_rows(0, table.num_rows-1)
 
     return table
@@ -245,9 +247,6 @@ def get_parametric_sheet(glider : ParametricGlider) -> Table:
         add_leparagliding("front", _shape_param_rows(shape.params.to_dict()), 0)
         table[0, 2] = "back"
         table[0, 3] = "leparagliding"
-    elif isinstance(shape, ExplicitShape):
-        add_explicit_points("front", shape.front_points, 0)
-        add_explicit_points("back", shape.back_points, 2)
     elif isinstance(shape, ParametricShape):
         add_curve("front", shape.front_curve, 0)
         add_curve("back", shape.back_curve, 2)
@@ -256,9 +255,9 @@ def get_parametric_sheet(glider : ParametricGlider) -> Table:
 
     # ── rib distribution ──
     # Cell distribution is independent from spline/Leparagliding planform mode.
-    if not isinstance(shape, ExplicitShape) and shape.cell_widths is not None:
+    if shape.cell_widths is not None:
         add_explicit_values("rib_distribution", list(shape.cell_widths), 4)
-    elif not isinstance(shape, ExplicitShape):
+    else:
         add_curve("rib_distribution", shape.rib_distribution, 4)
 
     # ── arc ──

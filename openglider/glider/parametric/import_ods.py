@@ -13,8 +13,11 @@ from openglider.airfoil import Profile2D
 
 from openglider.glider.parametric.arc import ArcCurve, ExplicitArc, LeparaglidingArc
 from openglider.glider.parametric.config import ParametricGliderConfig, SewingAllowanceConfig
-from openglider.glider.parametric.leparagliding import LeparaglidingShapeParams
-from openglider.glider.parametric.shape import ExplicitShape, LeparaglidingShape, ParametricShape
+from openglider.glider.parametric.leparagliding_shape import (
+    LeparaglidingShape,
+    LeparaglidingShapeParams,
+)
+from openglider.glider.parametric.parametric_shape import ParametricShape
 from openglider.glider.parametric.table import GliderTables
 from openglider.glider.parametric.table.attachment_points import AttachmentPointTable, CellAttachmentPointTable
 from openglider.glider.parametric.table.ballooning import BallooningTable, transpose_columns
@@ -179,7 +182,11 @@ def import_markdown_glider(cls: type[ParametricGlider], tables: list[Table] | di
 
     profiles = [Profile2D(profile, name).normalized() for name, profile in transpose_columns(table_dct.get("Airfoils", Table()))]
     geometry = get_geometry_explicit(table_dct["geometry"], config)
-    geometry_parametric = get_geometry_parametric(table_dct.get(TableNames.parametric_data, Table()), geometry.shape.cell_no, config)
+    # ``cell_no`` includes both stabilizer cells; parametric ``cell_num`` does not.
+    cell_num = geometry.shape.cell_no - 2 * config.has_stabicell
+    geometry_parametric = get_geometry_parametric(
+        table_dct.get(TableNames.parametric_data, Table()), cell_num, config
+    )
     balloonings = BallooningTable(table=table_dct.get(BallooningTable.table_name, Table()))
 
     attachment_points_lower = config.get_lower_attachment_points()
@@ -443,15 +450,6 @@ def get_geometry_parametric(table: Table, cell_num: int, config: ParametricGlide
             config,
             rib_distribution=rib_distribution,
             cell_widths=cell_widths,
-        )
-    elif front_type == "explicit":
-        _, back_col = columns.get("back", (None, None))
-        assert front_col is not None
-        assert back_col is not None
-        parametric_shape = ExplicitShape(
-            _parse_explicit_points(table, front_col),
-            _parse_explicit_points(table, back_col),
-            cell_num, config,
         )
     else:
         if rib_type == "explicit":

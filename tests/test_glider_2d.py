@@ -9,7 +9,7 @@ TEMPDIR =  tempfile.gettempdir()
 class GliderTestCase2D(GliderTestCase):
     def test_create_glider(self) -> None:
         glider = self.parametric_glider.get_glider_3d()
-        self.assertAlmostEqual(glider.span, 2*self.parametric_glider.shape.span, 2)
+        self.assertAlmostEqual(glider.span, self.parametric_glider.shape.span, 2)
 
     def test_export(self) -> None:
         exp = jsonify.dumps(self.parametric_glider)

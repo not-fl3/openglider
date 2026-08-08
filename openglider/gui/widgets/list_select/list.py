@@ -61,5 +61,5 @@ class GenericListWidget(Generic[ItemType, WidgetTypeT], QtWidgets.QListWidget):
         self.changed.emit()
 
 
-class ListWidget(Generic[ItemType], GenericListWidget[ItemType, ListItemWidget]):
-    WidgetType = ListWidgetItem
+class ListWidget(Generic[ItemType], GenericListWidget[ItemType, ListItemWidget[ItemType]]):
+    WidgetType: type[ListWidgetItem[ItemType, ListItemWidget[ItemType]]] = ListWidgetItem

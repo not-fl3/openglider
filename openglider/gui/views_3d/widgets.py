@@ -88,7 +88,7 @@ class WgpuRenderWidget(QtWidgets.QWidget):
             return ("appkit", None)
 
         app = QtWidgets.QApplication.instance()
-        if app is not None and hasattr(app, "nativeInterface"):
+        if isinstance(app, QtWidgets.QApplication) and hasattr(app, "nativeInterface"):
             native = app.nativeInterface()
             # Use the platform plugin name to pick the backend. QX11Application
             # exposes both display() (Xlib Display*) and connection() (xcb), so

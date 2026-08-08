@@ -6,7 +6,8 @@ from typing import Any
 from collections.abc import Iterator
 import openglider.rs
 
-from openglider.glider.parametric.shape import ParametricShape
+from openglider.glider.parametric.parametric_shape import ParametricShape
+from openglider.glider.parametric.shape import PlanformShape
 from openglider.glider.parametric.glider import ParametricGlider
 
 from openglider.glider.cell.panel import Panel, PanelCut
@@ -28,7 +29,7 @@ class ShapeConfig(BaseModel):
 
 
 class Shape2D(QtWidgets.QGraphicsObject):
-    glider_shape: ParametricShape
+    glider_shape: PlanformShape
 
     half_wing: bool=False
     draw_ribs: bool=True
@@ -42,9 +43,11 @@ class Shape2D(QtWidgets.QGraphicsObject):
 
         if isinstance(shape, ParametricShape):
             shape._clean()
+        if not isinstance(shape, PlanformShape):
+            raise TypeError(f"Shape2D requires a planform shape, got {type(shape)}")
         return cls(shape, panels, **kwargs)
 
-    def __init__(self, shape: ParametricShape, panels: list[list[Panel]]=None, color: tuple[int, int, int]=None, alpha: int=160, config: ShapeConfig=None) -> None:
+    def __init__(self, shape: PlanformShape, panels: list[list[Panel]]=None, color: tuple[int, int, int]=None, alpha: int=160, config: ShapeConfig=None) -> None:
         super().__init__()
         self.glider_shape = shape
         self.glider_shape_r = shape.get_half_shape()
@@ -169,7 +172,7 @@ class Shape2D(QtWidgets.QGraphicsObject):
 
     def boundingRect(self) -> QtCore.QRectF:
         span = self.glider_shape.span
-        chord = self.glider_shape.get_rib_point(0, 1)[1]
+        chord = self.glider_shape.ribs[0][1][1]
         if self.half_wing:
             return QtCore.QRectF(0, 0, span/2, chord)
         else:

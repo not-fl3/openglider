@@ -91,9 +91,13 @@ class GliderActors:
                 return self.get_panels(numribs)
             self._cached_svg_texture_path = self.texture_svg_path
 
+        texture = self._cached_svg_texture
+        if texture is None:
+            return self.get_panels(numribs)
+
         try:
             return uv_map.get_textured_panels_actor(
-                texture=self._cached_svg_texture,
+                texture=texture,
                 numribs=numribs,
                 mode=self.texture_uv_mode,
                 precision=self.texture_precision,
