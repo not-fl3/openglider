@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from tests.helpers import GliderTestCase
 
-from openglider.glider.uv_map import UVMap
+from openglider.glider.uv_map import UVMap, UVMapMirrored, UVMapStacked
 
 
 class UVMapStackedLayoutTest(GliderTestCase):
@@ -46,3 +46,83 @@ class UVMapStackedLayoutTest(GliderTestCase):
         self.assertTrue(upper_y)
         self.assertTrue(lower_y)
         self.assertGreater(min(upper_y), max(lower_y))
+
+    def test_split_classes_exist_and_layouts(self) -> None:
+        stacked_map = UVMapStacked(self.parametric_glider)
+        mirrored_map = UVMapMirrored(self.parametric_glider)
+
+        stacked_layout = stacked_map.get_layout()
+        mirrored_layout = mirrored_map.get_layout()
+
+        self.assertTrue(stacked_layout.parts)
+        self.assertTrue(mirrored_layout.parts)
+
+    def test_transform_cell_local_coordinates_returns_normalized_uv(self) -> None:
+        uv_map = UVMap(self.parametric_glider)
+        u, v = uv_map.transform_cell_local_coordinates(
+            cell_no=0,
+            panel_idx=0,
+            x=0.5,
+            y=0.0,
+            mode="stacked",
+        )
+
+        self.assertGreaterEqual(u, 0.0)
+        self.assertLessEqual(u, 1.0)
+        self.assertGreaterEqual(v, 0.0)
+        self.assertLessEqual(v, 1.0)
+
+    def test_transform_glider_coordinates_from_panel_stacked(self) -> None:
+        uv_map = UVMapStacked(self.parametric_glider)
+        panel = self.glider.cells[0].panels[0]
+        u, v = uv_map.transform_glider_coordinates(panel=panel, x=0.5, y=0.25)
+
+        self.assertGreaterEqual(u, 0.0)
+        self.assertLessEqual(u, 1.0)
+        self.assertGreaterEqual(v, 0.0)
+        self.assertLessEqual(v, 1.0)
+
+    def test_transform_glider_coordinates_from_panel_mirrored(self) -> None:
+        uv_map = UVMapMirrored(self.parametric_glider)
+        panel = self.glider.cells[0].panels[0]
+        u, v = uv_map.transform_glider_coordinates(panel=panel, x=0.5, y=-0.25)
+
+        self.assertGreaterEqual(u, 0.0)
+        self.assertLessEqual(u, 1.0)
+        self.assertGreaterEqual(v, 0.0)
+        self.assertLessEqual(v, 1.0)
+
+    def test_uvmap_facade_transform_glider_coordinates(self) -> None:
+        uv_map = UVMap(self.parametric_glider)
+        panel = self.glider.cells[0].panels[0]
+        us, vs = uv_map.transform_glider_coordinates(panel=panel, x=0.5, y=0.25, mode="stacked")
+        um, vm = uv_map.transform_glider_coordinates(panel=panel, x=0.5, y=-0.25, mode="mirrored")
+
+        self.assertGreaterEqual(us, 0.0)
+        self.assertLessEqual(us, 1.0)
+        self.assertGreaterEqual(vs, 0.0)
+        self.assertLessEqual(vs, 1.0)
+        self.assertGreaterEqual(um, 0.0)
+        self.assertLessEqual(um, 1.0)
+        self.assertGreaterEqual(vm, 0.0)
+        self.assertLessEqual(vm, 1.0)
+
+    def test_transform_panel_local_coordinates_stacked(self) -> None:
+        uv_map = UVMapStacked(self.parametric_glider)
+        panel = self.glider.cells[0].panels[0]
+        u, v = uv_map.transform_panel_local_coordinates(panel=panel, x=0.5, y=0.0)
+
+        self.assertGreaterEqual(u, 0.0)
+        self.assertLessEqual(u, 1.0)
+        self.assertGreaterEqual(v, 0.0)
+        self.assertLessEqual(v, 1.0)
+
+    def test_uvmap_facade_transform_panel_local_coordinates(self) -> None:
+        uv_map = UVMap(self.parametric_glider)
+        panel = self.glider.cells[0].panels[0]
+        u, v = uv_map.transform_panel_local_coordinates(panel=panel, x=0.5, y=0.0, mode="stacked")
+
+        self.assertGreaterEqual(u, 0.0)
+        self.assertLessEqual(u, 1.0)
+        self.assertGreaterEqual(v, 0.0)
+        self.assertLessEqual(v, 1.0)

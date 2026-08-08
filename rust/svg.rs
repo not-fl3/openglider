@@ -6,28 +6,28 @@ type SourceBbox = (f32, f32, f32, f32);
 type RasterRequest = (u32, u32, Option<SourceBbox>);
 type UvBbox = (f32, f32, f32, f32);
 
+fn parse_svg_tree(svg_data: &[u8], source_label: &str) -> PyResult<usvg::Tree> {
+    let mut options = usvg::Options::default();
+    options.fontdb_mut().load_system_fonts();
+
+    usvg::Tree::from_data(svg_data, &options)
+        .map_err(|err| PyValueError::new_err(format!("failed to parse svg '{}': {}", source_label, err)))
+}
+
 fn load_svg_tree(file_path: &str) -> PyResult<usvg::Tree> {
     let svg_data = fs::read(file_path)
         .map_err(|err| PyValueError::new_err(format!("failed to read svg file '{}': {}", file_path, err)))?;
 
-    let mut options = usvg::Options::default();
-    options.fontdb_mut().load_system_fonts();
-
-    usvg::Tree::from_data(&svg_data, &options)
-        .map_err(|err| PyValueError::new_err(format!("failed to parse svg file '{}': {}", file_path, err)))
+    parse_svg_tree(&svg_data, file_path)
 }
 
-#[pyfunction]
-#[pyo3(signature = (file_path, width, height, precision = 1.0, source_bbox = None))]
-pub fn render_svg_rgba(
-    file_path: String,
+fn render_svg_tree_rgba(
+    tree: &usvg::Tree,
     width: u32,
     height: u32,
     precision: f32,
     source_bbox: Option<(f32, f32, f32, f32)>,
 ) -> PyResult<(u32, u32, Vec<u8>)> {
-    let tree = load_svg_tree(&file_path)?;
-
     let precision = precision.max(0.1);
     let width = ((width as f32) * precision).round().max(1.0) as u32;
     let height = ((height as f32) * precision).round().max(1.0) as u32;
@@ -41,9 +41,35 @@ pub fn render_svg_rgba(
     let scale_x = width as f32 / source_w;
     let scale_y = height as f32 / source_h;
     let transform = usvg::Transform::from_translate(-source_x, -source_y).pre_scale(scale_x, scale_y);
-    resvg::render(&tree, transform, &mut pixmap.as_mut());
+    resvg::render(tree, transform, &mut pixmap.as_mut());
 
     Ok((width, height, pixmap.take()))
+}
+
+#[pyfunction]
+#[pyo3(signature = (file_path, width, height, precision = 1.0, source_bbox = None))]
+pub fn render_svg_rgba(
+    file_path: String,
+    width: u32,
+    height: u32,
+    precision: f32,
+    source_bbox: Option<(f32, f32, f32, f32)>,
+) -> PyResult<(u32, u32, Vec<u8>)> {
+    let tree = load_svg_tree(&file_path)?;
+    render_svg_tree_rgba(&tree, width, height, precision, source_bbox)
+}
+
+#[pyfunction]
+#[pyo3(signature = (svg_data, width, height, precision = 1.0, source_bbox = None))]
+pub fn render_svg_rgba_from_string(
+    svg_data: String,
+    width: u32,
+    height: u32,
+    precision: f32,
+    source_bbox: Option<(f32, f32, f32, f32)>,
+) -> PyResult<(u32, u32, Vec<u8>)> {
+    let tree = parse_svg_tree(svg_data.as_bytes(), "inline-string")?;
+    render_svg_tree_rgba(&tree, width, height, precision, source_bbox)
 }
 
 #[pyfunction]
@@ -185,6 +211,7 @@ fn render_svg_rgba_batch_requests(
 #[pymodule]
 pub fn svg_mod(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(render_svg_rgba, m)?)?;
+    m.add_function(wrap_pyfunction!(render_svg_rgba_from_string, m)?)?;
     m.add_function(wrap_pyfunction!(render_svg_rgba_bboxes, m)?)?;
     m.add_function(wrap_pyfunction!(render_svg_rgba_batch, m)?)?;
     m.add_function(wrap_pyfunction!(render_svg_rgba_crop_batch, m)?)?;

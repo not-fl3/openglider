@@ -346,9 +346,7 @@ class Panel(BaseModel):
             # todo: return polygon-data
         return ribs
 
-    def get_mesh(self, cell: Cell, numribs: int=0, exact: bool=False, tri: bool=False,
-                 x_span_left: float | None = None, x_span_right: float | None = None,
-                 chord_left: float | None = None, chord_right: float | None = None) -> mesh.Mesh:
+    def get_mesh(self, cell: Cell, numribs: int=0, exact: bool=False, tri: bool=False) -> openglider.rs.mesh.Mesh:
         """
         Get Panel-mesh
         :param cell: the parent cell of the panel
@@ -372,15 +370,6 @@ class Panel(BaseModel):
 
         for rib_no in range(numribs + 2):
             y = rib_no / max(numribs+1, 1)
-            if x_span_left is None or x_span_right is None:
-                span_x = None
-            else:
-                span_x = x_span_left + y * (x_span_right - x_span_left)
-
-            if chord_left is None or chord_right is None:
-                chord_y = None
-            else:
-                chord_y = chord_left + y * (chord_right - chord_left)
 
             front, back = ik_values[rib_no]
 
@@ -388,21 +377,15 @@ class Panel(BaseModel):
 
             rib_iks.append(midrib.get_positions(front, back))
 
-            ik_range = back - front
             for ik in rib_iks[-1]:
-                if span_x is not None:
-                    # Global glider coords: (span_normalized, y_physical)
-                    # y_physical = chord_p * chord_y matches _get_panel_shape exactly.
-                    chord_p = float(x_value_interpolation.get_value(ik))
-                    y_phys = chord_p * chord_y if chord_y is not None else chord_p
-                    node_attributes.append({"uv": (float(span_x), y_phys)})
-                else:
-                    if abs(ik_range) > 1e-9:
-                        u = (ik - front) / ik_range
-                    else:
-                        u = 0.0
-                    u = max(0.0, min(1.0, u))
-                    node_attributes.append({"uv": (float(u), float(y))})
+                # Store cell-local UVs: x=span in [0,1], y=profile in [-1,1].
+                profile_y = float(x_value_interpolation.get_value(ik))
+                node_attributes.append({
+                    "uv": (
+                        float(y),
+                        profile_y,
+                        )
+                })
 
             i0 = len(nodes)
             rib_node_indices.append([i + i0 for i, _ in enumerate(rib_iks[-1])])

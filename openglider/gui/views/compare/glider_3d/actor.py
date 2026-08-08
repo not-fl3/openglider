@@ -23,13 +23,12 @@ class GliderActors:
 
     def __init__(self, project: GliderProject):
         self.project = project
-        self.glider_3d = None
+        self.glider_3d = self.project.get_glider_3d()
         self.actors = {}
         self.config = None
         self.texture_svg_path: str | None = None
         self.texture_uv_mode: UVMapMode = "stacked"
         self.texture_precision: float = 0.35
-        self.texture_overlay: bool = False
         self._panel_texture_key: str | None = None
         self._cached_svg_texture: SVGTexture | None = None
         self._cached_svg_texture_path: str | None = None
@@ -39,14 +38,12 @@ class GliderActors:
         self,
         texture_svg_path: str | None,
         uv_mode: UVMapMode = "stacked",
-        precision: float | None = None,
-        overlay: bool = False,
+        precision: float | None = None
     ) -> None:
         self.texture_svg_path = texture_svg_path
         self.texture_uv_mode = uv_mode
         if precision is not None:
             self.texture_precision = precision
-        self.texture_overlay = overlay
 
     def invalidate_texture_cache(self) -> None:
         self._cached_svg_texture = None
@@ -101,9 +98,7 @@ class GliderActors:
                 numribs=numribs,
                 mode=self.texture_uv_mode,
                 precision=self.texture_precision,
-                cache_texture=False,
-                draw_edges=self.texture_overlay,
-                boundary_only=self.texture_overlay,
+                cache_texture=True,
             )
         except Exception:
             logger.exception("failed to build textured panel mesh")
@@ -193,7 +188,7 @@ class GliderActors:
     
  
     def add(self, view_3d: View3D, config: GliderViewConfig) -> None:
-        texture_key = f"{self.texture_svg_path or ''}|{self.texture_uv_mode}|{self.texture_precision:.3f}|{int(self.texture_overlay)}"
+        texture_key = f"{self.texture_svg_path or ''}|{self.texture_uv_mode}|{self.texture_precision:.3f}"
 
         if self.glider_3d is None or config.needs_recalc(self.config):
             self.glider_3d = self.project.get_glider_3d().copy()

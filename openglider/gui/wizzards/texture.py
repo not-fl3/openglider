@@ -9,6 +9,7 @@ import numpy as np
 from openglider.glider.project import GliderProject
 from openglider.glider.uv_map import SVGTexture, UVMap, UVMapMode
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
+from openglider.gui.views.compare.glider_3d.actor import GliderActors
 from openglider.gui.views.compare.glider_3d.config import GliderViewConfig
 from openglider.gui.views.compare.glider_3d.view import Glider3DCache
 from openglider.gui.views_2d.mpl.canvas import PlotCanvas
@@ -31,7 +32,7 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         super().__init__("Texture Wizard", parent)
         self.app = app
         self._svg_path: str | None = None
-        self._auto_reload = False
+        self._auto_reload = True
 
         main_layout = QtWidgets.QVBoxLayout()
         self.setLayout(main_layout)
@@ -66,10 +67,6 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         self._btn_reload.setEnabled(False)
         path_layout.addWidget(self._btn_reload, 1, 3)
 
-        self._chk_auto_reload = QtWidgets.QCheckBox("Auto-reload texture on save", self)
-        self._chk_auto_reload.toggled.connect(self._toggle_auto_reload)
-        path_layout.addWidget(self._chk_auto_reload, 2, 0, 1, 5)
-
         main_layout.addLayout(path_layout)
 
         style_layout = QtWidgets.QGridLayout()
@@ -87,8 +84,11 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         self._precision.setRange(0.1, 1.0)
         self._precision.setSingleStep(0.05)
         self._precision.setDecimals(2)
+        self._precision.setKeyboardTracking(False)
         self._precision.setValue(0.35)
-        self._precision.valueChanged.connect(self.changed)
+        precision_line = self._precision.lineEdit()
+        if precision_line is not None:
+            precision_line.returnPressed.connect(self.changed)
         style_layout.addWidget(QtWidgets.QLabel("Texture precision:", self), 1, 0)
         style_layout.addWidget(self._precision, 1, 1)
 
@@ -109,10 +109,6 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
     @property
     def texture_precision(self) -> float:
         return float(self._precision.value())
-
-    def _toggle_auto_reload(self, checked: bool) -> None:
-        self._auto_reload = checked
-        self.changed.emit()
 
     def _load_texture(self) -> None:
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -168,9 +164,10 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
 
 
 class Texture3DPreview(QtWidgets.QWidget):
-    def __init__(self, parent: QtWidgets.QWidget, app: MainWindow) -> None:
+    def __init__(self, parent: QtWidgets.QWidget, app: MainWindow, glider: GliderProject) -> None:
         super().__init__(parent)
         self.app = app
+        self.glider = glider
         self._is_shutting_down = False
         self.setLayout(QtWidgets.QVBoxLayout())
 
@@ -190,12 +187,12 @@ class Texture3DPreview(QtWidgets.QWidget):
 
         self.view_3d.render_widget.destroyed.connect(self._on_view_destroyed)
 
-        self.actor_cache = Glider3DCache(app.state.projects)
+        self.actor = GliderActors(self.glider)
 
         self.texture_svg_path: str | None = None
         self.texture_uv_mode: UVMapMode = "stacked"
         self.texture_precision: float = 0.35
-        self.texture_overlay: bool = False
+        self._last_scene_key: tuple[str | None, UVMapMode, float] | None = None
 
     def set_texture_settings(
         self,
@@ -207,28 +204,35 @@ class Texture3DPreview(QtWidgets.QWidget):
         self.texture_svg_path = texture_svg_path
         self.texture_uv_mode = uv_mode
         self.texture_precision = precision
-        self.texture_overlay = overlay
 
     def invalidate_texture_cache(self) -> None:
-        for actor in self.actor_cache.cache.values():
-            actor.invalidate_texture_cache()
+        self.actor.invalidate_texture_cache()
+        self._last_scene_key = None
 
     def _on_view_destroyed(self, *_: object) -> None:
         self.shutdown()
 
     def update_scene(self) -> None:
+        scene_key = (self.texture_svg_path, self.texture_uv_mode, round(self.texture_precision, 3))
+        if scene_key == self._last_scene_key:
+            return
+
         self.view_3d.clear()
 
-        changeset = self.actor_cache.get_update()
-        for actor in changeset.active:
-            actor.set_panel_texture(
-                self.texture_svg_path,
-                self.texture_uv_mode,
-                self.texture_precision,
-                self.texture_overlay,
-            )
-            actor.add(self.view_3d, self._fixed_config)
+        self.actor.set_panel_texture(
+            self.texture_svg_path,
+            self.texture_uv_mode,
+            self.texture_precision,
+        )
+        panels = self.actor.get_panels_textured(self._fixed_config.numribs)
+        self.view_3d.show_actor(panels)
 
+        self.view_3d.rerender()
+        self._last_scene_key = scene_key
+
+    def clear_stale_scene(self) -> None:
+        self._last_scene_key = None
+        self.view_3d.clear()
         self.view_3d.rerender()
 
     def shutdown(self) -> None:
@@ -252,6 +256,44 @@ class Texture2DPreview(QtWidgets.QWidget):
         self.canvas.grid = True
         self.canvas.update_settings()
         expect_value(self.layout()).addWidget(self.canvas)
+        self._uv_map: UVMap | None = None
+        self._panel_polys_by_mode: dict[UVMapMode, list[list[tuple[float, float]]]] = {}
+        self._bbox_by_mode: dict[UVMapMode, tuple[float, float, float, float]] = {}
+        self._cached_texture_path: str | None = None
+        self._cached_texture: SVGTexture | None = None
+
+    def invalidate_texture_cache(self) -> None:
+        self._cached_texture_path = None
+        self._cached_texture = None
+
+    def _get_panel_polys(
+        self,
+        project: GliderProject,
+        uv_mode: UVMapMode,
+    ) -> tuple[list[list[tuple[float, float]]], tuple[float, float, float, float]]:
+        cached_polys = self._panel_polys_by_mode.get(uv_mode)
+        cached_bbox = self._bbox_by_mode.get(uv_mode)
+        if cached_polys is not None and cached_bbox is not None:
+            return cached_polys, cached_bbox
+
+        if self._uv_map is None:
+            self._uv_map = UVMap(project.glider)
+
+        layout = self._uv_map.get_layout(mode=uv_mode)
+        panel_polys: list[list[tuple[float, float]]] = []
+        for part in layout.parts:
+            for polyline in part.layers["marks"]:
+                panel_polys.append(list(polyline))
+
+        if not panel_polys:
+            for part in layout.parts:
+                for polyline in part.layers["cuts"]:
+                    panel_polys.append(list(polyline))
+
+        bbox = self._get_bbox(panel_polys)
+        self._panel_polys_by_mode[uv_mode] = panel_polys
+        self._bbox_by_mode[uv_mode] = bbox
+        return panel_polys, bbox
 
     @staticmethod
     def _get_bbox(polylines: list[list[tuple[float, float]]]) -> tuple[float, float, float, float]:
@@ -281,34 +323,32 @@ class Texture2DPreview(QtWidgets.QWidget):
         axes = self.canvas.axes
         axes.clear()
 
-        uv_map = UVMap(project.glider)
-        layout = uv_map.get_layout(mode=uv_mode)
-        panel_polys: list[list[tuple[float, float]]] = []
-        for part in layout.parts:
-            for polyline in part.layers["marks"]:
-                panel_polys.append(list(polyline))
-
-        if not panel_polys:
-            for part in layout.parts:
-                for polyline in part.layers["cuts"]:
-                    panel_polys.append(list(polyline))
-        min_x, max_x, min_y, max_y = self._get_bbox(panel_polys)
+        panel_polys, (min_x, max_x, min_y, max_y) = self._get_panel_polys(project, uv_mode)
 
         if texture_svg_path:
             texture_path = Path(texture_svg_path)
             if texture_path.exists():
                 try:
-                    texture = SVGTexture(texture_path)
-                    image = texture.get_raster_bounded(8192, precision=precision, cache=False)
-                    image_data = np.asarray(image)
-                    # Align SVG raster orientation with layout coordinates.
-                    image_data = np.flip(image_data, axis=0)
-                    axes.imshow(
-                        image_data,
-                        extent=(min_x, max_x, min_y, max_y),
-                        origin="lower",
-                        interpolation="bilinear",
-                    )
+                    texture_path_str = str(texture_path)
+                    if self._cached_texture_path != texture_path_str:
+                        self._cached_texture = SVGTexture(texture_path)
+                        self._cached_texture_path = texture_path_str
+
+                    texture = self._cached_texture
+                    if texture is not None:
+                        image = texture.get_raster_bounded(8192, precision=precision, cache=True)
+                    else:
+                        image = None
+                    if image is not None:
+                        image_data = np.asarray(image)
+                        # Align SVG raster orientation with layout coordinates.
+                        image_data = np.flip(image_data, axis=0)
+                        axes.imshow(
+                            image_data,
+                            extent=(min_x, max_x, min_y, max_y),
+                            origin="lower",
+                            interpolation="bilinear",
+                        )
                 except Exception:
                     logger.exception("Failed to render 2D texture preview: %s", texture_path)
 
@@ -338,6 +378,11 @@ class TextureWizard(Wizard):
 
         self._watcher = QtCore.QFileSystemWatcher(self)
         self._watcher.fileChanged.connect(self._on_texture_file_changed)
+        self._deferred_3d_timer = QtCore.QTimer(self)
+        self._deferred_3d_timer.setSingleShot(True)
+        self._deferred_3d_timer.setInterval(180)
+        self._deferred_3d_timer.timeout.connect(self._apply_3d_preview)
+        self._pending_3d_update = False
 
         self.setLayout(QtWidgets.QHBoxLayout())
 
@@ -356,11 +401,12 @@ class TextureWizard(Wizard):
         left_layout.addStretch()
 
         self._tabs = QtWidgets.QTabWidget(self)
-        self._preview_3d = Texture3DPreview(self._tabs, app)
+        self._preview_3d = Texture3DPreview(self._tabs, app, self.project)
         self._preview_2d = Texture2DPreview(self._tabs)
         self._tabs.addTab(self._preview_2d, "2D Overlay")
         self._tabs.addTab(self._preview_3d, "3D View")
         self._tabs.setCurrentIndex(0)
+        self._tabs.currentChanged.connect(self._on_tab_changed)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self)
         splitter.addWidget(left_panel)
@@ -376,7 +422,7 @@ class TextureWizard(Wizard):
             self._watcher.removePaths(current_files)
 
         svg_path = self._texture_widget.svg_path
-        if not svg_path or not self._texture_widget.auto_reload:
+        if not svg_path:
             return
 
         if Path(svg_path).exists():
@@ -389,7 +435,7 @@ class TextureWizard(Wizard):
         overlay = False
 
         self._preview_3d.set_texture_settings(svg_path, uv_mode, precision, overlay)
-        self._preview_3d.update_scene()
+        self._schedule_3d_preview_update()
 
         try:
             self._preview_2d.update_preview(self.project, svg_path, uv_mode, precision)
@@ -398,8 +444,32 @@ class TextureWizard(Wizard):
             logger.exception("Failed to update 2D texture preview")
             self._status.setText("Failed to update 2D preview. See logs.")
 
+    def _schedule_3d_preview_update(self) -> None:
+        self._pending_3d_update = True
+        if self._tabs.currentWidget() is self._preview_3d:
+            self._preview_3d.clear_stale_scene()
+            self._status.setText("3D preview stale; updating...")
+            self._deferred_3d_timer.start()
+        else:
+            self._status.setText("3D preview stale. Open 3D View to refresh.")
+            self._deferred_3d_timer.stop()
+
+    def _apply_3d_preview(self) -> None:
+        if not self._pending_3d_update:
+            return
+        self._pending_3d_update = False
+        self._preview_3d.update_scene()
+        self._status.setText("Texture settings applied to wizard-local previews.")
+
+    def _on_tab_changed(self, index: int) -> None:
+        if self._tabs.widget(index) is self._preview_3d and self._pending_3d_update:
+            self._preview_3d.clear_stale_scene()
+            self._status.setText("3D preview stale; updating...")
+            self._deferred_3d_timer.start(40)
+
     def _reload_texture_from_disk(self) -> None:
         self._preview_3d.invalidate_texture_cache()
+        self._preview_2d.invalidate_texture_cache()
         self._apply_settings()
 
     def _on_texture_file_changed(self, file_path: str) -> None:
@@ -408,13 +478,13 @@ class TextureWizard(Wizard):
 
         # Re-register in case editor write strategy replaces the file inode.
         self._set_texture_watch_target()
-        if self._texture_widget.auto_reload:
-            self._reload_texture_from_disk()
+        self._reload_texture_from_disk()
 
     def _on_texture_settings_changed(self) -> None:
         self._set_texture_watch_target()
         self._apply_settings()
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self._deferred_3d_timer.stop()
         self._preview_3d.shutdown()
         super().closeEvent(event)
