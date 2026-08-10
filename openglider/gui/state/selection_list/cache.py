@@ -119,7 +119,7 @@ class Cache(Generic[ListType, CacheListType]):
             if name not in existing_names:
                 cache_elem = self.cache.pop(name)
                 changeset.removed.append(cache_elem)
-                self.cache_hashes.pop(name)
+                self.cache_hashes.pop(name, None)
         
         self.cache_last_active = active_names
 

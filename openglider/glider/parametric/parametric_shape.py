@@ -263,7 +263,7 @@ class ParametricShape(PlanformShape):
     # scaling stuff
     @property
     def area(self) -> float:
-        return self.get_shape().area
+        return self.get_half_shape().area
 
     def set_area(self, area: float, fixed: Literal["aspect_ratio"] | Literal["span"] | Literal["depth"]="aspect_ratio") -> float:
         if fixed == "aspect_ratio":
