@@ -81,7 +81,6 @@ class BallooningTable(BaseModel):
     def from_list(cls, balloonings: list[BallooningBase]) -> Self:
         table = Table(name=cls.table_name)
         #row_num = max([len(b.upper_spline.controlpoints)+len(b.lower_spline.controlpoints) for b in balloonings])+1
-        #sheet = ezodf.Sheet(name="Balloonings", size=(row_num, 2*len(balloonings)))
 
         for ballooning_no, ballooning in enumerate(balloonings):
             

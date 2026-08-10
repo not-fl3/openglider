@@ -24,6 +24,7 @@ class GliderViewConfig(BaseModel):
     numribs: int = 3
     line_numpoints: int = 3
     hole_numpoints: int = 10
+    texture_precision: float = 0.35
 
     def needs_recalc(self, old_config: GliderViewConfig | None=None) -> bool:
         if old_config is None:
@@ -34,11 +35,13 @@ class GliderViewConfig(BaseModel):
             self.profile_numpoints = 120
             self.line_numpoints = 12
             self.hole_numpoints = 30
+            self.texture_precision = 0.9
         else:
             self.numribs = 3
             self.profile_numpoints = 25
             self.line_numpoints = 3
             self.hole_numpoints = 10
+            self.texture_precision = 0.35
         
         if old_config.numribs != self.numribs:
             return True

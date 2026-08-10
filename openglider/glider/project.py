@@ -6,6 +6,7 @@ import re
 import datetime
 import logging
 from typing import Any
+from odfdo import Document
 
 from openglider.glider.glider import Glider
 from openglider.glider.parametric import ParametricGlider
@@ -169,7 +170,8 @@ class GliderProject:
 
     @classmethod
     def import_ods(cls, path: str) -> GliderProject:
-        tables = openglider.utils.table.Table.load(path)
+        source_document = Document(path)
+        tables = openglider.utils.table.Table.load_document(source_document)
         table_dct = {t.name: t for t in tables}
         changelog = []
         
@@ -184,7 +186,7 @@ class GliderProject:
                         dt, changelog_table[row, 1], changelog_table[row, 2]
                     ))
 
-        glider_2d = import_ods_glider(ParametricGlider, tables)
+        glider_2d = import_ods_glider(ParametricGlider, tables, source_document=source_document)
 
         filename = os.path.split(path)[-1]
         name, ext = os.path.splitext(filename)

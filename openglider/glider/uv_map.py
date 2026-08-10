@@ -5,6 +5,7 @@ from collections.abc import Iterable
 import math
 from xml.etree import ElementTree
 from pathlib import Path
+from io import BytesIO
 from typing import TYPE_CHECKING, Literal
 
 import openglider
@@ -30,15 +31,20 @@ UVMapMode = Literal["mirrored", "stacked"]
 
 
 class SVGTexture:
-    def __init__(self, file_path: str | Path, dpi: int = 300):
+    def __init__(self, file_path: str | Path, dpi: int = 300, svg_data: str | None = None):
         self.file_path = Path(file_path)
         self.dpi = dpi
-        self._svg_data = self._read_svg_string(self.file_path)
-        self.width, self.height = self._read_svg_size(self._svg_data, self.file_path)
+        self._svg_data = svg_data if svg_data is not None else self._read_svg_string(self.file_path)
+        source = None if svg_data is not None else self.file_path
+        self.width, self.height = self._read_svg_size(self._svg_data, source)
         self._drawing: Drawing | None = None
         self._normalized_vectors: list[openglider.rs.vector.PolyLine2D] | None = None
         self._raster: Image.Image | None = None
         self._raster_by_max_dim: dict[tuple[int, float], Image.Image] = {}
+
+    @classmethod
+    def from_svg_string(cls, svg_data: str, source_label: str = "<inline-svg>", dpi: int = 300) -> SVGTexture:
+        return cls(Path(source_label), dpi=dpi, svg_data=svg_data)
 
     @staticmethod
     def _read_svg_string(file_path: Path) -> str:
@@ -101,7 +107,7 @@ class SVGTexture:
 
     def _get_drawing(self) -> Drawing:
         if self._drawing is None:
-            drawing = svglib.svglib.svg2rlg(str(self.file_path))
+            drawing = svglib.svglib.svg2rlg(BytesIO(self._svg_data.encode("utf-8")))
             if drawing is None:
                 raise ValueError(f"could not read svg file: {self.file_path}")
             self._drawing = drawing

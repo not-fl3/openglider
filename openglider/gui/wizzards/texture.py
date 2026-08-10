@@ -6,12 +6,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+import openglider.rs
 from openglider.glider.project import GliderProject
 from openglider.glider.uv_map import SVGTexture, UVMap, UVMapMode
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
-from openglider.gui.views.compare.glider_3d.actor import GliderActors
 from openglider.gui.views.compare.glider_3d.config import GliderViewConfig
-from openglider.gui.views.compare.glider_3d.view import Glider3DCache
 from openglider.gui.views_2d.mpl.canvas import PlotCanvas
 from openglider.gui.views_3d.widgets import View3D
 from openglider.gui.wizzards.base import Wizard
@@ -22,6 +21,112 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+class TexturePanelsActor:
+    """Wizard-only textured panel actor with explicit reload control."""
+
+    def __init__(self, project: GliderProject):
+        self.project = project
+        self.glider_3d = self.project.get_glider_3d()
+        self.texture_svg_path: str | None = None
+        self.texture_uv_mode: UVMapMode = "stacked"
+        self.texture_precision: float = 0.35
+        self._cached_uv_map: UVMap | None = None
+        self._cached_svg_texture: SVGTexture | None = None
+        self._cached_svg_texture_key: str | None = None
+
+    def set_texture_settings(
+        self,
+        texture_svg_path: str | None,
+        uv_mode: UVMapMode,
+        precision: float,
+    ) -> None:
+        self.texture_svg_path = texture_svg_path
+        self.texture_uv_mode = uv_mode
+        self.texture_precision = precision
+
+    def invalidate_texture_cache(self) -> None:
+        self._cached_svg_texture = None
+        self._cached_svg_texture_key = None
+
+    def _get_project_texture_svg(self) -> str | None:
+        texture = self.project.glider.texture
+        if texture.has_texture():
+            return texture.svg
+        return None
+
+    def _get_panels(self, numribs: int) -> openglider.rs.wgpu.MeshActor:
+        if self.glider_3d is None:
+            raise ValueError("Glider3D not set")
+
+        panel_mesh = openglider.mesh.Mesh()
+        for i, cell in enumerate(self.glider_3d.cells):
+            for panel in cell.panels:
+                mesh_temp = panel.get_mesh(cell, numribs=numribs)
+                panel_mesh += mesh_temp
+                if not (i == 0 and self.glider_3d.has_center_cell):
+                    panel_mesh += mesh_temp.copy().mirror("y")
+
+        return openglider.rs.wgpu.MeshActor(panel_mesh, draw_edges=False)
+
+    def _load_texture(self) -> SVGTexture | None:
+        if self.texture_svg_path:
+            texture_path = Path(self.texture_svg_path)
+            if not texture_path.exists():
+                logger.warning("texture svg does not exist: %s", texture_path)
+                return None
+
+            cache_key = f"path:{texture_path.resolve()}"
+            if self._cached_svg_texture_key != cache_key:
+                try:
+                    self._cached_svg_texture = SVGTexture(texture_path)
+                except Exception:
+                    logger.exception("failed to load SVG texture: %s", texture_path)
+                    return None
+                self._cached_svg_texture_key = cache_key
+
+            return self._cached_svg_texture
+
+        project_texture_svg = self._get_project_texture_svg()
+        if not project_texture_svg:
+            return None
+
+        cache_key = f"inline:{hash(project_texture_svg)}"
+        if self._cached_svg_texture_key != cache_key:
+            try:
+                self._cached_svg_texture = SVGTexture.from_svg_string(project_texture_svg)
+            except Exception:
+                logger.exception("failed to load inline project texture")
+                return None
+            self._cached_svg_texture_key = cache_key
+
+        return self._cached_svg_texture
+
+    def get_actor(self, numribs: int, profile_numpoints: int) -> openglider.rs.wgpu.MeshActor:
+        self.glider_3d = self.project.get_glider_3d().copy()
+        self.glider_3d.profile_numpoints = profile_numpoints
+        for rib in self.glider_3d.ribs:
+            rib.get_hull()
+
+        texture = self._load_texture()
+        if texture is None:
+            return self._get_panels(numribs)
+
+        if self._cached_uv_map is None:
+            self._cached_uv_map = UVMap(self.project.glider)
+
+        try:
+            return self._cached_uv_map.get_textured_panels_actor(
+                texture=texture,
+                numribs=numribs,
+                mode=self.texture_uv_mode,
+                precision=self.texture_precision,
+                cache_texture=True,
+            )
+        except Exception:
+            logger.exception("failed to build textured panel mesh")
+            return self._get_panels(numribs)
 
 
 class TextureWizardWidget(QtWidgets.QGroupBox):
@@ -110,6 +215,9 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
     def texture_precision(self) -> float:
         return float(self._precision.value())
 
+    def set_uv_mode(self, mode: UVMapMode) -> None:
+        self._combo_mode.setCurrentText(mode)
+
     def _load_texture(self) -> None:
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
@@ -187,13 +295,12 @@ class Texture3DPreview(QtWidgets.QWidget):
 
         self.view_3d.render_widget.destroyed.connect(self._on_view_destroyed)
 
-        self.actor = GliderActors(self.glider)
+        self.actor = TexturePanelsActor(self.glider)
 
         self.texture_svg_path: str | None = None
         self.texture_uv_mode: UVMapMode = "stacked"
         self.texture_precision: float = 0.35
         self._last_scene_key: tuple[str | None, UVMapMode, float] | None = None
-
     def set_texture_settings(
         self,
         texture_svg_path: str | None,
@@ -219,12 +326,15 @@ class Texture3DPreview(QtWidgets.QWidget):
 
         self.view_3d.clear()
 
-        self.actor.set_panel_texture(
+        self.actor.set_texture_settings(
             self.texture_svg_path,
             self.texture_uv_mode,
             self.texture_precision,
         )
-        panels = self.actor.get_panels_textured(self._fixed_config.numribs)
+        panels = self.actor.get_actor(
+            numribs=self._fixed_config.numribs,
+            profile_numpoints=self._fixed_config.profile_numpoints,
+        )
         self.view_3d.show_actor(panels)
 
         self.view_3d.rerender()
@@ -371,7 +481,7 @@ class Texture2DPreview(QtWidgets.QWidget):
 
 
 class TextureWizard(Wizard):
-    copy_project = False
+    copy_project = True
 
     def __init__(self, app: MainWindow, project: GliderProject):
         super().__init__(app, project)
@@ -398,6 +508,11 @@ class TextureWizard(Wizard):
 
         self._status = QtWidgets.QLabel("", left_panel)
         left_layout.addWidget(self._status)
+
+        self._btn_apply = QtWidgets.QPushButton("Apply as New Glider", left_panel)
+        self._btn_apply.clicked.connect(self._apply_as_new_glider)
+        left_layout.addWidget(self._btn_apply)
+
         left_layout.addStretch()
 
         self._tabs = QtWidgets.QTabWidget(self)
@@ -413,6 +528,8 @@ class TextureWizard(Wizard):
         splitter.addWidget(self._tabs)
         splitter.setSizes([360, 980])
         expect_value(self.layout()).addWidget(splitter)
+
+        self._texture_widget.set_uv_mode(self.project.glider.texture_style)
 
         self._apply_settings()
 
@@ -434,6 +551,8 @@ class TextureWizard(Wizard):
         precision = self._texture_widget.texture_precision
         overlay = False
 
+        self._sync_model_texture(svg_path, uv_mode)
+
         self._preview_3d.set_texture_settings(svg_path, uv_mode, precision, overlay)
         self._schedule_3d_preview_update()
 
@@ -443,6 +562,29 @@ class TextureWizard(Wizard):
         except Exception:
             logger.exception("Failed to update 2D texture preview")
             self._status.setText("Failed to update 2D preview. See logs.")
+
+    def _sync_model_texture(self, svg_path: str | None, uv_mode: UVMapMode) -> None:
+        texture_svg: str | None = None
+        if svg_path:
+            path = Path(svg_path)
+            if path.exists():
+                svg_bytes = path.read_bytes()
+                for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+                    try:
+                        texture_svg = svg_bytes.decode(encoding)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+
+        self.project.glider.texture.svg = texture_svg
+        self.project.glider.texture.style = uv_mode
+        if self.project.glider_3d is not None:
+            self.project.glider_3d.texture.svg = texture_svg
+            self.project.glider_3d.texture.style = uv_mode
+
+    def _apply_as_new_glider(self) -> None:
+        self._sync_model_texture(self._texture_widget.svg_path, self._texture_widget.uv_mode)
+        self.apply(update=True)
 
     def _schedule_3d_preview_update(self) -> None:
         self._pending_3d_update = True

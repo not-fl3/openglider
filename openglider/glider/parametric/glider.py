@@ -18,6 +18,7 @@ from openglider.glider.ballooning.new import BallooningBezierNeu
 from openglider.glider.cell import Cell
 from openglider.glider.cell.panel import Panel, PanelCut, PANELCUT_TYPES
 from openglider.glider.glider import Glider
+from openglider.glider.texture import Texture, TextureStyle
 from openglider.glider.parametric.arc import ArcCurve
 from openglider.glider.parametric.export_ods import export_ods_2d
 from openglider.glider.parametric.import_ods import import_markdown_2d, import_ods_2d
@@ -59,6 +60,23 @@ class ParametricGlider:
 
     num_interpolate: int=30
     num_profile: int | None=None
+    texture: Texture = Field(default_factory=Texture)
+
+    @property
+    def texture_svg(self) -> str | None:
+        return self.texture.svg
+
+    @texture_svg.setter
+    def texture_svg(self, value: str | None) -> None:
+        self.texture.svg = value
+
+    @property
+    def texture_style(self) -> TextureStyle:
+        return self.texture.style
+
+    @texture_style.setter
+    def texture_style(self, value: TextureStyle) -> None:
+        self.texture.style = Texture.normalize_style(value)
 
     @classmethod
     def import_ods(cls, path: str) -> ParametricGlider:
@@ -423,7 +441,9 @@ class ParametricGlider:
         logger.debug("get glider 3d")
 
         if glider is None:
-            glider = Glider()
+            glider = Glider(texture=self.texture.model_copy(deep=True))
+        else:
+            glider.texture = self.texture.model_copy(deep=True)
         
         ribs = []
 

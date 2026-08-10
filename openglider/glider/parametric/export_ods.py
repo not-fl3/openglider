@@ -4,7 +4,6 @@ import math
 from typing import TYPE_CHECKING
 
 import openglider.rs
-import ezodf
 
 from openglider.glider.parametric.arc import ExplicitArc, LeparaglidingArc
 from openglider.glider.parametric.leparagliding_shape import LeparaglidingShape
@@ -19,15 +18,17 @@ if TYPE_CHECKING:
     from openglider.glider.project import GliderProject
 
 file_version = "V4"
+WIDTH_SKIP_TABLES = {"Cell Elements", "Rib Elements"}
+WIDTH_SKIP_ROWS = {1, 2}
 
 def export_ods_project(glider: GliderProject, filename: str) -> None:
-    
-    doc = ezodf.newdoc(doctype="ods")
-
-    for table in get_project_tables(glider):
-        doc.sheets.append(table.get_ods_sheet())
-
-    doc.saveas(filename)
+    document = Table.build_ods_document(
+        get_project_tables(glider),
+        skip_width_rows=WIDTH_SKIP_ROWS,
+        skip_width_rows_for_tables=WIDTH_SKIP_TABLES,
+    )
+    glider.glider.texture.embed_svg_in_document(document.document)
+    document.saveas(filename)
 
 
 def get_split_tables(project: GliderProject) -> list[Table]:
@@ -35,6 +36,8 @@ def get_split_tables(project: GliderProject) -> list[Table]:
     tables.append(get_changelog_table(project))
     tables.append(get_geom_sheet(project.glider))
     tables.append(get_parametric_sheet(project.glider))
+    if project.glider.texture.has_texture():
+        tables.append(project.glider.texture.export_table(include_svg=True))
     tables.append(get_airfoil_sheet(project.glider))
     tables.append(BallooningTable.from_list(project.glider.balloonings).table)
     
@@ -84,6 +87,8 @@ def get_glider_tables(glider: ParametricGlider) -> list[Table]:
     tables.append(get_airfoil_sheet(glider))
     tables.append(BallooningTable.from_list(glider.balloonings).table)
     tables.append(get_parametric_sheet(glider))
+    if glider.texture.has_texture():
+        tables.append(glider.texture.export_table(include_svg=False, asset_path=glider.texture.default_asset_path))
     tables.append(get_lines_sheet(glider))
     tables.append(glider.config.get_table())
     tables.append(glider.allowances.get_table())
@@ -96,7 +101,13 @@ def get_glider_tables(glider: ParametricGlider) -> list[Table]:
 def export_ods_2d(glider: ParametricGlider, filename: str) -> None:
     # airfoil sheet
     tables = get_glider_tables(glider)
-    Table.save_tables(tables, filename)
+    document = Table.build_ods_document(
+        tables,
+        skip_width_rows=WIDTH_SKIP_ROWS,
+        skip_width_rows_for_tables=WIDTH_SKIP_TABLES,
+    )
+    glider.texture.embed_svg_in_document(document.document)
+    document.saveas(filename)
 
 
 def get_airfoil_sheet(glider_2d: ParametricGlider) -> Table:
@@ -114,7 +125,6 @@ def get_airfoil_sheet(glider_2d: ParametricGlider) -> Table:
 
 def get_geom_sheet(glider_2d: ParametricGlider) -> Table:
     table = Table(name="geometry")
-    #geom_page = ezodf.Sheet(name="geometry", size=(glider_2d.shape.half_cell_num + 2, 10))
 
     # rib_nos
     table[0, 0] = "Ribs"

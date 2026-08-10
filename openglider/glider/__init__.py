@@ -4,4 +4,5 @@ from openglider.glider import ballooning
 from openglider.glider.project import GliderProject
 from openglider.glider.glider import Glider
 from openglider.glider.parametric.glider import ParametricGlider
+from openglider.glider.texture import Texture
 from openglider.glider.uv_map import SVGTexture, UVMap, UVMapMirrored, UVMapStacked

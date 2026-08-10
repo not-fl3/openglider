@@ -1,17 +1,36 @@
 from __future__ import annotations
 
 import copy
+from decimal import Decimal
 import re
 from typing import Any, Union
+import numbers
 
-try:
-    import pyexcel_ods
-except ImportError:
-    import pyexcel_ods3 as pyexcel_ods
-
-import ezodf
+from odfdo import Cell as OdfdoCell
+from odfdo import Column as OdfdoColumn
+from odfdo import Document as OdfdoDocument
+from odfdo import Row as OdfdoRow
+from odfdo import Style as OdfdoStyle
+from odfdo import Table as OdfdoTable
 
 CellIndex = Union[tuple[int, int], str]
+
+
+class ODSDocument:
+    """Compatibility wrapper for ODS export objects.
+
+    Existing call sites expect `.saveas(path)` and optional `.document`
+    access for post-processing.
+    """
+
+    def __init__(self, document: OdfdoDocument):
+        self.document = document
+
+    def saveas(self, path: str) -> None:
+        self.document.save(path)
+
+    def save(self, path: str) -> None:
+        self.document.save(path)
 
 class Table:
     rex = re.compile(r"([A-Z]*)([0-9]*)")
@@ -184,60 +203,203 @@ class Table:
             if value is not None:
                 self.set_value(column_no, total_rows+row_no+space, value)
 
-    def get_ods_sheet(self, name: str=None) -> ezodf.Table:
+    @staticmethod
+    def _cell_from_value(value: Any) -> OdfdoCell:
+        if value is None:
+            return OdfdoCell()
+
+        if isinstance(value, bool):
+            return OdfdoCell(value=value, cell_type="boolean")
+
+        if isinstance(value, numbers.Integral) and not isinstance(value, bool):
+            return OdfdoCell(value=int(value), cell_type="float")
+
+        if isinstance(value, numbers.Real) and not isinstance(value, bool):
+            return OdfdoCell(value=float(value), cell_type="float")
+
+        text = str(value)
+        return OdfdoCell(value=text, text=text, cell_type="string")
+
+    def get_ods_sheet(self, name: str=None) -> OdfdoTable:
+        sheet_name = name or self.name or "table"
         rows = max(1, self.num_rows)
         columns = max(1, self.num_columns)
-        ods_sheet = ezodf.Table(size=(rows, columns))
-        for key in self.dct:
-            column, row = self.str_decrypt(key)
-            if self.dct[key] is not None:
-                ods_sheet[row, column].set_value(self.dct[key])
 
-        if name:
-            ods_sheet.name = name
-        elif self.name is not None:
-            ods_sheet.name = self.name
-        else:
-            ods_sheet.name = "table"
+        sheet = OdfdoTable(name=sheet_name)
 
-        return ods_sheet
+        for row_no in range(rows):
+            row = OdfdoRow()
+            for column_no in range(columns):
+                value = self[row_no, column_no]
+                row.append(self._cell_from_value(value))
+            sheet.append(row)
 
-    def save(self, path: str) -> ezodf.document.PackagedDocument:
-        doc = ezodf.newdoc(doctype="ods", filename=path)
-        doc.sheets.append(self.get_ods_sheet())
-        doc.save()
+        return sheet
+
+    @staticmethod
+    def _estimate_column_width_cm(char_count: int) -> float:
+        # Tuned for LibreOffice Calc default font sizing.
+        # Previous calibration was about 1.6x too wide in practice.
+        return min(28.0, max(2.0, 0.154 * char_count + 0.55))
+
+    def _column_widths_cm(self, skip_rows_1_based: set[int] | None = None) -> list[float]:
+        if self.num_columns <= 0:
+            return []
+
+        widths: list[int] = [4] * self.num_columns
+        float_str = f"{{:.{self.format_float_digits}f}}"
+
+        for row_no in range(self.num_rows):
+            if skip_rows_1_based and (row_no + 1) in skip_rows_1_based:
+                continue
+            for col_no in range(self.num_columns):
+                value = self[row_no, col_no]
+                if value is None:
+                    continue
+
+                if isinstance(value, float):
+                    text = float_str.format(value)
+                else:
+                    text = str(value)
+
+                longest_line = max(len(line) for line in text.splitlines()) if text else 0
+                widths[col_no] = max(widths[col_no], min(longest_line, 120))
+
+        return [self._estimate_column_width_cm(char_count) for char_count in widths]
+
+    @classmethod
+    def build_ods_document(
+        cls,
+        tables: list[Table],
+        skip_width_rows: set[int] | None = None,
+        skip_width_rows_for_tables: set[str] | None = None,
+    ) -> ODSDocument:
+        doc = OdfdoDocument("spreadsheet")
+        doc.body.clear()
+        for table_index, table in enumerate(tables):
+            sheet = table.get_ods_sheet()
+
+            apply_skip_rows = skip_width_rows
+            if skip_width_rows_for_tables is not None and table.name not in skip_width_rows_for_tables:
+                apply_skip_rows = None
+
+            for col_no, width_cm in enumerate(table._column_widths_cm(skip_rows_1_based=apply_skip_rows)):
+                style_name = f"co_{table_index}_{col_no}"
+                style = OdfdoStyle(family="table-column", name=style_name, width=f"{width_cm:.2f}cm")
+                doc.insert_style(style, automatic=True)
+                sheet.set_column(col_no, OdfdoColumn(style=style_name))
+
+            doc.body.append(sheet)
+        return ODSDocument(doc)
+
+    def save(
+        self,
+        path: str,
+        skip_width_rows: set[int] | None = None,
+        skip_width_rows_for_tables: set[str] | None = None,
+    ) -> ODSDocument:
+        doc = self.__class__.build_ods_document(
+            [self],
+            skip_width_rows=skip_width_rows,
+            skip_width_rows_for_tables=skip_width_rows_for_tables,
+        )
+        doc.save(path)
         return doc
     
     @classmethod
-    def save_tables(self, tables: list[Table], path: str) -> ezodf.document.PackagedDocument:
-        doc = ezodf.newdoc(doctype="ods", filename=path)
-
-        for table in tables:
-            doc.sheets.append(table.get_ods_sheet())
-        doc.save()
+    def save_tables(
+        cls,
+        tables: list[Table],
+        path: str,
+        skip_width_rows: set[int] | None = None,
+        skip_width_rows_for_tables: set[str] | None = None,
+    ) -> ODSDocument:
+        doc = cls.build_ods_document(
+            tables,
+            skip_width_rows=skip_width_rows,
+            skip_width_rows_for_tables=skip_width_rows_for_tables,
+        )
+        doc.save(path)
         return doc
+
+    @staticmethod
+    def _repeat_count(value: Any) -> int:
+        if value in (None, ""):
+            return 1
+        try:
+            count = int(value)
+            return max(1, count)
+        except (TypeError, ValueError):
+            return 1
+
+    @staticmethod
+    def _read_ods_cell_value(cell: Any) -> Any:
+        value = getattr(cell, "value", None)
+
+        if isinstance(value, Decimal):
+            value = float(value)
+
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+
+        if value not in (None, ""):
+            return value
+
+        text_value = getattr(cell, "text", "")
+        if isinstance(text_value, str):
+            text_value = text_value.strip()
+            if text_value:
+                return text_value
+
+        return None
 
     @classmethod
     def load(cls, path: str) -> list[Table]:
-        data: dict[str, list[list[Any]]] = pyexcel_ods.get_data(path)
-
-        sheets = [cls.from_list(sheet, name=name) for name, sheet in data.items()]
-        
-        return sheets
+        document = OdfdoDocument(path)
+        return cls.load_document(document)
 
     @classmethod
-    def from_ods_sheet(cls, sheet: ezodf.Sheet) -> Table:
-        num_rows = sheet.nrows()
-        num_cols = sheet.ncols()
-        table = cls()
+    def load_document(cls, document: OdfdoDocument) -> list[Table]:
+        tables: list[Table] = []
 
-        for row in range(num_rows):
-            for col in range(num_cols):
-                value = sheet.get_cell([row, col]).value
-                if value is not None:
-                    table[row, col] = value
+        for sheet in document.body.get_sheets():
+            table = cls(name=sheet.get_attribute("table:name") or "")
+            row_no = 0
 
-        return table
+            for node in sheet.get_rows():
+                row_repeat = cls._repeat_count(getattr(node, "repeated", None))
+                row_values: list[tuple[int, Any]] = []
+                col_no = 0
+
+                for cell in node.get_cells():
+                    tag = getattr(cell, "tag", None)
+                    col_repeat = cls._repeat_count(getattr(cell, "repeated", None))
+
+                    if tag == "table:covered-table-cell":
+                        col_no += col_repeat
+                        continue
+
+                    value = cls._read_ods_cell_value(cell)
+                    if value not in ("", None):
+                        for offset in range(col_repeat):
+                            row_values.append((col_no + offset, value))
+
+                    col_no += col_repeat
+
+                for row_offset in range(row_repeat):
+                    current_row = row_no + row_offset
+                    for current_col, value in row_values:
+                        table[current_row, current_col] = value
+
+                row_no += row_repeat
+
+            tables.append(table)
+
+        return tables
+
+    @classmethod
+    def from_ods_sheet(cls, sheet: Any) -> Table:
+        raise NotImplementedError("Use Table.load() for ODS imports")
 
     @classmethod
     def from_list(cls, lst: list[list[Any]], name: str | None=None) -> Table:

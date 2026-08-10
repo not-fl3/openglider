@@ -6,6 +6,7 @@ import math
 import numbers
 from typing import TYPE_CHECKING, Any
 from packaging.version import Version
+from odfdo import Document
 
 from openglider.glider.shape import Shape
 import openglider.rs
@@ -32,6 +33,7 @@ from openglider.glider.parametric.table.rib.holes import HolesTable
 from openglider.glider.parametric.table.rib.profile import ProfileModifierTable
 from openglider.glider.parametric.table.rib.rib import SingleSkinTable
 from openglider.glider.parametric.table.rigidfoil import CellRigidTable, RibRigidTable
+from openglider.glider.texture import Texture
 from openglider.utils import linspace
 from openglider.utils.dataclass import BaseModel
 from openglider.utils.table import Table
@@ -46,6 +48,7 @@ class TableNames:
     cell_sheet = "Cell Elements"
     rib_sheet = "Rib Elements"
     parametric_data = "Parametric"
+    texture = Texture.table_name
 
 
 def _parse_leparagliding_column(table: Table, column: int) -> dict[str, Any]:
@@ -155,9 +158,10 @@ def _arc_from_leparagliding(flat: dict[str, Any], x_values: list[float]) -> Lepa
 
 def import_ods_2d(cls: type[ParametricGlider], filename: str) -> ParametricGlider:
     logger.info(f"Import file: {filename}")
-    tables = Table.load(filename)
+    source_document = Document(filename)
+    tables = Table.load_document(source_document)
 
-    return import_ods_glider(cls, tables)
+    return import_ods_glider(cls, tables, source_document=source_document)
 
 
 def import_markdown_2d(cls: type[ParametricGlider], filename: str) -> ParametricGlider:
@@ -188,6 +192,7 @@ def import_markdown_glider(cls: type[ParametricGlider], tables: list[Table] | di
         table_dct.get(TableNames.parametric_data, Table()), cell_num, config
     )
     balloonings = BallooningTable(table=table_dct.get(BallooningTable.table_name, Table()))
+    texture = Texture.read_table(table_dct.get(TableNames.texture))
 
     attachment_points_lower = config.get_lower_attachment_points()
     lineset_table = LineSetTable(table=table_dct.get(LineSetTable.table_name, Table()), lower_attachment_points=attachment_points_lower)
@@ -223,12 +228,17 @@ def import_markdown_glider(cls: type[ParametricGlider], tables: list[Table] | di
                          config=config,
                          speed=config.speed,
                          glide=config.glide,
+                         texture=texture,
                          **geometry_parametric.model_dump())
 
     return glider_2d
 
 
-def import_ods_glider(cls: type[ParametricGlider], tables: list[Table]) -> ParametricGlider:
+def import_ods_glider(
+    cls: type[ParametricGlider],
+    tables: list[Table],
+    source_document: Any | None = None,
+) -> ParametricGlider:
     table_dct: dict[str, Table] = {
         TableNames.cell_sheet: tables[1],
         TableNames.rib_sheet: tables[2]
@@ -242,8 +252,18 @@ def import_ods_glider(cls: type[ParametricGlider], tables: list[Table]) -> Param
     cell_sheet = tables[1]
     rib_sheet = tables[2]
 
-    config = ParametricGliderConfig.read_table(tables[7])
+    config_table = table_dct.get(ParametricGliderConfig.table_name)
+    if config_table is None and len(tables) > 7:
+        config_table = tables[7]
+    config = ParametricGliderConfig.read_table(config_table or Table())
     sewing_allowances = SewingAllowanceConfig.read_table(table_dct.get(SewingAllowanceConfig.table_name, Table()))
+    texture_table = table_dct.get(TableNames.texture)
+    texture = Texture.read_table(texture_table)
+    if texture.svg is None and source_document is not None:
+        texture.svg = Texture.read_embedded_svg_from_ods(
+            source_document,
+            asset_path=Texture.get_asset_path_from_table(texture_table),
+        )
 
 
     logger.info(f"Loading file version {config.version}")
@@ -293,6 +313,7 @@ def import_ods_glider(cls: type[ParametricGlider], tables: list[Table]) -> Param
                          config=config,
                          speed=config.speed,
                          glide=config.glide,
+                         texture=texture,
                          # pass the geometry objects directly; model_dump() would
                          # serialize the shape/arc and lose their subclass type.
                          shape=geometry.shape,
