@@ -58,4 +58,4 @@ examples
 #scripts
 __pycache__*
 
-src_cpp/fmt
+openglider_xfoil/fmt

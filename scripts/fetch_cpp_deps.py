@@ -15,11 +15,11 @@ FMT_ARCHIVE_URL = f"https://github.com/fmtlib/fmt/archive/refs/tags/{FMT_VERSION
 
 
 def fetch_fmt_headers(repo_root: Path) -> None:
-    header = repo_root / "src_cpp" / "fmt" / "include" / "fmt" / "format.h"
+    header = repo_root / "openglider_xfoil" / "fmt" / "include" / "fmt" / "format.h"
     if header.exists():
         return
 
-    target_root = repo_root / "src_cpp"
+    target_root = repo_root / "openglider_xfoil"
     target_dir = target_root / "fmt"
     target_root.mkdir(parents=True, exist_ok=True)
 

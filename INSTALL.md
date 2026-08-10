@@ -168,7 +168,7 @@ Output:
 
 - Cross-building is not supported here. Build on the target OS (Windows for `.exe`, macOS for `.app`, Linux for `.AppImage`).
 - The scripts prefer `uv` when available. In CI they use `uv pip install --system`; locally they use the active venv, or create/use `.venv` automatically.
-- The C++ `fmt` dependency is bootstrapped automatically by `setup.py` via `scripts/fetch_cpp_deps.py` into `src_cpp/fmt` when missing.
+- The C++ `fmt` dependency is bootstrapped automatically by `setup.py` via `scripts/fetch_cpp_deps.py` into `openglider_xfoil/fmt` when missing.
 
 ### GitHub Actions (Manual)
 

@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "rs"
-path = "rust/lib.rs"
+path = "openglider_rs/lib.rs"
 crate-type = ["cdylib"]
 
 [features]
@@ -14,7 +14,7 @@ inspect = ["pyo3/experimental-inspect"]
 
 [[bin]]
 name = "pyo3_stub_gen"
-path = "rust/stub_gen.rs"
+path = "openglider_rs/stub_gen.rs"
 
 [dependencies]
 anyhow = "1"

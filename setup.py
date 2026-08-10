@@ -22,7 +22,7 @@ def ensure_cpp_deps() -> None:
     subprocess.run([sys.executable, str(script_path)], check=True)
 
 
-SRC_CPP = "src_cpp"
+SRC_CPP = "openglider_xfoil"
 
 ensure_cpp_deps()
 
@@ -45,7 +45,7 @@ if sys.platform == "win32":
 xfoil_extension = Pybind11Extension(
     "openglider.xfoil",
     [f"{SRC_CPP}/{file_name}" for file_name in CPP_FILES],
-    include_dirs=[SRC_CPP, "src_cpp/fmt/include"],
+    include_dirs=[SRC_CPP, f"{SRC_CPP}/fmt/include"],
     define_macros=[("FMT_HEADER_ONLY", "1")],
     extra_compile_args=extra_compile_args,
     cxx_std=17,

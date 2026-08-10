@@ -25,11 +25,11 @@
 
 ### C++ package (pybind11)
 - C++ extension target: `openglider.xfoil` (configured in `setup.py`).
-- C++ sources are in `src_cpp/` (`pybind.cpp`, `solver.cpp`, `xfoil.cpp`, headers).
+- C++ sources are in `openglider_xfoil/` (`pybind.cpp`, `solver.cpp`, `xfoil.cpp`, headers).
 - Build dependency fetch runs via `scripts/fetch_cpp_deps.py` from `setup.py`.
 
 ## Build Notes for AI Agents
 - Changes touching `rust/` likely impact the `openglider.rs` extension build.
-- Changes touching `src_cpp/` likely impact the `openglider.xfoil` extension build.
+- Changes touching `openglider_xfoil/` likely impact the `openglider.xfoil` extension build.
 - When both Python and native code change, validate with an editable install from repo root:
   - `uv pip install -e .`
