@@ -46,17 +46,22 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let view_dir = normalize(vec3<f32>(0.0, 0.0, 1.0));
     let n = normalize(input.normal);
     let ndotl = abs(dot(n, light_dir));
-    let ambient = 0.16;
     let diffuse = 0.24 + 0.76 * pow(ndotl, 0.9);
 
     let reflected = reflect(-light_dir, n);
     let specular = pow(max(dot(reflected, view_dir), 0.0), 64.0);
     let rim = pow(1.0 - max(dot(n, view_dir), 0.0), 3.2);
+    let facing = max(dot(n, view_dir), 0.0);
+    let grazing = pow(1.0 - facing, 1.8);
 
     let luma = dot(source_color, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let saturated = mix(vec3<f32>(luma, luma, luma), source_color, 1.75);
+    let saturation = mix(1.75, 1.08, texture_weight);
+    let saturated = mix(vec3<f32>(luma, luma, luma), source_color, saturation);
 
-    let base = saturated * (ambient + diffuse * 1.02);
+    let shaded_ambient = mix(0.16, 0.08, texture_weight);
+    let shaded_diffuse = mix(diffuse * 1.02, diffuse * 1.28, texture_weight);
+    let angle_darkening = mix(1.0, 1.0 - 0.34 * grazing, texture_weight);
+    let base = saturated * (shaded_ambient + shaded_diffuse) * angle_darkening;
     let highlight = vec3<f32>(1.0, 0.98, 0.92) * (0.12 * specular + 0.10 * rim);
     let color = clamp(base + highlight, vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0));
 

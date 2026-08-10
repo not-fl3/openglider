@@ -271,7 +271,13 @@ class _UVMapBase:
         self.glider = glider_obj
         self.glider3d = self.glider.get_glider_3d()
         self.cell_x_values = self.glider.shape.rib_x_values
+        self._has_center_cell = bool(self.glider3d.has_center_cell)
         self._texture_bbox_cache: tuple[float, float, float, float] | None = None
+        self._panel_index_by_id: dict[int, tuple[int, int]] = {}
+        self._uv_panel_mesh_cache: dict[int, openglider.rs.mesh.Mesh] = {}
+        for cell_no, cell in enumerate(self.glider3d.cells):
+            for panel_idx, panel in enumerate(cell.panels):
+                self._panel_index_by_id[id(panel)] = (cell_no, panel_idx)
 
     @staticmethod
     def _get_bbox(polylines: Iterable[openglider.rs.vector.PolyLine2D]) -> tuple[float, float, float, float]:
@@ -286,7 +292,7 @@ class _UVMapBase:
         return min_x, max_x, min_y, max_y
 
     def _can_mirror(self, cell_no: int) -> bool:
-        return cell_no > 0 or not self.glider3d.has_center_cell
+        return cell_no > 0 or not self._has_center_cell
 
     @staticmethod
     def _clamp01(value: float) -> float:
@@ -332,6 +338,10 @@ class _UVMapBase:
 
     def _resolve_panel_reference(self, panel: Panel) -> tuple[int, int]:
         """Resolve a panel instance to (cell_no, panel_idx)."""
+        cached = self._panel_index_by_id.get(id(panel))
+        if cached is not None:
+            return cached
+
         candidate_cells: list[int] = []
 
         if hasattr(panel, "cell_no"):
@@ -374,13 +384,28 @@ class _UVMapBase:
         mirrored: bool = False,
     ) -> tuple[float, float]:
         cell_no, panel_idx = self._resolve_panel_reference(panel)
-        cell = self.glider3d.cells[cell_no]
-        panel_obj = cell.panels[panel_idx]
+        panel_obj = self.glider3d.cells[cell_no].panels[panel_idx]
+        return self._transform_panel_local_coordinates_resolved(
+            cell_no=cell_no,
+            panel=panel_obj,
+            x=x,
+            y=y,
+            mirrored=mirrored,
+        )
+
+    def _transform_panel_local_coordinates_resolved(
+        self,
+        cell_no: int,
+        panel: Panel,
+        x: float,
+        y: float,
+        mirrored: bool = False,
+    ) -> tuple[float, float]:
         x_local = self._clamp01(x)
         y_local = self._clamp11(y)
         tx, ty = self._texture_point_from_panel_local(
             cell_no=cell_no,
-            panel=panel_obj,
+            panel=panel,
             x=x_local,
             y=y_local,
             mirrored=mirrored,
@@ -407,32 +432,12 @@ class _UVMapBase:
         boundary_only: bool = False,
     ) -> openglider.rs.wgpu.MeshActor:
         texture_map = texture if isinstance(texture, SVGTexture) else SVGTexture(texture)
-        panel_mesh = openglider.rs.mesh.Mesh(name="textured_panels")
-
-        for cell_no, panel_idx, cell, panel in self._iter_panels():
-            mesh_temp = panel.get_mesh(cell, numribs=numribs)
-            uv_original = mesh_temp.get_uv_coords()
-
-            if uv_original is not None:
-                uv_mapped = [
-                    self.transform_panel_local_coordinates(panel=panel, x=float(u), y=float(v), mirrored=False)
-                    for u, v in uv_original
-                ]
-                mesh_temp.set_uv_coords(uv_mapped)
-
-            panel_mesh += mesh_temp
-
-            if self._can_mirror(cell_no):
-                mesh_mirrored = mesh_temp.copy().mirror("y")
-                # Keep panel-local UV inputs stable; mirrored mesh mutates UV y values.
-                uv_source_m = uv_original if uv_original is not None else mesh_mirrored.get_uv_coords()
-                if uv_source_m is not None:
-                    uv_mapped_m = [
-                        self.transform_panel_local_coordinates(panel=panel, x=float(u), y=float(v), mirrored=True)
-                        for u, v in uv_source_m
-                    ]
-                    mesh_mirrored.set_uv_coords(uv_mapped_m)
-                panel_mesh += mesh_mirrored
+        panel_mesh_cached = self._uv_panel_mesh_cache.get(numribs)
+        if panel_mesh_cached is None:
+            panel_mesh = self._build_uv_panel_mesh(numribs)
+            self._uv_panel_mesh_cache[numribs] = panel_mesh.copy()
+        else:
+            panel_mesh = panel_mesh_cached.copy()
 
         image = texture_map.get_raster_bounded(8192, precision=precision, cache=cache_texture)
         # WGPU mandates MAX_TEXTURE_DIMENSION_2D <= 8192 on all conformant devices.
@@ -445,6 +450,37 @@ class _UVMapBase:
             )
         panel_mesh.set_texture_rgba(image.width, image.height, image.tobytes())
         return openglider.rs.wgpu.MeshActor(panel_mesh, draw_edges=draw_edges, boundary_only=boundary_only)
+
+    def _build_uv_panel_mesh(self, numribs: int) -> openglider.rs.mesh.Mesh:
+        panel_mesh = openglider.rs.mesh.Mesh(name="textured_panels")
+        map_local = self._transform_panel_local_coordinates_resolved
+
+        for cell_no, _panel_idx, cell, panel in self._iter_panels():
+            mesh_temp = panel.get_mesh(cell, numribs=numribs)
+            uv_original = mesh_temp.get_uv_coords()
+
+            if uv_original is not None:
+                uv_mapped = [
+                    map_local(cell_no=cell_no, panel=panel, x=u, y=v, mirrored=False)
+                    for u, v in uv_original
+                ]
+                mesh_temp.set_uv_coords(uv_mapped)
+
+            panel_mesh += mesh_temp
+
+            if self._can_mirror(cell_no):
+                mesh_mirrored = mesh_temp.copy().mirror("y")
+                # Keep panel-local UV inputs stable; mirrored mesh mutates UV y values.
+                uv_source_m = uv_original if uv_original is not None else mesh_mirrored.get_uv_coords()
+                if uv_source_m is not None:
+                    uv_mapped_m = [
+                        map_local(cell_no=cell_no, panel=panel, x=u, y=v, mirrored=True)
+                        for u, v in uv_source_m
+                    ]
+                    mesh_mirrored.set_uv_coords(uv_mapped_m)
+                panel_mesh += mesh_mirrored
+
+        return panel_mesh
 
     def get_layout(self) -> Layout:
         points: list[openglider.rs.vector.PolyLine2D] = []
@@ -537,6 +573,7 @@ class UVMapMirrored(_UVMapBase):
     def __init__(self, glider_obj: glider.ParametricGlider) -> None:
         super().__init__(glider_obj)
         self._rib_profile_to_y: list[openglider.rs.vector.Interpolation] = self._build_rib_profile_to_y()
+        self._y_pair_cache: dict[tuple[int, float], tuple[float, float]] = {}
 
     def _get_length(self, x: Percentage, rib: Rib) -> float:
         ik_front = rib.profile_2d.get_ik(0)
@@ -571,8 +608,16 @@ class UVMapMirrored(_UVMapBase):
     def _texture_y_raw(self, cell_no: int, x: float, y: float) -> float:
         x_local = self._clamp01(x)
         y_local = self._clamp11(y)
-        left = float(self._rib_profile_to_y[cell_no].get_value(y_local))
-        right = float(self._rib_profile_to_y[cell_no + 1].get_value(y_local))
+        key = (cell_no, y_local)
+        cached = self._y_pair_cache.get(key)
+        if cached is None:
+            cached = (
+                float(self._rib_profile_to_y[cell_no].get_value(y_local)),
+                float(self._rib_profile_to_y[cell_no + 1].get_value(y_local)),
+            )
+            self._y_pair_cache[key] = cached
+
+        left, right = cached
         return self._lerp(left, right, x_local)
 
     def _texture_point_from_panel_local(
@@ -634,7 +679,19 @@ class UVMapStacked(_UVMapBase):
         super().__init__(glider_obj)
         self._shape = self.glider.get_shape()
         self._upper_offset = 0.0
+        self._shape_point_cache: dict[tuple[int, float], tuple[float, float]] = {}
         _, _, self._upper_offset, _ = self._stacked_params(self._shape)
+
+    def _shape_point_cached(self, rib_no: int, chord_pos: float) -> tuple[float, float]:
+        key = (rib_no, chord_pos)
+        cached = self._shape_point_cache.get(key)
+        if cached is not None:
+            return cached
+
+        point = self._shape.get_point(rib_no, chord_pos)
+        cached = (float(point[0]), float(point[1]))
+        self._shape_point_cache[key] = cached
+        return cached
 
     def _stacked_params(
         self,
@@ -719,19 +776,20 @@ class UVMapStacked(_UVMapBase):
     ) -> tuple[float, float]:
         x_local = self._clamp01(x)
         y_local = self._clamp11(y)
+        is_lower = panel.is_lower()
 
-        if panel.is_lower():
+        if is_lower:
             chord_pos = max(y_local, 0.0)
         else:
             chord_pos = max(-y_local, 0.0)
 
-        p_l = self._shape.get_point(cell_no, chord_pos)
-        p_r = self._shape.get_point(cell_no + 1, chord_pos)
+        p_lx, p_ly = self._shape_point_cached(cell_no, chord_pos)
+        p_rx, p_ry = self._shape_point_cached(cell_no + 1, chord_pos)
 
-        tx = self._lerp(float(p_l[0]), float(p_r[0]), x_local)
-        ty = self._lerp(float(p_l[1]), float(p_r[1]), x_local)
+        tx = self._lerp(p_lx, p_rx, x_local)
+        ty = self._lerp(p_ly, p_ry, x_local)
 
-        if not panel.is_lower():
+        if not is_lower:
             ty += self._upper_offset
 
         if mirrored and self._can_mirror(cell_no):
