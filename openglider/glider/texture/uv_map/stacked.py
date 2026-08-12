@@ -73,6 +73,8 @@ class UVMapStacked(_UVMapBase):
 
         if is_upper:
             ty += self._upper_offset
+        else:
+            tx = -tx
 
         if mirrored and self._can_mirror(cell_no):
             tx = -tx

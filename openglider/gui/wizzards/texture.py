@@ -29,6 +29,46 @@ logger = logging.getLogger(__name__)
 WizardUVMap = UVMapMirrored | UVMapStacked
 
 
+class DelayedFileWatcher(QtCore.QObject):
+    """Debounce QFileSystemWatcher notifications until writes have settled."""
+
+    fileChanged = QtCore.Signal(str)
+
+    def __init__(self, parent: QtCore.QObject | None = None, delay_ms: int = 150):
+        super().__init__(parent)
+        self._watcher = QtCore.QFileSystemWatcher(self)
+        self._delay_timer = QtCore.QTimer(self)
+        self._delay_timer.setSingleShot(True)
+        self._delay_timer.setInterval(delay_ms)
+        self._delay_timer.timeout.connect(self._emit_pending_files)
+        self._pending_files: set[str] = set()
+        self._watcher.fileChanged.connect(self._on_file_changed)
+
+    def _on_file_changed(self, file_path: str) -> None:
+        if not file_path:
+            return
+        self._pending_files.add(file_path)
+        self._delay_timer.start()
+
+    def _emit_pending_files(self) -> None:
+        pending_files = sorted(self._pending_files)
+        self._pending_files.clear()
+        for file_path in pending_files:
+            self.fileChanged.emit(file_path)
+
+    def addPath(self, path: str) -> None:
+        self._watcher.addPath(path)
+
+    def removePath(self, path: str) -> None:
+        self._watcher.removePath(path)
+
+    def removePaths(self, paths: list[str] | tuple[str, ...] | set[str]) -> None:
+        self._watcher.removePaths(list(paths))
+
+    def files(self) -> list[str]:
+        return self._watcher.files()
+
+
 class TexturePanelsActor:
     """Wizard-only textured panel actor with explicit reload control."""
 
@@ -478,7 +518,7 @@ class TextureWizard(Wizard):
 
         self._cached_uv_maps: dict[tuple[int, UVMapMode], WizardUVMap] = {}
 
-        self._watcher = QtCore.QFileSystemWatcher(self)
+        self._watcher = DelayedFileWatcher(self)
         self._watcher.fileChanged.connect(self._on_texture_file_changed)
         self._deferred_3d_timer = QtCore.QTimer(self)
         self._deferred_3d_timer.setSingleShot(True)
