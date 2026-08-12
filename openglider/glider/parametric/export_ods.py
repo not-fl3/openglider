@@ -6,9 +6,8 @@ from typing import TYPE_CHECKING
 import openglider.rs
 
 from openglider.glider.parametric.arc import ExplicitArc, LeparaglidingArc
-from openglider.glider.parametric.leparagliding_shape import LeparaglidingShape
-from openglider.glider.parametric.parametric_shape import ParametricShape
-from openglider.glider.parametric.shape import PlanformShape
+from openglider.glider.parametric.shape import ParametricShape, LeparaglidingShape
+from openglider.glider.shape import Shape
 from openglider.glider.parametric.table.ballooning import BallooningTable
 from openglider.utils.table import Table
 from openglider.utils.types import CurveType
@@ -37,7 +36,7 @@ def get_split_tables(project: GliderProject) -> list[Table]:
     tables.append(get_geom_sheet(project.glider))
     tables.append(get_parametric_sheet(project.glider))
     if project.glider.texture.has_texture():
-        tables.append(project.glider.texture.export_table(include_svg=True))
+        tables.append(project.glider.texture.get_table())
     tables.append(get_airfoil_sheet(project.glider))
     tables.append(BallooningTable.from_list(project.glider.balloonings).table)
     
@@ -88,7 +87,7 @@ def get_glider_tables(glider: ParametricGlider) -> list[Table]:
     tables.append(BallooningTable.from_list(glider.balloonings).table)
     tables.append(get_parametric_sheet(glider))
     if glider.texture.has_texture():
-        tables.append(glider.texture.export_table(include_svg=False, asset_path=glider.texture.default_asset_path))
+        tables.append(glider.texture.get_table())
     tables.append(get_lines_sheet(glider))
     tables.append(glider.config.get_table())
     tables.append(glider.allowances.get_table())
@@ -178,7 +177,7 @@ def get_geom_sheet(glider_2d: ParametricGlider) -> Table:
         table[rib_no+1, 8] = profile_int.get_value(x)
         table[rib_no+1, 9] = ballooning_int.get_value(x)
     
-    if isinstance(glider_2d.shape, PlanformShape) and glider_2d.shape.config.has_stabicell:
+    if not isinstance(glider_2d.shape, Shape) and glider_2d.shape.config.has_stabicell:
         table = table.get_rows(0, table.num_rows-1)
 
     return table

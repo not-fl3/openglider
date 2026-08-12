@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 from collections.abc import Callable
 
 import openglider.rs
-from openglider.glider.parametric.leparagliding_shape import (
+from openglider.glider.parametric.shape.leparagliding_shape import (
     LeadingEdgeParams,
     LeparaglidingShape,
     LeparaglidingShapeParams,
     TrailingEdgeParams,
 )
-from openglider.glider.parametric.parametric_shape import ParametricShape
+from openglider.glider.parametric.shape import ParametricShape
 from openglider.glider.project import GliderProject
 from openglider.gui.qt import QtWidgets, QtCore
 from openglider.gui.views_2d import Canvas, DraggableLine, Line2D

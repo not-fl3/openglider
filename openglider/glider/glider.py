@@ -20,8 +20,7 @@ from openglider.utils.distribution import Distribution
 from openglider.vector.projection import flatten_list
 from openglider.lines.lineset import LineSet
 from openglider.lines.node import Node
-from openglider.vector.unit import Percentage
-from openglider.glider.texture import Texture, TextureStyle
+from openglider.glider.texture.texture import Texture
 
 if TYPE_CHECKING:
     from openglider.glider.cell.panel import Panel
@@ -36,37 +35,18 @@ class Glider:
     cells: list[Cell]
     lineset: LineSet
 
+    texture: Texture | None = None
+
     def __init__(
         self,
         cells: list[Cell] | None=None,
         lineset: LineSet=None,
-        texture: Texture | None=None,
-        texture_svg: str | None=None,
-        texture_style: TextureStyle="stacked",
+        texture: Texture | None=None
     ):
         self.cells: list[Cell] = cells or []
         self.lineset = lineset or LineSet([])
         if texture is not None:
             self.texture = texture.model_copy(deep=True)
-        else:
-            self.texture = Texture(style=texture_style, svg=texture_svg)
-
-    @property
-    def texture_svg(self) -> str | None:
-        return self.texture.svg
-
-    @texture_svg.setter
-    def texture_svg(self, value: str | None) -> None:
-        self.texture.svg = value
-
-    @property
-    def texture_style(self) -> TextureStyle:
-        return self.texture.style
-
-    @texture_style.setter
-    def texture_style(self, value: TextureStyle) -> None:
-        self.texture.style = Texture.normalize_style(value)
-
     def __json__(self) -> dict[str, Any]:
         new = self.copy()
         ribs = new.ribs[:]
@@ -78,11 +58,12 @@ class Glider:
             cell_dct["rib2"] = ribs.index(cell.rib2)
             cells.append(cell_dct)
 
-        return {"cells": cells,
-                "ribs": ribs,
-                "lineset": self.lineset,
+        return {
+            "cells": cells,
+            "ribs": ribs,
+            "lineset": self.lineset,
             "texture": self.texture,
-                }
+        }
 
     @classmethod
     def __from_json__(
@@ -91,8 +72,6 @@ class Glider:
         ribs: list[Rib],
         lineset: LineSet,
         texture: Texture | dict[str, Any] | None=None,
-        texture_svg: str | None=None,
-        texture_style: TextureStyle="stacked",
     ) -> Glider:
         cells_new = []
         for cell in cells:
@@ -104,7 +83,7 @@ class Glider:
             cells_new.append(Cell(**cell))
 
         if texture is None:
-            texture_obj = Texture(style=texture_style, svg=texture_svg)
+            texture_obj = None
         elif isinstance(texture, Texture):
             texture_obj = texture
         else:

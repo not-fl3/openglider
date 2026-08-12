@@ -1,58 +1,63 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from odfdo import Document, DrawImage, Element, Frame
 
-from openglider.utils.dataclass import BaseModel
+from openglider.glider.texture.texture import SVGTexture, Texture
+from openglider.glider.texture.uv_map.stacked import UVMapStacked
+from openglider.glider.texture.uv_map.mirrored import UVMapMirrored
+from openglider.utils.config_table import ConfigTable
 from openglider.utils.table import Table
+
+
+if TYPE_CHECKING:
+    from openglider.glider.glider import Glider
+    from openglider.glider.shape import Shape
 
 
 TextureStyle = Literal["mirrored", "stacked"]
 
 
-class Texture(BaseModel):
+class TextureTable(ConfigTable):
     table_name: ClassVar[str] = "Texture"
     default_asset_path: ClassVar[str] = "Pictures/openglider_texture.svg"
     package_url_prefix: ClassVar[str] = "vnd.sun.star.Package:"
 
     style: TextureStyle = "stacked"
+    dpi: int = 300
     svg: str | None = None
 
     def has_texture(self) -> bool:
         return bool(self.svg and self.svg.strip())
 
-    @classmethod
-    def normalize_style(cls, value: Any) -> TextureStyle:
-        if isinstance(value, str):
-            normalized = value.strip().lower()
-            if normalized in ("stacked", "mirrored"):
-                return normalized
-        return "stacked"
+    def get_texture(self, shape: Shape, glider3d: Glider) -> Texture | None:
+        if not self.has_texture():
+            return None
+
+        if self.style == "stacked":
+            uv_map = UVMapStacked(shape, glider3d)
+        else:
+            uv_map = UVMapMirrored(shape, glider3d)
+
+        svg_texture = SVGTexture(svg_data=self.svg, dpi=self.dpi)
+
+        return Texture(uv_map=uv_map, texture=svg_texture)
 
     @classmethod
-    def read_table(cls, table: Table | None) -> Texture:
-        if table is None or table.num_rows == 0:
-            return cls()
+    def _migrate_table(cls, data: dict[str, list[Any]]) -> dict[str, list[Any]]:
+        migrated = dict(data)
 
-        values: dict[str, str] = {}
-        for row in range(1, table.num_rows):
-            key_raw = table[row, 0]
-            if key_raw is None:
-                continue
-            key = str(key_raw).strip().lower()
-            if not key:
-                continue
-            value_raw = table[row, 1]
-            values[key] = "" if value_raw is None else str(value_raw)
+        svg_values = migrated.get("svg")
+        if svg_values:
+            svg_value = svg_values[0]
+            if svg_value is None:
+                migrated["svg"] = [None]
+            else:
+                svg_text = str(svg_value)
+                migrated["svg"] = [svg_text if svg_text.strip() else None]
 
-        style = cls.normalize_style(values.get("style", "stacked"))
-
-        svg_inline = values.get("svg")
-        if svg_inline:
-            return cls(style=style, svg=svg_inline)
-
-        return cls(style=style, svg=None)
+        return migrated
 
     @classmethod
     def get_asset_path_from_table(cls, table: Table | None) -> str | None:
@@ -166,27 +171,11 @@ class Texture(BaseModel):
             raise TypeError("read_embedded_svg_from_ods expects an odfdo Document")
         return cls._read_embedded_svg_from_document(ods_source, asset_path=asset_path)
 
-    def export_table(self, include_svg: bool = True, asset_path: str | None = None) -> Table:
-        table = Table(name=self.table_name)
-        table[0, 0] = "Key"
-        table[0, 1] = "Value"
-        table[1, 0] = "style"
-        table[1, 1] = self.style
-
-        row = 2
-        if asset_path:
-            table[row, 0] = "svg_asset"
-            table[row, 1] = f"{self.package_url_prefix}{asset_path}"
-            row += 1
-
-        svg_data = self.svg or ""
-        if not svg_data or not include_svg:
-            return table
-
-        table[row, 0] = "svg"
-        table[row, 1] = svg_data
-
-        return table
+    def get_table(self) -> Table:
+        return super().get_table(
+            exclude_fields={"svg"},
+            extra_rows=[("svg_asset", f"{self.package_url_prefix}{self.default_asset_path}")]
+        )
 
     @classmethod
     def _get_table_node(cls, document: Any, table_name: str) -> Any | None:

@@ -1,11 +1,12 @@
 import logging
 from pathlib import Path
 
+from openglider.glider.texture.texture import SVGTexture
 import openglider.mesh
 import openglider.rs
 from openglider.glider.glider import Glider
 from openglider.glider.project import GliderProject
-from openglider.glider.uv_map import SVGTexture, UVMap, UVMapMode
+from openglider.glider.texture.uv_map import UVMapMode
 from openglider.gui.views.compare.glider_3d.config import GliderViewConfig
 from openglider.gui.views_3d.widgets import View3D
 
@@ -25,7 +26,6 @@ class GliderActors:
         self.actors = {}
         self.config = None
         self._panel_texture_key: str | None = None
-        self._cached_uv_map: UVMap | None = None
         self._cached_project_svg_texture: SVGTexture | None = None
         self._cached_project_svg_hash: int | None = None
 
@@ -43,7 +43,7 @@ class GliderActors:
         project_svg_hash = hash(project_texture_svg)
         if self._cached_project_svg_hash != project_svg_hash:
             try:
-                self._cached_project_svg_texture = SVGTexture.from_svg_string(project_texture_svg)
+                self._cached_project_svg_texture = SVGTexture(project_texture_svg)
             except Exception:
                 logger.exception("failed to load inline project texture")
                 self._cached_project_svg_texture = None
@@ -74,19 +74,16 @@ class GliderActors:
         return openglider.rs.wgpu.MeshActor(panel_mesh, draw_edges=False)
 
     def get_panels_textured(self, numribs: int, config: GliderViewConfig) -> openglider.rs.wgpu.MeshActor:
-        if self._cached_uv_map is None:
-            self._cached_uv_map = UVMap(self.project.glider)
-        uv_map = self._cached_uv_map
-
         texture, uv_mode = self._get_effective_texture()
         if texture is None:
             return self.get_panels(numribs)
+
+        uv_map = self.glider_3d.texture.uv_map
 
         try:
             return uv_map.get_textured_panels_actor(
                 texture=texture,
                 numribs=numribs,
-                mode=uv_mode,
                 precision=config.texture_precision,
                 cache_texture=True,
             )

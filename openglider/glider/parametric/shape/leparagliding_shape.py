@@ -7,8 +7,7 @@ from typing import Any, Literal
 import openglider.rs
 
 from openglider.glider.parametric.config import ParametricGliderConfig
-from openglider.glider.parametric.shape import PlanformShape
-from openglider.glider.shape import Shape
+from openglider.glider.shape import Shape, ShapeBase
 from openglider.utils import linspace
 from openglider.utils.types import CurveType
 from openglider.vector.unit import Angle, Percentage
@@ -67,7 +66,7 @@ class LeparaglidingShapeParams:
 
 
 
-class LeparaglidingShape(PlanformShape):
+class LeparaglidingShape(ShapeBase):
     """Analytic planform evaluated from Leparagliding coefficients.
 
     Cell distribution is independent: it can still be an editable spline or a

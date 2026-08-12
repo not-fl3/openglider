@@ -363,7 +363,12 @@ class Table:
         tables: list[Table] = []
 
         for sheet in document.body.get_sheets():
-            table = cls(name=sheet.get_attribute("table:name") or "")
+            table_name = sheet.get_attribute("table:name")
+            if isinstance(table_name, str):
+                table_name = table_name.strip()
+            else:
+                table_name = ""
+            table = cls(name=table_name)
             row_no = 0
 
             for node in sheet.get_rows():

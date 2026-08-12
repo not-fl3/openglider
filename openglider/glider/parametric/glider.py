@@ -18,19 +18,17 @@ from openglider.glider.ballooning.new import BallooningBezierNeu
 from openglider.glider.cell import Cell
 from openglider.glider.cell.panel import Panel, PanelCut, PANELCUT_TYPES
 from openglider.glider.glider import Glider
-from openglider.glider.texture import Texture, TextureStyle
+from openglider.glider.texture.texture_table import TextureTable
 from openglider.glider.parametric.arc import ArcCurve
 from openglider.glider.parametric.export_ods import export_ods_2d
 from openglider.glider.parametric.import_ods import import_markdown_2d, import_ods_2d
-from openglider.glider.parametric.leparagliding_shape import LeparaglidingShape
-from openglider.glider.parametric.parametric_shape import ParametricShape
+from openglider.glider.parametric.shape import ParametricShape, LeparaglidingShape
 from openglider.glider.parametric.table import GliderTables
 from openglider.glider.rib import Rib, SingleSkinRib
 from openglider.utils import ZipCmp
 from openglider.utils.cache import cached_property
 from openglider.utils.dataclass import dataclass, Field
 from openglider.utils.distribution import Distribution
-from openglider.utils.table import Table
 from openglider.utils.types import CurveType, SymmetricCurveType
 from openglider.vector.unit import Percentage, Quantity
 
@@ -60,23 +58,7 @@ class ParametricGlider:
 
     num_interpolate: int=30
     num_profile: int | None=None
-    texture: Texture = Field(default_factory=Texture)
-
-    @property
-    def texture_svg(self) -> str | None:
-        return self.texture.svg
-
-    @texture_svg.setter
-    def texture_svg(self, value: str | None) -> None:
-        self.texture.svg = value
-
-    @property
-    def texture_style(self) -> TextureStyle:
-        return self.texture.style
-
-    @texture_style.setter
-    def texture_style(self, value: TextureStyle) -> None:
-        self.texture.style = Texture.normalize_style(value)
+    texture: TextureTable = Field(default_factory=TextureTable)
 
     @classmethod
     def import_ods(cls, path: str) -> ParametricGlider:
@@ -441,9 +423,7 @@ class ParametricGlider:
         logger.debug("get glider 3d")
 
         if glider is None:
-            glider = Glider(texture=self.texture.model_copy(deep=True))
-        else:
-            glider.texture = self.texture.model_copy(deep=True)
+            glider = Glider()
         
         ribs = []
 
@@ -579,6 +559,10 @@ class ParametricGlider:
         glider.lineset.calculate_sag = self.config.use_sag
         glider.lineset.recalc(glider=glider)
         glider.lineset.rename_lines()
+
+        logger.info("apply texture")
+        if self.texture.has_texture():
+            glider.texture = self.texture.get_texture(self.get_shape(), glider)
 
         return glider
 

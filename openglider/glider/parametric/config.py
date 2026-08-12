@@ -1,95 +1,14 @@
 import re
-from typing import Any, ClassVar, Self, Annotated
+from typing import Any, Self, Annotated
 
 from packaging.version import Version
 import openglider.rs
 import pydantic
 
 from openglider.lines.node import Node
-from openglider.utils.dataclass import BaseModel
-from openglider.utils.table import Table
-from openglider.vector import unit
+from openglider.utils.config_table import ConfigTable
 from openglider.vector.unit import Angle, Length, Percentage
 from openglider.version import __version__
-
-adapters: dict[type, Any] = {}
-
-def get_adapter(cls: type) -> Any:
-    if cls not in adapters:
-        try:
-            adapter: Any = pydantic.TypeAdapter(cls).validate_python
-        except pydantic.errors.PydanticSchemaGenerationError:
-            adapter = cls
-        
-        adapters[cls] = adapter
-
-    return adapters[cls]
-
-
-class ConfigTable(BaseModel):
-    @classmethod
-    def _migrate_table(cls, data: dict[str, list[Any]]) -> dict[str, list[Any]]:
-        return data
-    
-    
-    @classmethod
-    def read_table(cls, table: Table) -> Self:
-        raw_data = {}
-        for current_row in range(1, table.num_rows):
-            key = str(table[current_row, 0]).lower()
-            if key:
-                raw_data[key] = [table[current_row, i] for i in range(1, table.num_columns)]
-        
-        raw_data = cls._migrate_table(raw_data)
-        data = {}
-
-        for key, value in raw_data.items():
-            if key in cls.model_fields:
-                target_type = cls.model_fields[key].annotation
-                adapter = get_adapter(target_type)  # type: ignore
-
-                assert target_type is not None
-
-                if target_type == openglider.rs.vector.Vector3D:
-                    data_length = 3
-                else:
-                    data_length = 1
-                
-                try:
-                    if data_length == 1:
-                        data[key] = adapter(value[0])
-                    else:
-                        data[key] = adapter(value)
-                except pydantic.ValidationError as e:
-                    if value[0]is None:
-                        continue
-                    else:
-                        raise e
-
-        return cls(**data)
-    
-    table_name: ClassVar[str] = "Data"
-    def get_table(self) -> Table:
-        table = Table(name=self.table_name)
-        table[0,0] = "Key"
-        table[0,1] = "Values"
-
-        #dct = self.model_dump()
-        for i, (key, value) in enumerate(self):
-            if key == "version":
-                value = [Version(__version__)]
-            elif isinstance(value, openglider.rs.vector.Vector3D):
-                value = list(value)
-            elif isinstance(value, unit.Quantity):
-                value = [str(value)]
-            else:
-                value = [value]
-            
-            table[i+1, 0] = key
-            for column, column_value in enumerate(value):
-                table[i+1,column+1] = column_value
-
-        return table
 
 class SewingAllowanceConfig(ConfigTable):
     table_name = "Sewing Allowance"
@@ -147,6 +66,11 @@ class ParametricGliderConfig(ConfigTable):
         data = super().__json__()
         data["version"] = str(self.version)
         return data
+
+    def _serialize_table_value(self, key: str, value: Any) -> list[Any]:
+        if key == "version":
+            return [Version(__version__)]
+        return super()._serialize_table_value(key, value)
 
     def get_lower_attachment_points(self) -> dict[str, Node]:
         points = {

@@ -14,11 +14,7 @@ from openglider.airfoil import Profile2D
 
 from openglider.glider.parametric.arc import ArcCurve, ExplicitArc, LeparaglidingArc
 from openglider.glider.parametric.config import ParametricGliderConfig, SewingAllowanceConfig
-from openglider.glider.parametric.leparagliding_shape import (
-    LeparaglidingShape,
-    LeparaglidingShapeParams,
-)
-from openglider.glider.parametric.parametric_shape import ParametricShape
+from openglider.glider.parametric.shape import ParametricShape, LeparaglidingShape, LeparaglidingShapeParams
 from openglider.glider.parametric.table import GliderTables
 from openglider.glider.parametric.table.attachment_points import AttachmentPointTable, CellAttachmentPointTable
 from openglider.glider.parametric.table.ballooning import BallooningTable, transpose_columns
@@ -33,7 +29,7 @@ from openglider.glider.parametric.table.rib.holes import HolesTable
 from openglider.glider.parametric.table.rib.profile import ProfileModifierTable
 from openglider.glider.parametric.table.rib.rib import SingleSkinTable
 from openglider.glider.parametric.table.rigidfoil import CellRigidTable, RibRigidTable
-from openglider.glider.texture import Texture
+from openglider.glider.texture.texture_table import TextureTable
 from openglider.utils import linspace
 from openglider.utils.dataclass import BaseModel
 from openglider.utils.table import Table
@@ -48,7 +44,7 @@ class TableNames:
     cell_sheet = "Cell Elements"
     rib_sheet = "Rib Elements"
     parametric_data = "Parametric"
-    texture = Texture.table_name
+    texture = TextureTable.table_name
 
 
 def _parse_leparagliding_column(table: Table, column: int) -> dict[str, Any]:
@@ -192,7 +188,7 @@ def import_markdown_glider(cls: type[ParametricGlider], tables: list[Table] | di
         table_dct.get(TableNames.parametric_data, Table()), cell_num, config
     )
     balloonings = BallooningTable(table=table_dct.get(BallooningTable.table_name, Table()))
-    texture = Texture.read_table(table_dct.get(TableNames.texture))
+    texture = TextureTable.read_table(table_dct.get(TableNames.texture))
 
     attachment_points_lower = config.get_lower_attachment_points()
     lineset_table = LineSetTable(table=table_dct.get(LineSetTable.table_name, Table()), lower_attachment_points=attachment_points_lower)
@@ -257,14 +253,18 @@ def import_ods_glider(
         config_table = tables[7]
     config = ParametricGliderConfig.read_table(config_table or Table())
     sewing_allowances = SewingAllowanceConfig.read_table(table_dct.get(SewingAllowanceConfig.table_name, Table()))
-    texture_table = table_dct.get(TableNames.texture)
-    texture = Texture.read_table(texture_table)
-    if texture.svg is None and source_document is not None:
-        texture.svg = Texture.read_embedded_svg_from_ods(
-            source_document,
-            asset_path=Texture.get_asset_path_from_table(texture_table),
-        )
 
+    texture_table = table_dct.get(TableNames.texture)
+
+    if texture_table is None:
+        texture = TextureTable()
+    else:
+        texture = TextureTable.read_table(texture_table)
+        if texture.svg is None and source_document is not None:
+            texture.svg = TextureTable.read_embedded_svg_from_ods(
+                source_document,
+                asset_path=TextureTable.get_asset_path_from_table(texture_table),
+            )
 
     logger.info(f"Loading file version {config.version}")
     # ------------

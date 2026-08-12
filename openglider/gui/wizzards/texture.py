@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 
+from openglider.glider.glider import Glider
+from openglider.glider.texture.texture import SVGTexture, Texture
 import openglider.rs
 from openglider.glider.project import GliderProject
-from openglider.glider.uv_map import SVGTexture, UVMap, UVMapMode
+from openglider.glider.texture.uv_map import UVMapMode
+from openglider.glider.texture.uv_map.mirrored import UVMapMirrored
+from openglider.glider.texture.uv_map.stacked import UVMapStacked
 from openglider.gui.qt import QtCore, QtGui, QtWidgets
 from openglider.gui.views.compare.glider_3d.config import GliderViewConfig
 from openglider.gui.views_2d.mpl.canvas import PlotCanvas
@@ -22,17 +26,23 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+WizardUVMap = UVMapMirrored | UVMapStacked
+
 
 class TexturePanelsActor:
     """Wizard-only textured panel actor with explicit reload control."""
 
-    def __init__(self, project: GliderProject):
+    def __init__(
+        self,
+        project: GliderProject,
+        get_uv_map: Callable[[Glider, UVMapMode], WizardUVMap],
+    ):
         self.project = project
-        self.glider_3d = self.project.get_glider_3d()
+        self._get_uv_map = get_uv_map
+        self.glider_3d: Glider | None = None
         self.texture_svg_path: str | None = None
         self.texture_uv_mode: UVMapMode = "stacked"
         self.texture_precision: float = 0.35
-        self._cached_uv_map: UVMap | None = None
         self._cached_svg_texture: SVGTexture | None = None
         self._cached_svg_texture_key: str | None = None
 
@@ -80,7 +90,7 @@ class TexturePanelsActor:
             cache_key = f"path:{texture_path.resolve()}"
             if self._cached_svg_texture_key != cache_key:
                 try:
-                    self._cached_svg_texture = SVGTexture(texture_path)
+                    self._cached_svg_texture = SVGTexture.read(texture_path)
                 except Exception:
                     logger.exception("failed to load SVG texture: %s", texture_path)
                     return None
@@ -95,7 +105,7 @@ class TexturePanelsActor:
         cache_key = f"inline:{hash(project_texture_svg)}"
         if self._cached_svg_texture_key != cache_key:
             try:
-                self._cached_svg_texture = SVGTexture.from_svg_string(project_texture_svg)
+                self._cached_svg_texture = SVGTexture(project_texture_svg)
             except Exception:
                 logger.exception("failed to load inline project texture")
                 return None
@@ -104,23 +114,23 @@ class TexturePanelsActor:
         return self._cached_svg_texture
 
     def get_actor(self, numribs: int, profile_numpoints: int) -> openglider.rs.wgpu.MeshActor:
-        self.glider_3d = self.project.get_glider_3d().copy()
-        self.glider_3d.profile_numpoints = profile_numpoints
-        for rib in self.glider_3d.ribs:
-            rib.get_hull()
+        if self.glider_3d is None or getattr(self.glider_3d, "profile_numpoints", None) != profile_numpoints:
+            self.glider_3d = self.project.get_glider_3d().copy()
+            self.glider_3d.profile_numpoints = profile_numpoints
+            for rib in self.glider_3d.ribs:
+                rib.get_hull()
 
         texture = self._load_texture()
         if texture is None:
             return self._get_panels(numribs)
 
-        if self._cached_uv_map is None:
-            self._cached_uv_map = UVMap(self.project.glider)
+        uv_map = self._get_uv_map(self.glider_3d, self.texture_uv_mode)
+        self.glider_3d.texture = Texture(uv_map=uv_map, texture=texture)
 
         try:
-            return self._cached_uv_map.get_textured_panels_actor(
+            return uv_map.get_textured_panels_actor(
                 texture=texture,
                 numribs=numribs,
-                mode=self.texture_uv_mode,
                 precision=self.texture_precision,
                 cache_texture=True,
             )
@@ -132,6 +142,7 @@ class TexturePanelsActor:
 class TextureWizardWidget(QtWidgets.QGroupBox):
     changed = QtCore.Signal()
     reload_requested = QtCore.Signal()
+    export_requested = QtCore.Signal()
 
     def __init__(self, parent: QtWidgets.QWidget, app: MainWindow) -> None:
         super().__init__("Texture Wizard", parent)
@@ -164,7 +175,7 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         path_layout.addWidget(self._btn_clear, 1, 1)
 
         self._btn_export = QtWidgets.QPushButton("Save Texture Template...", self)
-        self._btn_export.clicked.connect(self._export_uv_map)
+        self._btn_export.clicked.connect(self.export_requested)
         path_layout.addWidget(self._btn_export, 1, 2)
 
         self._btn_reload = QtWidgets.QPushButton("Reload Now", self)
@@ -241,38 +252,14 @@ class TextureWizardWidget(QtWidgets.QGroupBox):
         self._btn_reload.setEnabled(False)
         self.changed.emit()
 
-    def _export_uv_map(self) -> None:
-        project = None
-        for entry in self.app.state.projects.elements.values():
-            project = entry.element
-            break
-
-        if project is None:
-            QtWidgets.QMessageBox.warning(self, "Export UV Map", "No glider loaded.")
-            return
-
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self,
-            "Export UV Map Template",
-            "",
-            "SVG files (*.svg)",
-        )
-        if not filename:
-            return
-        if not filename.lower().endswith(".svg"):
-            filename += ".svg"
-
-        try:
-            uv_map = UVMap(project.glider)
-            layout = uv_map.get_layout(mode=self.uv_mode)
-            layout.export_svg(filename, border=0.0)
-        except Exception:
-            logger.exception("Failed to export UV map SVG")
-            QtWidgets.QMessageBox.critical(self, "Export UV Map", "Export failed - see log for details.")
-
-
 class Texture3DPreview(QtWidgets.QWidget):
-    def __init__(self, parent: QtWidgets.QWidget, app: MainWindow, glider: GliderProject) -> None:
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget,
+        app: MainWindow,
+        glider: GliderProject,
+        get_uv_map: Callable[[Glider, UVMapMode], WizardUVMap],
+    ) -> None:
         super().__init__(parent)
         self.app = app
         self.glider = glider
@@ -295,7 +282,7 @@ class Texture3DPreview(QtWidgets.QWidget):
 
         self.view_3d.render_widget.destroyed.connect(self._on_view_destroyed)
 
-        self.actor = TexturePanelsActor(self.glider)
+        self.actor = TexturePanelsActor(self.glider, get_uv_map)
 
         self.texture_svg_path: str | None = None
         self.texture_uv_mode: UVMapMode = "stacked"
@@ -358,7 +345,11 @@ class Texture3DPreview(QtWidgets.QWidget):
 
 
 class Texture2DPreview(QtWidgets.QWidget):
-    def __init__(self, parent: QtWidgets.QWidget) -> None:
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget,
+        get_uv_map: Callable[[Glider, UVMapMode], WizardUVMap],
+    ) -> None:
         super().__init__(parent)
         self.setLayout(QtWidgets.QVBoxLayout())
 
@@ -366,7 +357,7 @@ class Texture2DPreview(QtWidgets.QWidget):
         self.canvas.grid = True
         self.canvas.update_settings()
         expect_value(self.layout()).addWidget(self.canvas)
-        self._uv_map: UVMap | None = None
+        self._get_uv_map = get_uv_map
         self._panel_polys_by_mode: dict[UVMapMode, list[list[tuple[float, float]]]] = {}
         self._bbox_by_mode: dict[UVMapMode, tuple[float, float, float, float]] = {}
         self._cached_texture_path: str | None = None
@@ -378,7 +369,7 @@ class Texture2DPreview(QtWidgets.QWidget):
 
     def _get_panel_polys(
         self,
-        project: GliderProject,
+        glider_3d: Glider,
         uv_mode: UVMapMode,
     ) -> tuple[list[list[tuple[float, float]]], tuple[float, float, float, float]]:
         cached_polys = self._panel_polys_by_mode.get(uv_mode)
@@ -386,10 +377,8 @@ class Texture2DPreview(QtWidgets.QWidget):
         if cached_polys is not None and cached_bbox is not None:
             return cached_polys, cached_bbox
 
-        if self._uv_map is None:
-            self._uv_map = UVMap(project.glider)
-
-        layout = self._uv_map.get_layout(mode=uv_mode)
+        uv_map = self._get_uv_map(glider_3d, uv_mode)
+        layout = uv_map.get_layout()
         panel_polys: list[list[tuple[float, float]]] = []
         for part in layout.parts:
             for polyline in part.layers["marks"]:
@@ -433,7 +422,8 @@ class Texture2DPreview(QtWidgets.QWidget):
         axes = self.canvas.axes
         axes.clear()
 
-        panel_polys, (min_x, max_x, min_y, max_y) = self._get_panel_polys(project, uv_mode)
+        glider_3d = project.get_glider_3d()
+        panel_polys, (min_x, max_x, min_y, max_y) = self._get_panel_polys(glider_3d, uv_mode)
 
         if texture_svg_path:
             texture_path = Path(texture_svg_path)
@@ -441,7 +431,7 @@ class Texture2DPreview(QtWidgets.QWidget):
                 try:
                     texture_path_str = str(texture_path)
                     if self._cached_texture_path != texture_path_str:
-                        self._cached_texture = SVGTexture(texture_path)
+                        self._cached_texture = SVGTexture.read(texture_path)
                         self._cached_texture_path = texture_path_str
 
                     texture = self._cached_texture
@@ -486,6 +476,8 @@ class TextureWizard(Wizard):
     def __init__(self, app: MainWindow, project: GliderProject):
         super().__init__(app, project)
 
+        self._cached_uv_maps: dict[tuple[int, UVMapMode], WizardUVMap] = {}
+
         self._watcher = QtCore.QFileSystemWatcher(self)
         self._watcher.fileChanged.connect(self._on_texture_file_changed)
         self._deferred_3d_timer = QtCore.QTimer(self)
@@ -503,6 +495,7 @@ class TextureWizard(Wizard):
 
         self._texture_widget = TextureWizardWidget(left_panel, app)
         self._texture_widget.changed.connect(self._on_texture_settings_changed)
+        self._texture_widget.export_requested.connect(self._export_uv_map)
         self._texture_widget.reload_requested.connect(self._reload_texture_from_disk)
         left_layout.addWidget(self._texture_widget)
 
@@ -516,8 +509,8 @@ class TextureWizard(Wizard):
         left_layout.addStretch()
 
         self._tabs = QtWidgets.QTabWidget(self)
-        self._preview_3d = Texture3DPreview(self._tabs, app, self.project)
-        self._preview_2d = Texture2DPreview(self._tabs)
+        self._preview_3d = Texture3DPreview(self._tabs, app, self.project, self._get_uv_map)
+        self._preview_2d = Texture2DPreview(self._tabs, self._get_uv_map)
         self._tabs.addTab(self._preview_2d, "2D Overlay")
         self._tabs.addTab(self._preview_3d, "3D View")
         self._tabs.setCurrentIndex(0)
@@ -529,9 +522,46 @@ class TextureWizard(Wizard):
         splitter.setSizes([360, 980])
         expect_value(self.layout()).addWidget(splitter)
 
-        self._texture_widget.set_uv_mode(self.project.glider.texture_style)
+        self._texture_widget.set_uv_mode(self.project.glider.texture.style)
 
         self._apply_settings()
+
+    @staticmethod
+    def _decode_texture_svg(svg_bytes: bytes) -> str | None:
+        for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+            try:
+                return svg_bytes.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return None
+
+    def _get_uv_map(self, glider_3d: Glider, uv_mode: UVMapMode) -> WizardUVMap:
+        cache_key = (id(glider_3d), uv_mode)
+        cached = self._cached_uv_maps.get(cache_key)
+        if cached is not None:
+            return cached
+
+        shape = self.project.glider.get_shape()
+
+        uv_map: WizardUVMap
+        if uv_mode == "mirrored":
+            uv_map = UVMapMirrored(shape, glider_3d)
+        else:
+            uv_map = UVMapStacked(shape, glider_3d)
+
+        self._cached_uv_maps[cache_key] = uv_map
+        return uv_map
+
+    def _apply_texture_to_glider(self, glider_3d: Glider, texture_svg: str | None, uv_mode: UVMapMode) -> None:
+        if not texture_svg:
+            glider_3d.texture = None
+            return
+
+        uv_map = self._get_uv_map(glider_3d, uv_mode)
+        glider_3d.texture = Texture(
+            uv_map=uv_map,
+            texture=SVGTexture(texture_svg, dpi=self.project.glider.texture.dpi),
+        )
 
     def _set_texture_watch_target(self) -> None:
         current_files = self._watcher.files()
@@ -568,19 +598,31 @@ class TextureWizard(Wizard):
         if svg_path:
             path = Path(svg_path)
             if path.exists():
-                svg_bytes = path.read_bytes()
-                for encoding in ("utf-8-sig", "utf-8", "latin-1"):
-                    try:
-                        texture_svg = svg_bytes.decode(encoding)
-                        break
-                    except UnicodeDecodeError:
-                        continue
+                texture_svg = self._decode_texture_svg(path.read_bytes())
 
         self.project.glider.texture.svg = texture_svg
         self.project.glider.texture.style = uv_mode
-        if self.project.glider_3d is not None:
-            self.project.glider_3d.texture.svg = texture_svg
-            self.project.glider_3d.texture.style = uv_mode
+        self._apply_texture_to_glider(self.project.get_glider_3d(), texture_svg, uv_mode)
+
+    def _export_uv_map(self) -> None:
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Export UV Map Template",
+            "",
+            "SVG files (*.svg)",
+        )
+        if not filename:
+            return
+        if not filename.lower().endswith(".svg"):
+            filename += ".svg"
+
+        try:
+            uv_map = self._get_uv_map(self.project.get_glider_3d(), self._texture_widget.uv_mode)
+            layout = uv_map.get_layout()
+            layout.export_svg(filename, border=0.0)
+        except Exception:
+            logger.exception("Failed to export UV map SVG")
+            QtWidgets.QMessageBox.critical(self, "Export UV Map", "Export failed - see log for details.")
 
     def _apply_as_new_glider(self) -> None:
         self._sync_model_texture(self._texture_widget.svg_path, self._texture_widget.uv_mode)

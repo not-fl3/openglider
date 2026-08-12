@@ -136,7 +136,7 @@ class PatternsNew:
         excel = get_glider_data(self.project, consumption=self.weight)
         excel_internal = get_glider_data_internal(self.project)
         excel.saveas(str(outdir / f"{self.project.name}_production.ods"))
-        excel_internal.saveas(outdir / f"{self.project.name}_internal.ods")
+        excel_internal.saveas(str(outdir / f"{self.project.name}_internal.ods"))
 
 
 class Patterns(PatternsNew):

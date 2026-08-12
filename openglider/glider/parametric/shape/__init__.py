@@ -1,0 +1,2 @@
+from openglider.glider.parametric.shape.parametric_shape import ParametricShape
+from openglider.glider.parametric.shape.leparagliding_shape import LeparaglidingShape, LeparaglidingShapeParams

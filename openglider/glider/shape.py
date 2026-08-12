@@ -19,29 +19,61 @@ logger = logging.getLogger(__name__)
 V2: TypeAlias = openglider.rs.vector.Vector2D
 
 class ShapeBase(abc.ABC):
+    @abc.abstractmethod
+    def copy(self) -> Self:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get_half_shape(self, zrot: list[Angle | None] | None = None) -> Shape:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get_shape(self) -> Shape:
+        raise NotImplementedError()
+
     @property
+    @abc.abstractmethod
     def has_center_cell(self) -> bool:
         raise NotImplementedError()
     
+    @abc.abstractmethod
     def get_point(self, x: float | int, y: float | Percentage) -> openglider.rs.vector.Vector2D:
         raise NotImplementedError()
 
+    @abc.abstractmethod
     def get_baseline(self, position: Percentage) -> openglider.rs.vector.PolyLine2D:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def chord_at(self, x: float) -> float:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def scale(self, x: float = 1.0, y: float | None = None) -> Any:
         raise NotImplementedError()
     
     @property
+    @abc.abstractmethod
     def cell_no(self) -> int:
         raise NotImplementedError()
 
     @property
+    @abc.abstractmethod
+    def half_cell_num(self) -> int:
+        raise NotImplementedError()
+
+    @property
+    @abc.abstractmethod
     def rib_no(self) -> int:
         raise NotImplementedError()
 
     @property
+    @abc.abstractmethod
     def ribs(self) -> list[tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]]:
         raise NotImplementedError()
 
     @property
+    @abc.abstractmethod
     def rib_x_values(self) -> list[float]:
         raise NotImplementedError()
     
@@ -56,25 +88,39 @@ class ShapeBase(abc.ABC):
         return cells
     
     @property
+    @abc.abstractmethod
     def span(self) -> float:
         raise NotImplementedError()
     
     @property
+    @abc.abstractmethod
     def chords(self) -> list[float]:
         raise NotImplementedError()#
     
     @property
+    @abc.abstractmethod
     def area(self) -> float:
         raise NotImplementedError()
     
     @property
     def aspect_ratio(self) -> float:
         return self.span ** 2 / self.area
+
+    @abc.abstractmethod
+    def get_sweep(self) -> float:
+        raise NotImplementedError()
     
 
 class Shape(ShapeBase, BaseModel):
     front: openglider.rs.vector.PolyLine2D
     back: openglider.rs.vector.PolyLine2D
+
+    def get_half_shape(self, zrot: list[Angle | None] | None = None) -> Shape:
+        del zrot
+        return self.copy()
+
+    def get_shape(self) -> Shape:
+        return self.copy()
 
     @property
     def has_center_cell(self) -> bool:
@@ -95,6 +141,11 @@ class Shape(ShapeBase, BaseModel):
             )
 
         return openglider.rs.vector.PolyLine2D(points)
+
+    def chord_at(self, x: float) -> float:
+        front = self.front.get(x)
+        back = self.back.get(x)
+        return (back - front).length()
 
     def get_panel(self, cell_no: int, panel: Panel) -> tuple[V2, V2, V2, V2]:
         p1 = self.get_point(cell_no, panel.cut_front.x_left)
@@ -119,6 +170,10 @@ class Shape(ShapeBase, BaseModel):
     @property
     def ribs(self) -> list[tuple[openglider.rs.vector.Vector2D, openglider.rs.vector.Vector2D]]:
         return [(self.front.get(x), self.back.get(x)) for x in range(len(self.front.nodes))]
+
+    @property
+    def rib_x_values(self) -> list[float]:
+        return [float(point[0]) for point in self.front.nodes]
 
     @property
     def span(self) -> float:
@@ -161,6 +216,20 @@ class Shape(ShapeBase, BaseModel):
         self.back = self.back.scale(openglider.rs.vector.Vector2D([x, y]))
 
         return self
+
+    def get_sweep(self) -> float:
+        ribs = self.ribs
+        if not ribs:
+            return 0.0
+
+        center_front, center_back = ribs[0]
+        tip_front, tip_back = ribs[-1]
+        denominator = float((center_front + center_back)[1])
+        if abs(denominator) < 1e-9:
+            return 0.0
+
+        delta_y = float(((tip_front + tip_back) * 0.5)[1] - center_front[1])
+        return delta_y / denominator
     
     def copy(self, *args: Any, **kwargs: Any) -> Self:
         return self.__class__(

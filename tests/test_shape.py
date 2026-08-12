@@ -1,10 +1,10 @@
 import unittest
 
-from openglider.glider.parametric.leparagliding_shape import (
+from openglider.glider.parametric.shape.leparagliding_shape import (
     LeparaglidingShape,
     LeparaglidingShapeParams,
 )
-from openglider.glider.parametric.parametric_shape import ParametricShape
+from openglider.glider.parametric.shape.parametric_shape import ParametricShape
 from openglider.glider.parametric.shape import PlanformShape
 from tests.helpers import GliderTestCase
 
