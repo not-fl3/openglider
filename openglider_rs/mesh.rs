@@ -4,6 +4,8 @@ use spade::{ConstrainedDelaunayTriangulation, Point2, RefinementParameters, Tria
 use std::collections::HashMap;
 use std::fs;
 
+use serde_json::{json, Map, Value};
+
 use crate::vector::{PolyLine2D, Vector2D, Vector3D};
 
 #[derive(Clone, Debug)]
@@ -196,6 +198,8 @@ pub struct MeshObject {
     pub name: String,
     #[pyo3(get, set)]
     pub color: (u8, u8, u8),
+    #[pyo3(get, set)]
+    pub textured: bool,
     #[pyo3(get)]
     pub lines: Vec<Line>,
     #[pyo3(get)]
@@ -207,10 +211,11 @@ pub struct MeshObject {
 #[pymethods]
 impl MeshObject {
     #[new]
-    #[pyo3(signature = (name, color = (255, 255, 255), lines = None, triangles = None, quads = None))]
+    #[pyo3(signature = (name, color = (255, 255, 255), textured = false, lines = None, triangles = None, quads = None))]
     fn new(
         name: String,
         color: (u8, u8, u8),
+        textured: bool,
         lines: Option<Vec<Line>>,
         triangles: Option<Vec<Triangle>>,
         quads: Option<Vec<Quad>>,
@@ -218,6 +223,7 @@ impl MeshObject {
         Self {
             name,
             color,
+            textured,
             lines: lines.unwrap_or_default(),
             triangles: triangles.unwrap_or_default(),
             quads: quads.unwrap_or_default(),
@@ -275,6 +281,7 @@ impl Mesh {
             let mut object = MeshObject {
                 name: object_name,
                 color,
+                textured: false,
                 lines: Vec::new(),
                 triangles: Vec::new(),
                 quads: Vec::new(),
@@ -383,6 +390,7 @@ impl Mesh {
                         MeshObject {
                             name: current_group.clone(),
                             color: parse_color_code(&current_group),
+                            textured: false,
                             lines: Vec::new(),
                             triangles: Vec::new(),
                             quads: Vec::new(),
@@ -649,16 +657,24 @@ impl Mesh {
         index
     }
 
-    #[pyo3(signature = (name, color = (255, 255, 255)))]
-    fn add_object(&mut self, name: String, color: (u8, u8, u8)) -> usize {
+    #[pyo3(signature = (name, color = (255, 255, 255), textured = false))]
+    fn add_object(&mut self, name: String, color: (u8, u8, u8), textured: bool) -> usize {
         self.objects.push(MeshObject {
             name,
             color,
+            textured,
             lines: Vec::new(),
             triangles: Vec::new(),
             quads: Vec::new(),
         });
         self.objects.len() - 1
+    }
+
+    #[pyo3(signature = (textured = true))]
+    fn set_all_objects_textured(&mut self, textured: bool) {
+        for object in &mut self.objects {
+            object.textured = textured;
+        }
     }
 
     fn add_line(&mut self, object_index: usize, line: PyRef<'_, Line>) {
@@ -1024,6 +1040,20 @@ impl Mesh {
         Ok(output)
     }
 
+    #[pyo3(signature = (path = None))]
+    fn export_gltf(&self, path: Option<&Bound<'_, PyAny>>) -> PyResult<String> {
+        let gltf = self.build_gltf()?;
+
+        if let Some(path_value) = path {
+            let path_string = stringify_path(path_value)?;
+            fs::write(&path_string, &gltf).map_err(|error| {
+                pyo3::exceptions::PyIOError::new_err(format!("failed to write {path_string}: {error}"))
+            })?;
+        }
+
+        Ok(gltf)
+    }
+
     fn merge_duplicate_points(&mut self, max_distance: f64) -> Vec<usize> {
         let vectors = self.point_vectors();
         let representatives = duplicate_representatives_impl(&vectors, max_distance);
@@ -1046,8 +1076,8 @@ impl Mesh {
 
         self.points = merged_points;
 
-        if let Some(old_uvs) = &self.uv_coords {
-            let mut new_uvs = vec![[0.0_f32, 0.0_f32]; self.points.len()];
+        if let Some(old_uvs) = self.uv_coords.as_ref() {
+            let mut new_uvs = vec![[0.0, 0.0]; self.points.len()];
             let mut seen = vec![false; self.points.len()];
             for (old_index, new_index) in old_to_new.iter().enumerate() {
                 if !seen[*new_index] {
@@ -1150,6 +1180,7 @@ impl Mesh {
 
         for other_object in &other.objects {
             if let Some(target) = self.objects.iter_mut().find(|obj| obj.name == other_object.name) {
+                target.textured = target.textured || other_object.textured;
                 target.lines.extend(other_object.lines.iter().map(|line| Line {
                     a: line.a + offset,
                     b: line.b + offset,
@@ -1169,6 +1200,7 @@ impl Mesh {
                 self.objects.push(MeshObject {
                     name: other_object.name.clone(),
                     color: other_object.color,
+                    textured: other_object.textured,
                     lines: other_object.lines.iter().map(|line| Line {
                         a: line.a + offset,
                         b: line.b + offset,
@@ -1187,6 +1219,281 @@ impl Mesh {
                 });
             }
         }
+    }
+
+    fn position_bounds(&self) -> ([f32; 3], [f32; 3]) {
+        let mut min_values = [f32::INFINITY; 3];
+        let mut max_values = [f32::NEG_INFINITY; 3];
+
+        for point in &self.points {
+            let values = [point.x as f32, point.y as f32, point.z as f32];
+            for index in 0..3 {
+                min_values[index] = min_values[index].min(values[index]);
+                max_values[index] = max_values[index].max(values[index]);
+            }
+        }
+
+        (min_values, max_values)
+    }
+
+    fn positions_as_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(self.points.len() * 12);
+        for point in &self.points {
+            bytes.extend_from_slice(&(point.x as f32).to_le_bytes());
+            bytes.extend_from_slice(&(point.y as f32).to_le_bytes());
+            bytes.extend_from_slice(&(point.z as f32).to_le_bytes());
+        }
+        bytes
+    }
+
+    fn build_gltf(&self) -> PyResult<String> {
+        if self.points.is_empty() {
+            return Err(pyo3::exceptions::PyValueError::new_err("cannot export an empty mesh to glTF"));
+        }
+
+        let has_texture = self.texture.is_some();
+        if has_texture {
+            match self.uv_coords.as_ref() {
+                Some(uvs) if uvs.len() == self.points.len() => {}
+                Some(uvs) => {
+                    return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                        "uv_coords length ({}) must match vertex count ({}) when exporting textured glTF",
+                        uvs.len(),
+                        self.points.len(),
+                    )));
+                }
+                None => {
+                    return Err(pyo3::exceptions::PyValueError::new_err(
+                        "textured glTF export requires uv_coords",
+                    ));
+                }
+            }
+        }
+
+        let mut buffer = Vec::new();
+        let mut buffer_views: Vec<Value> = Vec::new();
+        let mut accessors: Vec<Value> = Vec::new();
+        let mut meshes_primitives: Vec<Value> = Vec::new();
+        let mut materials: Vec<Value> = Vec::new();
+
+        let (position_min, position_max) = self.position_bounds();
+        let position_bytes = self.positions_as_bytes();
+        let (position_offset, position_length) = push_aligned_bytes(&mut buffer, &position_bytes);
+
+        let mut position_view = Map::new();
+        position_view.insert("buffer".to_string(), Value::from(0u32));
+        position_view.insert("byteOffset".to_string(), Value::from(position_offset));
+        position_view.insert("byteLength".to_string(), Value::from(position_length));
+        position_view.insert("target".to_string(), Value::from(34962u32));
+        buffer_views.push(Value::Object(position_view));
+
+        let mut position_accessor = Map::new();
+        position_accessor.insert("bufferView".to_string(), Value::from(0u32));
+        position_accessor.insert("componentType".to_string(), Value::from(5126u32));
+        position_accessor.insert("count".to_string(), Value::from(self.points.len()));
+        position_accessor.insert("type".to_string(), Value::from("VEC3"));
+        position_accessor.insert("min".to_string(), json!(position_min));
+        position_accessor.insert("max".to_string(), json!(position_max));
+        accessors.push(Value::Object(position_accessor));
+
+        let uv_accessor_index = if let Some(uv_coords) = &self.uv_coords {
+            let uv_bytes = uvs_as_bytes(uv_coords);
+            let (uv_offset, uv_length) = push_aligned_bytes(&mut buffer, &uv_bytes);
+
+            let mut uv_view = Map::new();
+            uv_view.insert("buffer".to_string(), Value::from(0u32));
+            uv_view.insert("byteOffset".to_string(), Value::from(uv_offset));
+            uv_view.insert("byteLength".to_string(), Value::from(uv_length));
+            uv_view.insert("target".to_string(), Value::from(34962u32));
+            let uv_view_index = buffer_views.len();
+            buffer_views.push(Value::Object(uv_view));
+
+            let mut uv_accessor = Map::new();
+            uv_accessor.insert("bufferView".to_string(), Value::from(uv_view_index));
+            uv_accessor.insert("componentType".to_string(), Value::from(5126u32));
+            uv_accessor.insert("count".to_string(), Value::from(self.points.len()));
+            uv_accessor.insert("type".to_string(), Value::from("VEC2"));
+            let uv_accessor_index = accessors.len();
+            accessors.push(Value::Object(uv_accessor));
+            Some(uv_accessor_index)
+        } else {
+            None
+        };
+
+        let texture_uri = if let Some(texture) = &self.texture {
+            let png_bytes = encode_png_rgba(texture.width, texture.height, &texture.rgba)?;
+            Some(format!("data:image/png;base64,{}", encode_base64(&png_bytes)))
+        } else {
+            None
+        };
+
+        let mut next_accessor_index = accessors.len();
+        let has_shared_texture = texture_uri.is_some();
+
+        for object in &self.objects {
+            if !object.lines.is_empty() {
+                let line_indices = object_line_indices(object);
+                let (line_offset, line_length) = push_u32_indices(&mut buffer, &line_indices);
+                let line_view_index = buffer_views.len();
+
+                let mut line_view = Map::new();
+                line_view.insert("buffer".to_string(), Value::from(0u32));
+                line_view.insert("byteOffset".to_string(), Value::from(line_offset));
+                line_view.insert("byteLength".to_string(), Value::from(line_length));
+                line_view.insert("target".to_string(), Value::from(34963u32));
+                buffer_views.push(Value::Object(line_view));
+
+                let mut line_accessor = Map::new();
+                line_accessor.insert("bufferView".to_string(), Value::from(line_view_index));
+                line_accessor.insert("componentType".to_string(), Value::from(5125u32));
+                line_accessor.insert("count".to_string(), Value::from(line_indices.len()));
+                line_accessor.insert("type".to_string(), Value::from("SCALAR"));
+                accessors.push(Value::Object(line_accessor));
+
+                let line_accessor_index = next_accessor_index;
+                next_accessor_index += 1;
+
+                let mut attributes = Map::new();
+                attributes.insert("POSITION".to_string(), Value::from(0u32));
+
+                let mut primitive = Map::new();
+                primitive.insert("attributes".to_string(), Value::Object(attributes));
+                primitive.insert("indices".to_string(), Value::from(line_accessor_index));
+                primitive.insert("mode".to_string(), Value::from(1u32));
+                meshes_primitives.push(Value::Object(primitive));
+            }
+
+            let surface_indices = object_surface_indices(object);
+            if surface_indices.is_empty() {
+                continue;
+            }
+
+            let (surface_offset, surface_length) = push_u32_indices(&mut buffer, &surface_indices);
+            let surface_view_index = buffer_views.len();
+
+            let mut surface_view = Map::new();
+            surface_view.insert("buffer".to_string(), Value::from(0u32));
+            surface_view.insert("byteOffset".to_string(), Value::from(surface_offset));
+            surface_view.insert("byteLength".to_string(), Value::from(surface_length));
+            surface_view.insert("target".to_string(), Value::from(34963u32));
+            buffer_views.push(Value::Object(surface_view));
+
+            let mut surface_accessor = Map::new();
+            surface_accessor.insert("bufferView".to_string(), Value::from(surface_view_index));
+            surface_accessor.insert("componentType".to_string(), Value::from(5125u32));
+            surface_accessor.insert("count".to_string(), Value::from(surface_indices.len()));
+            surface_accessor.insert("type".to_string(), Value::from("SCALAR"));
+            accessors.push(Value::Object(surface_accessor));
+
+            let surface_accessor_index = next_accessor_index;
+            next_accessor_index += 1;
+
+            let mut attributes = Map::new();
+            attributes.insert("POSITION".to_string(), Value::from(0u32));
+
+            if let Some(uv_index) = uv_accessor_index {
+                attributes.insert("TEXCOORD_0".to_string(), Value::from(uv_index));
+            }
+
+            let material_index = if has_shared_texture && object.textured && uv_accessor_index.is_some() {
+                let textured_material_index = materials.len();
+                let mut textured_pbr = Map::new();
+                textured_pbr.insert("baseColorFactor".to_string(), json!([1.0, 1.0, 1.0, 1.0]));
+                textured_pbr.insert("metallicFactor".to_string(), Value::from(0.0));
+                textured_pbr.insert("roughnessFactor".to_string(), Value::from(1.0));
+                textured_pbr.insert("baseColorTexture".to_string(), json!({"index": 0, "texCoord": 0}));
+
+                let mut textured_material = Map::new();
+                textured_material.insert("name".to_string(), Value::from(format!("{} texture", object.name)));
+                textured_material.insert("doubleSided".to_string(), Value::from(true));
+                textured_material.insert("alphaMode".to_string(), Value::from("BLEND"));
+                textured_material.insert("pbrMetallicRoughness".to_string(), Value::Object(textured_pbr));
+                textured_material.insert(
+                    "extras".to_string(),
+                    json!({"part": object.name, "layer": "texture"}),
+                );
+                materials.push(Value::Object(textured_material));
+                textured_material_index
+            } else {
+                let mut pbr = Map::new();
+                pbr.insert("baseColorFactor".to_string(), color_factor(object.color));
+                pbr.insert("metallicFactor".to_string(), Value::from(0.0));
+                pbr.insert("roughnessFactor".to_string(), Value::from(1.0));
+
+                let mut material = Map::new();
+                material.insert("name".to_string(), Value::from(object.name.clone()));
+                material.insert("doubleSided".to_string(), Value::from(true));
+                material.insert("pbrMetallicRoughness".to_string(), Value::Object(pbr));
+                material.insert(
+                    "extras".to_string(),
+                    json!({"part": object.name, "layer": "base"}),
+                );
+                materials.push(Value::Object(material));
+                materials.len() - 1
+            };
+
+            let mut primitive = Map::new();
+            primitive.insert("attributes".to_string(), Value::Object(attributes));
+            primitive.insert("indices".to_string(), Value::from(surface_accessor_index));
+            primitive.insert("material".to_string(), Value::from(material_index));
+            primitive.insert("mode".to_string(), Value::from(4u32));
+            primitive.insert(
+                "extras".to_string(),
+                json!({"part": object.name, "layer": if has_shared_texture && object.textured && uv_accessor_index.is_some() { "texture" } else { "base" }}),
+            );
+            meshes_primitives.push(Value::Object(primitive));
+        }
+
+        if meshes_primitives.is_empty() {
+            return Err(pyo3::exceptions::PyValueError::new_err("mesh has no exportable primitives"));
+        }
+
+        let mut buffer_object = Map::new();
+        buffer_object.insert("byteLength".to_string(), Value::from(buffer.len()));
+        buffer_object.insert(
+            "uri".to_string(),
+            Value::from(format!("data:application/octet-stream;base64,{}", encode_base64(&buffer))),
+        );
+
+        let mut mesh_object = Map::new();
+        mesh_object.insert("name".to_string(), Value::from(self.name.clone()));
+        mesh_object.insert("primitives".to_string(), Value::Array(meshes_primitives));
+
+        let mut root = Map::new();
+        root.insert(
+            "asset".to_string(),
+            json!({
+                "version": "2.0",
+                "generator": "OpenGlider",
+            }),
+        );
+        root.insert("scene".to_string(), Value::from(0u32));
+        root.insert("scenes".to_string(), json!([{ "nodes": [0] }]));
+        root.insert("nodes".to_string(), json!([{ "mesh": 0, "name": self.name.clone() }]));
+        root.insert("meshes".to_string(), Value::Array(vec![Value::Object(mesh_object)]));
+        root.insert("buffers".to_string(), Value::Array(vec![Value::Object(buffer_object)]));
+        root.insert("bufferViews".to_string(), Value::Array(buffer_views));
+        root.insert("accessors".to_string(), Value::Array(accessors));
+
+        if !materials.is_empty() {
+            root.insert("materials".to_string(), Value::Array(materials));
+        }
+
+        if let Some(uri) = texture_uri {
+            root.insert(
+                "samplers".to_string(),
+                json!([{ "magFilter": 9729, "minFilter": 9729, "wrapS": 33071, "wrapT": 33071 }]),
+            );
+            root.insert("textures".to_string(), json!([{ "sampler": 0, "source": 0 }]));
+            root.insert(
+                "images".to_string(),
+                json!([{ "uri": uri, "name": format!("{} texture", self.name) }]),
+            );
+        }
+
+        serde_json::to_string_pretty(&Value::Object(root)).map_err(|error| {
+            pyo3::exceptions::PyValueError::new_err(format!("failed to serialize glTF JSON: {error}"))
+        })
     }
 
     fn polygons_dict(&self, py: Python<'_>) -> HashMap<String, Vec<(Py<PyAny>, Py<PyAny>)>> {
@@ -1232,6 +1539,129 @@ fn stringify_path(path: &Bound<'_, PyAny>) -> PyResult<String> {
     }
     let text = path.str()?.to_str()?.to_string();
     Ok(text)
+}
+
+fn color_factor(color: (u8, u8, u8)) -> Value {
+    json!([
+        color.0 as f32 / 255.0,
+        color.1 as f32 / 255.0,
+        color.2 as f32 / 255.0,
+        1.0,
+    ])
+}
+
+fn encode_base64(data: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut output = String::with_capacity(((data.len() + 2) / 3) * 4);
+
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0];
+        let b1 = *chunk.get(1).unwrap_or(&0);
+        let b2 = *chunk.get(2).unwrap_or(&0);
+
+        output.push(TABLE[(b0 >> 2) as usize] as char);
+        output.push(TABLE[(((b0 & 0b11) << 4) | (b1 >> 4)) as usize] as char);
+
+        if chunk.len() > 1 {
+            output.push(TABLE[(((b1 & 0b1111) << 2) | (b2 >> 6)) as usize] as char);
+        } else {
+            output.push('=');
+        }
+
+        if chunk.len() > 2 {
+            output.push(TABLE[(b2 & 0b11_1111) as usize] as char);
+        } else {
+            output.push('=');
+        }
+    }
+
+    output
+}
+
+fn encode_png_rgba(width: u32, height: u32, rgba: &[u8]) -> PyResult<Vec<u8>> {
+    if width == 0 || height == 0 {
+        return Err(pyo3::exceptions::PyValueError::new_err("texture image must have non-zero dimensions"));
+    }
+
+    let expected = width as usize * height as usize * 4usize;
+    if rgba.len() != expected {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "rgba length ({}) does not match width*height*4 ({})",
+            rgba.len(),
+            expected,
+        )));
+    }
+
+    let mut png_data = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut png_data, width, height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().map_err(|error| {
+            pyo3::exceptions::PyValueError::new_err(format!("failed to create PNG encoder: {error}"))
+        })?;
+        writer.write_image_data(rgba).map_err(|error| {
+            pyo3::exceptions::PyValueError::new_err(format!("failed to encode PNG image: {error}"))
+        })?;
+    }
+
+    Ok(png_data)
+}
+
+fn push_aligned_bytes(buffer: &mut Vec<u8>, bytes: &[u8]) -> (usize, usize) {
+    while buffer.len() % 4 != 0 {
+        buffer.push(0);
+    }
+    let offset = buffer.len();
+    buffer.extend_from_slice(bytes);
+    (offset, bytes.len())
+}
+
+fn uvs_as_bytes(uv_coords: &[[f32; 2]]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(uv_coords.len() * 8);
+    for uv in uv_coords {
+        bytes.extend_from_slice(&uv[0].to_le_bytes());
+        bytes.extend_from_slice(&uv[1].to_le_bytes());
+    }
+    bytes
+}
+
+fn push_u32_indices(buffer: &mut Vec<u8>, indices: &[u32]) -> (usize, usize) {
+    let mut bytes = Vec::with_capacity(indices.len() * 4);
+    for index in indices {
+        bytes.extend_from_slice(&index.to_le_bytes());
+    }
+    push_aligned_bytes(buffer, &bytes)
+}
+
+fn object_surface_indices(object: &MeshObject) -> Vec<u32> {
+    let mut indices = Vec::with_capacity(object.triangles.len() * 3 + object.quads.len() * 6);
+
+    for triangle in &object.triangles {
+        indices.push(triangle.a as u32);
+        indices.push(triangle.b as u32);
+        indices.push(triangle.c as u32);
+    }
+
+    for quad in &object.quads {
+        indices.push(quad.a as u32);
+        indices.push(quad.b as u32);
+        indices.push(quad.c as u32);
+        indices.push(quad.a as u32);
+        indices.push(quad.c as u32);
+        indices.push(quad.d as u32);
+    }
+
+    indices
+}
+
+fn object_line_indices(object: &MeshObject) -> Vec<u32> {
+    let mut indices = Vec::with_capacity(object.lines.len() * 2);
+    for line in &object.lines {
+        indices.push(line.a as u32);
+        indices.push(line.b as u32);
+    }
+    indices
 }
 
 fn extract_indices(py: Python<'_>, value: &Py<PyAny>) -> PyResult<Vec<usize>> {

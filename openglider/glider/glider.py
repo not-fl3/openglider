@@ -181,14 +181,25 @@ class Glider:
 
         return Mesh.from_indexed(ribs_flat, {"hull": polygons})
     
-    def get_mesh_all(self, numribs: int=10) -> Mesh:
+    def get_mesh_all(self, numribs: int=10, use_texture: bool=False) -> Mesh:
 
         mesh = Mesh()
+        if self.texture is None:
+            use_texture = False
+
+        if use_texture:
+            mesh = self.texture.uv_map.get_textured_panels_mesh(
+                self.texture.texture,
+                numribs=numribs,
+                precision=1.0,
+                cache_texture=True,
+            )
 
         for i, cell in enumerate(self.cells):
             cell_mesh = Mesh()
-            for panel in cell.panels:
-                cell_mesh += panel.get_mesh(cell, numribs=numribs)
+            if not use_texture:
+                for panel in cell.panels:
+                    cell_mesh += panel.get_mesh(cell, numribs=numribs)
             for strap in cell.straps:
                 cell_mesh += strap.get_mesh(cell)
             for diagonal in cell.diagonals:

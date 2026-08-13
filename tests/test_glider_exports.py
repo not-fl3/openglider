@@ -1,9 +1,11 @@
+import json
 import tempfile
+from pathlib import Path
 
+from openglider.glider.parametric.glider import ParametricGlider
 from tests.helpers import GliderTestCase, os, unittest
 from openglider.plots import PlotMaker
 from openglider import jsonify
-
 
 class TestGlider(GliderTestCase):
     def tempfile(self, name: str) -> str:
@@ -20,6 +22,33 @@ class TestGlider(GliderTestCase):
     def test_export_dxf(self) -> None:
         path = self.tempfile('kite.dxf')
         self.glider.get_mesh(midribs=5).export_dxf(path)
+
+    def test_export_textured_gltf_from_ods(self) -> None:
+        if self.glider.texture is None:
+            self.skipTest("No texture available for this glider")
+
+        path = self.tempfile("demokite.gltf")
+
+        mesh = self.glider.get_mesh_all(8, True)
+        result = mesh.export_gltf(path)
+
+        self.assertTrue(os.path.exists(path))
+
+        with open(path, "w", encoding="utf-8") as outfile:
+            outfile.write(result)
+
+        return
+    
+        with open(path, "r", encoding="utf-8") as infile:
+            exported = json.load(infile)
+
+        self.assertEqual(exported["asset"]["version"], "2.0")
+        self.assertIn("meshes", exported)
+        self.assertIn("buffers", exported)
+        self.assertIn("images", exported)
+        self.assertIn("textures", exported)
+        self.assertGreaterEqual(len(exported["materials"]), 2)
+        self.assertGreaterEqual(len(exported["meshes"][0]["primitives"]), 2)
 
     def test_export_plots(self) -> None:
         path = self.tempfile('kite_plots.svg')

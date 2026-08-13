@@ -188,7 +188,6 @@ def import_markdown_glider(cls: type[ParametricGlider], tables: list[Table] | di
         table_dct.get(TableNames.parametric_data, Table()), cell_num, config
     )
     balloonings = BallooningTable(table=table_dct.get(BallooningTable.table_name, Table()))
-    texture = TextureTable.read_table(table_dct.get(TableNames.texture))
 
     attachment_points_lower = config.get_lower_attachment_points()
     lineset_table = LineSetTable(table=table_dct.get(LineSetTable.table_name, Table()), lower_attachment_points=attachment_points_lower)
@@ -224,7 +223,6 @@ def import_markdown_glider(cls: type[ParametricGlider], tables: list[Table] | di
                          config=config,
                          speed=config.speed,
                          glide=config.glide,
-                         texture=texture,
                          **geometry_parametric.model_dump())
 
     return glider_2d

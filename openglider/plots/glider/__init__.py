@@ -139,7 +139,6 @@ class PlotMaker:
             else:
                 rib_plot = self.RibPlot(rib, self.config)
 
-            print("ribplot: ", rib_plot)
             rib_plot.flatten(self.glider_3d)
 
             for hole in rib.holes:

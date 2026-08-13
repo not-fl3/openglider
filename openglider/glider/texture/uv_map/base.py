@@ -160,6 +160,17 @@ class _UVMapBase:
         boundary_only: bool = False,
     ) -> openglider.rs.wgpu.MeshActor:
         """Build a textured panel mesh actor with UVs mapped by this mode."""
+        panel_mesh = self.get_textured_panels_mesh(texture, numribs=numribs, precision=precision, cache_texture=cache_texture)
+        return openglider.rs.wgpu.MeshActor(panel_mesh, draw_edges=draw_edges, boundary_only=boundary_only)
+
+    def get_textured_panels_mesh(
+        self,
+        texture: SVGTexture,
+        numribs: int = 3,
+        precision: float = 1.0,
+        cache_texture: bool = True,
+    ) -> openglider.rs.mesh.Mesh:
+        """Build a textured panel mesh with UVs mapped by this mode."""
         panel_mesh_cached = self._uv_panel_mesh_cache.get(numribs)
         if panel_mesh_cached is None:
             panel_mesh = self._build_uv_panel_mesh(numribs)
@@ -177,7 +188,7 @@ class _UVMapBase:
                 Image.Resampling.LANCZOS,
             )
         panel_mesh.set_texture_rgba(image.width, image.height, image.tobytes())
-        return openglider.rs.wgpu.MeshActor(panel_mesh, draw_edges=draw_edges, boundary_only=boundary_only)
+        return panel_mesh
 
     def _build_uv_panel_mesh(self, numribs: int) -> openglider.rs.mesh.Mesh:
         """Generate panel mesh with per-vertex UVs for this mapping mode."""
@@ -187,6 +198,7 @@ class _UVMapBase:
         for cell_no, _panel_idx, cell, panel in self._iter_panels():
             mesh_temp = panel.get_mesh(cell, numribs=numribs)
             uv_original = mesh_temp.get_uv_coords()
+            mesh_temp.set_all_objects_textured(True)
 
             if uv_original is not None:
                 uv_mapped = [
@@ -199,6 +211,7 @@ class _UVMapBase:
 
             if self._can_mirror(cell_no):
                 mesh_mirrored = mesh_temp.copy().mirror("y")
+                mesh_mirrored.set_all_objects_textured(True)
                 # Keep panel-local UV inputs stable; mirrored mesh mutates UV y values.
                 uv_source_m = uv_original if uv_original is not None else mesh_mirrored.get_uv_coords()
                 if uv_source_m is not None:
